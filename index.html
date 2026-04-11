@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mini Gemini White</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #f0f2f5;
+            --bg-header: #f0f2f5;
+            --bg-bubble-ai: #ffffff;
+            --bg-bubble-user: #e9eef6;
+            --text-main: #1f1f1f;
+            --border-color: #e5e7eb;
+            --input-bg: #ffffff;
+        }
+
+        .dark-mode-active {
+            --bg-main: #131314;
+            --bg-header: #131314;
+            --bg-bubble-ai: #1e1f20;
+            --bg-bubble-user: #0b57d0;
+            --text-main: #e3e3e3;
+            --border-color: #333537;
+            --input-bg: #1e1f20;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            height: 100dvh;
+            /* 适配移动端动态高度 */
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+
+        header {
+            background-color: var(--bg-header);
+            border-bottom: 1px solid var(--border-color) !important;
+            flex-shrink: 0;
+        }
+
+        #chat-box {
+            flex: 1;
+            min-height: 0;
+            /* 关键：允许 flex 子元素收缩，防止溢出 */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 针对 Chrome, Safari 和 Edge (WebKit 引擎) */
+        #chat-box::-webkit-scrollbar {
+            width: 6px;
+            /* 调细滚动条 */
+        }
+
+        #chat-box::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.1);
+            /* 滚动条滑块颜色，设为浅色 */
+            border-radius: 10px;
+        }
+
+        .dark-mode-active #chat-box::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.1);
+            /* 暗黑模式下的滑块颜色 */
+        }
+
+        #chat-box::-webkit-scrollbar-track {
+            background: transparent;
+            /* 隐藏滚动条轨道 */
+        }
+
+        /* 针对 Firefox */
+        #chat-box {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+        }
+
+        footer {
+            flex-shrink: 0;
+            background-color: var(--bg-main);
+            padding-bottom: env(safe-area-inset-bottom, 1rem);
+        }
+
+        .ai-bubble {
+            background-color: var(--bg-bubble-ai) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-main) !important;
+        }
+
+        .user-bubble {
+            background-color: var(--bg-bubble-user) !important;
+            color: var(--text-main) !important;
+        }
+
+        /* Markdown & Code Styles */
+        .markdown-body pre {
+            background: #282c34 !important;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+        }
+
+        img.emoji {
+            height: 1.2em;
+            display: inline-block;
+        }
+    </style>
+</head>
+
+<body class="font-sans">
+
+    <header class="p-4 px-6 flex items-center justify-between z-50">
+        <div class="flex items-center gap-2">
+            <span class="font-bold text-xl text-[#0b57d0] tracking-tight">Mini Gemini</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="downloadChat()"
+                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+            </button>
+            <button onclick="toggleDarkMode()"
+                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500">
+                <svg id="mode-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z">
+                    </path>
+                </svg>
+            </button>
+            <button onclick="newChat()" class="p-2 hover:bg-red-50 rounded-full text-gray-500 hover:text-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                    </path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main id="chat-box" class="p-4 space-y-6 max-w-3xl mx-auto w-full">
+        <div class="flex justify-start">
+            <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">你好！有什么我可以帮你的吗？</div>
+        </div>
+    </main>
+
+    <div id="ai-loading-template"
+        class="hidden flex justify-start items-start gap-3 px-4 max-w-3xl mx-auto w-full mb-6">
+        <div class="mt-4 flex-shrink-0">
+            <div class="w-4 h-4 border-2 border-[#0b57d0] border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div class="ai-bubble p-4 rounded-2xl shadow-sm text-sm italic opacity-70">正在思考...</div>
+    </div>
+
+    <footer>
+        <div class="max-w-3xl mx-auto p-4">
+            <div
+                class="flex items-end rounded-[28px] border border-gray-200 dark:border-gray-700 px-4 py-2 shadow-lg bg-white dark:bg-[#1e1f20] focus-within:ring-2 focus-within:ring-blue-500">
+                <textarea id="user-input" rows="1" placeholder="输入消息..."
+                    class="flex-1 bg-transparent border-none focus:outline-none text-base py-3 resize-none min-h-[48px] max-h-[150px] leading-relaxed text-gray-800 dark:text-gray-200"
+                    oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
+                <button id="send-btn" onclick="send()"
+                    class="ml-2 bg-[#0b57d0] text-white px-6 py-2.5 rounded-full font-medium mb-1 shrink-0 active:scale-95 transition-transform">发送</button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 初始化配置
+        marked.setOptions({
+            highlight: (code, lang) => {
+                if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true, gfm: true
+        });
+
+        const chatBox = document.getElementById('chat-box');
+        const input = document.getElementById('user-input');
+        const loading = document.getElementById('ai-loading-template');
+        const sendBtn = document.getElementById('send-btn');
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark-mode-active');
+            document.getElementById('mode-icon').innerHTML = isDark
+                ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path>`
+                : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
+        }
+
+        async function send() {
+            const text = input.value.trim();
+            if (!text || sendBtn.disabled) return;
+
+            sendBtn.disabled = true;
+            input.value = '';
+            input.style.height = 'auto';
+
+            chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${text}</div></div>`);
+            chatBox.appendChild(loading);
+            loading.classList.remove('hidden');
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                loading.classList.add('hidden');
+
+                const id = 'ai-' + Date.now();
+                chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-4"><div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body"></div></div>`);
+                const div = document.getElementById(id);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let full = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                            try {
+                                const json = JSON.parse(line.substring(6));
+                                full += json.choices[0].delta.content || "";
+                                div.innerHTML = marked.parse(full);
+                                div.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                                twemoji.parse(div, { folder: 'svg', ext: '.svg' });
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            } catch (e) { }
+                        }
+                    }
+                }
+            } catch (err) {
+                loading.classList.add('hidden');
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        function downloadChat() {
+            const messages = chatBox.querySelectorAll('.user-bubble, .ai-bubble');
+            let content = "--- 聊天记录 ---\n\n";
+            messages.forEach(el => {
+                const role = el.classList.contains('user-bubble') ? "【用户】" : "【AI】";
+                content += `${role}\n${el.innerText.trim()}\n\n`;
+            });
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat-${Date.now()}.txt`;
+            a.click();
+        }
+
+        async function newChat() { if (confirm("清空所有对话？")) { await fetch('/api/new-chat'); location.reload(); } }
+
+        window.onload = () => {
+            loadHistory();
+            input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+        };
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    // 清空默认的欢迎语（可选）
+                    chatBox.innerHTML = '';
+
+                    data.forEach(m => {
+                        const isUser = m.role === 'user';
+                        const content = isUser ? m.content : marked.parse(m.content);
+                        const html = `
+                    <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
+                        <div class="${isUser ? 'user-bubble' : 'ai-bubble'} p-4 rounded-2xl max-w-[90%] shadow-sm markdown-body">
+                            ${content}
+                        </div>
+                    </div>`;
+                        chatBox.insertAdjacentHTML('beforeend', html);
+                    });
+
+                    // 渲染代码高亮和表情
+                    chatBox.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                    twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
+
+                    // 滚动到底部
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            } catch (e) {
+                console.error("加载历史记录失败:", e);
+            }
+        }
+    </script>
+</body>
+
+</html>
