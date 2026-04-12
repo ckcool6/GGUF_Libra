@@ -50,7 +50,7 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	totalTokens := 0
 
 	// 预留固定 Token 给 System Prompt (假设 50)
-	systemPrompt := Message{Role: "system", Content: "你是一个简洁的助手。"}
+	systemPrompt := Message{Role: "system", Content: "你是一个可爱的助手。"}
 	totalTokens += getMessageTokens(tkm, systemPrompt.Role, systemPrompt.Content)
 
 	// 从最新的消息开始往前遍历
@@ -156,10 +156,10 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		"model":    "x-ai/grok-4.1-fast",
 		"messages": sendHistory,
 		"stream":   true,
-		"reasoning": map[string]interface{}{
+		/* "reasoning": map[string]interface{}{
 			"effort":     "medium", // 降低思考成本
 			"max_tokens": 1000,     // 封顶思考字数
-		},
+		}, */
 	}
 	jsonData, _ := json.Marshal(payload)
 
@@ -167,7 +167,9 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequestWithContext(r.Context(), "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewBuffer(jsonData))
 	req.Header.Set("Authorization", "Bearer "+OpenRouterKey)
 	req.Header.Set("Content-Type", "application/json")
-
+	req.Header.Set("HTTP-Referer", "http://localhost:8024") // 你的项目地址
+	req.Header.Set("X-Title", "MyGrokBotV1")
+	
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
 		return

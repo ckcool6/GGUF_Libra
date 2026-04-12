@@ -209,10 +209,14 @@
             input.value = '';
             input.style.height = 'auto';
 
+            // 1. 插入用户消息
             chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${text}</div></div>`);
+
+            // 2. 显示加载动画
             chatBox.appendChild(loading);
             loading.classList.remove('hidden');
-            chatBox.scrollTop = chatBox.scrollHeight;
+
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
             try {
                 const response = await fetch('/api/chat', {
@@ -220,37 +224,68 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
-                loading.classList.add('hidden');
+
+                // --- 注意：这里不要立即隐藏 loading ---
 
                 const id = 'ai-' + Date.now();
-                chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-4"><div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body"></div></div>`);
-                const div = document.getElementById(id);
-
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let full = "";
+                let isFirstChunk = true; // 标记是否是第一个数据块
+                let aiBubbleDiv = null; // 预定义气泡容器
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
+
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
+
                     for (const line of lines) {
                         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                             try {
                                 const json = JSON.parse(line.substring(6));
-                                full += json.choices[0].delta.content || "";
-                                div.innerHTML = marked.parse(full);
-                                div.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
-                                twemoji.parse(div, { folder: 'svg', ext: '.svg' });
-                                chatBox.scrollTop = chatBox.scrollHeight;
+                                const content = json.choices[0].delta.content || "";
+
+                                if (content) {
+                                    full += content;
+
+                                    if (isFirstChunk) {
+                                        // 1. 隐藏“正在思考”
+                                        loading.classList.add('hidden');
+
+                                        // 2. 创建气泡的同时直接填入内容，避免出现空气泡
+                                        const id = 'ai-' + Date.now();
+                                        const html = `
+                            <div class="flex justify-start mb-4">
+                                <div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
+                                    ${marked.parse(full)}
+                                </div>
+                            </div>`;
+                                        chatBox.insertAdjacentHTML('beforeend', html);
+
+                                        aiBubbleDiv = document.getElementById(id);
+                                        isFirstChunk = false;
+                                    } else {
+                                        // 后续内容正常更新
+                                        aiBubbleDiv.innerHTML = marked.parse(full);
+                                    }
+
+                                    // 渲染高亮和表情
+                                    aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                                    twemoji.parse(aiBubbleDiv, { folder: 'svg', ext: '.svg' });
+
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                }
                             } catch (e) { }
                         }
                     }
                 }
             } catch (err) {
                 loading.classList.add('hidden');
+                chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-4"><div class="ai-bubble p-4 rounded-2xl bg-red-100 text-red-600">连接错误，请检查后端。</div></div>`);
             } finally {
+                loading.classList.add('hidden'); // 保险起见，最后必须隐藏
                 sendBtn.disabled = false;
             }
         }
@@ -287,7 +322,7 @@
 
                     data.forEach(m => {
                         const isUser = m.role === 'user';
-                        const content = isUser ? m.content : marked.parse(m.content);
+                        const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;") : marked.parse(m.content);
                         const html = `
                     <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
                         <div class="${isUser ? 'user-bubble' : 'ai-bubble'} p-4 rounded-2xl max-w-[90%] shadow-sm markdown-body">
