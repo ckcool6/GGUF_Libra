@@ -15,7 +15,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. 加锁并处理对话历史
+	// 加锁并处理对话历史
 	mu.Lock()
 	// 将用户输入加入历史
 	chatHistory = append(chatHistory, Message{Role: "user", Content: reqBody.Message})
@@ -23,13 +23,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	sendHistory := filterMessagesByToken(chatHistory, 4000)
 	mu.Unlock()
 
-	// 2. 准备流式响应头
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	flusher, _ := w.(http.Flusher)
-
-	// 3. 构建请求
+	// 构建请求
 	payload := map[string]interface{}{
 		"model":    "x-ai/grok-4.1-fast",
 		"messages": sendHistory,
@@ -50,9 +44,18 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "API 请求失败"})
 		return
 	}
 	defer resp.Body.Close()
+
+	// --- 只有在成功获取 API 响应后，才宣告我们要开始流式传输了 ---
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	flusher, _ := w.(http.Flusher)
 
 	reader := bufio.NewReader(resp.Body)
 	var aiFullContent string
@@ -86,7 +89,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. 将 AI 回复存入历史并持久化
+	// 将 AI 回复存入历史并持久化
 	if aiFullContent != "" {
 		mu.Lock()
 		chatHistory = append(chatHistory, Message{Role: "assistant", Content: aiFullContent})
@@ -97,16 +100,15 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-		mu.Lock()         // 加锁
-		defer mu.Unlock() // 确保函数结束解锁
-		json.NewEncoder(w).Encode(chatHistory)
+	mu.Lock()         // 加锁
+	defer mu.Unlock() // 确保函数结束解锁
+	json.NewEncoder(w).Encode(chatHistory)
 }
 
-func apiNewChatHandler(w http.ResponseWriter, r *http.Request){
+func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock() // 加锁
-		chatHistory = []Message{}
-		saveHistoryToFile()
-		mu.Unlock() // 解锁
-		w.WriteHeader(http.StatusOK)
+	chatHistory = []Message{}
+	saveHistoryToFile()
+	mu.Unlock() // 解锁
+	w.WriteHeader(http.StatusOK)
 }
-
