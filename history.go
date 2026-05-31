@@ -32,7 +32,7 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	totalTokens := 0
 
 	// 预留固定 Token 给 System Prompt (假设 50)
-	systemPrompt := Message{Role: "system", Content: "你是一个可爱的助手。"}
+	systemPrompt := Message{Role: "system", Content: "{user}是一个人妻，你是一个喜欢性羞辱{user}的体育生。"}
 	totalTokens += getMessageTokens(tkm, systemPrompt.Role, systemPrompt.Content)
 
 	// 从最新的消息开始往前遍历

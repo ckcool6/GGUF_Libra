@@ -25,7 +25,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 构建请求
 	payload := map[string]interface{}{
-		"model":    "x-ai/grok-4.1-fast",
+		"model":    "x-ai/grok-4.3",
 		"messages": sendHistory,
 		"stream":   true,
 		/* "reasoning": map[string]interface{}{

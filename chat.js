@@ -1,4 +1,3 @@
-
 // 初始化配置
 marked.setOptions({
     highlight: (code, lang) => {
@@ -13,8 +12,21 @@ const input = document.getElementById('user-input');
 const loading = document.getElementById('ai-loading-template');
 const sendBtn = document.getElementById('send-btn');
 
+// 修改：完美的暗黑模式切换逻辑
 function toggleDarkMode() {
-    const isDark = document.documentElement.classList.toggle('dark-mode-active');
+    // 同时切换自定义变量类名与 Tailwind 官方类名
+    document.documentElement.classList.toggle('dark-mode-active');
+    const isDark = document.documentElement.classList.toggle('dark');
+    
+    // 写入本地存储备忘录，以便刷新时读取
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    
+    // 刷新图标显示
+    updateModeIcon(isDark);
+}
+
+// 提取出更新图标的独立函数，方便复用
+function updateModeIcon(isDark) {
     document.getElementById('mode-icon').innerHTML = isDark
         ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path>`
         : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
@@ -44,14 +56,11 @@ async function send() {
             body: JSON.stringify({ message: text })
         });
 
-        // --- 注意：这里不要立即隐藏 loading ---
-
-        const id = 'ai-' + Date.now();
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let full = "";
-        let isFirstChunk = true; // 标记是否是第一个数据块
-        let aiBubbleDiv = null; // 预定义气泡容器
+        let isFirstChunk = true; 
+        let aiBubbleDiv = null; 
 
         while (true) {
             const { done, value } = await reader.read();
@@ -70,10 +79,8 @@ async function send() {
                             full += content;
 
                             if (isFirstChunk) {
-                                // 1. 隐藏“正在思考”
                                 loading.classList.add('hidden');
 
-                                // 2. 创建气泡的同时直接填入内容，避免出现空气泡
                                 const id = 'ai-' + Date.now();
                                 const html = `
                     <div class="flex justify-start mb-4">
@@ -86,11 +93,9 @@ async function send() {
                                 aiBubbleDiv = document.getElementById(id);
                                 isFirstChunk = false;
                             } else {
-                                // 后续内容正常更新
                                 aiBubbleDiv.innerHTML = marked.parse(full);
                             }
 
-                            // 渲染高亮和表情
                             aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                             twemoji.parse(aiBubbleDiv, { folder: 'svg', ext: '.svg' });
 
@@ -104,7 +109,7 @@ async function send() {
         loading.classList.add('hidden');
         chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-4"><div class="ai-bubble p-4 rounded-2xl bg-red-100 text-red-600">连接错误，请检查后端。</div></div>`);
     } finally {
-        loading.classList.add('hidden'); // 保险起见，最后必须隐藏
+        loading.classList.add('hidden'); 
         sendBtn.disabled = false;
     }
 }
@@ -124,11 +129,42 @@ function downloadChat() {
     a.click();
 }
 
-async function newChat() { if (confirm("清空所有对话？")) { await fetch('/api/new-chat'); location.reload(); } }
+async function newChat() { 
+    if (confirm("清空所有对话？")) { 
+        try {
+            await fetch('/api/new-chat'); 
+            chatBox.innerHTML = `
+                <div class="flex justify-start mb-4">
+                    <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
+                        你好！有什么我可以帮你的吗？
+                    </div>
+                </div>`;
+        } catch (e) {
+            console.error("清空对话失败:", e);
+        }
+    } 
+}
 
+// 修改：初始化逻辑，全面引入对备忘录的检查
 window.onload = () => {
+    const savedTheme = localStorage.getItem('theme');
+    
+    // 如果备忘录存着黑夜，或者本地没有存过但系统是黑夜模式
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark-mode-active', 'dark');
+        updateModeIcon(true);
+    } else {
+        document.documentElement.classList.remove('dark-mode-active', 'dark');
+        updateModeIcon(false);
+    }
+    
     loadHistory();
-    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    input.addEventListener('keydown', e => { 
+        if (e.key === 'Enter' && !e.shiftKey) { 
+            e.preventDefault(); 
+            send(); 
+        } 
+    });
 };
 
 async function loadHistory() {
@@ -136,7 +172,6 @@ async function loadHistory() {
         const res = await fetch('/api/history');
         const data = await res.json();
         if (data && data.length > 0) {
-            // 清空默认的欢迎语（可选）
             chatBox.innerHTML = '';
 
             data.forEach(m => {
@@ -151,11 +186,9 @@ async function loadHistory() {
                 chatBox.insertAdjacentHTML('beforeend', html);
             });
 
-            // 渲染代码高亮和表情
             chatBox.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
             twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
 
-            // 滚动到底部
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch (e) {
