@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkoukk/tiktoken-go"
 	"os"
+
+	"github.com/pkoukk/tiktoken-go"
 )
 
 // 内存中的对话历史
@@ -32,7 +33,7 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	totalTokens := 0
 
 	// 预留固定 Token 给 System Prompt (假设 50)
-	systemPrompt := Message{Role: "system", Content: "{user}是一个人妻，你是一个喜欢性羞辱{user}的体育生。"}
+	systemPrompt := Message{Role: "system", Content: ""}
 	totalTokens += getMessageTokens(tkm, systemPrompt.Role, systemPrompt.Content)
 
 	// 从最新的消息开始往前遍历
