@@ -8,59 +8,100 @@ import (
 	"github.com/pkoukk/tiktoken-go"
 )
 
-// 内存中的对话历史
-var chatHistory []Message
+var (
+	chatHistory  []Message          
+	tkm          *tiktoken.Tiktoken 
+	systemPrompt Message            
+	config SystemPromptConfig
+)
 
-// 计算单条消息的大致 Token 数
-func getMessageTokens(encoding *tiktoken.Tiktoken, role, content string) int {
+func init() {
+	var err error
+	// 初始化 Token 编码器
+	tkm, err = tiktoken.GetEncoding("cl100k_base")
+	if err != nil {
+		panic(fmt.Sprintf("初始化 Token 编码器失败: %v", err))
+	}
+
+	// 从 JSON 文件加载 System Prompt 
+	err = loadSystemPrompt("system_prompt.json")
+	if err != nil {
+		panic(fmt.Sprintf("加载 System Prompt 失败: %v", err))
+	}
+	fmt.Printf("【系统】成功加载提示词配置文件\n")
+}
+
+func loadSystemPrompt(filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	systemPrompt = Message{
+		Role:    "system",
+		Content: config.Content,
+	}
+	return nil
+}
+
+// 计算单条消息的大致 Token 数（直接使用全局变量 tkm）
+func getMessageTokens(role, content string) int {
 	// 基础开销：每条消息大约有 4 个 token 的元数据开销 ({role, content})
 	tokens := 4
-	tokens += len(encoding.Encode(role, nil, nil))
-	tokens += len(encoding.Encode(content, nil, nil))
+	tokens += len(tkm.Encode(role, nil, nil))
+	tokens += len(tkm.Encode(content, nil, nil))
 	return tokens
 }
 
 // 核心裁剪函数：从后往前取，直到达到 maxTokens
 func filterMessagesByToken(history []Message, maxTokens int) []Message {
-	// 获取用于 cl100k_base (GPT-4/Grok) 的编码器
-	tkm, err := tiktoken.GetEncoding("cl100k_base")
-	if err != nil {
-		fmt.Println("Encoding error:", err)
-		return history // 降级处理：出错则返回原样
-	}
-
 	var result []Message
 	totalTokens := 0
 
-	// 预留固定 Token 给 System Prompt (假设 50)
-	systemPrompt := Message{Role: "system", Content: ""}
-	totalTokens += getMessageTokens(tkm, systemPrompt.Role, systemPrompt.Content)
+	// 加上 System Prompt 的 Token 开销
+	totalTokens += getMessageTokens(systemPrompt.Role, systemPrompt.Content)
+
+	if totalTokens > maxTokens {
+		return []Message{systemPrompt}
+	}
 
 	// 从最新的消息开始往前遍历
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
-		msgTokens := getMessageTokens(tkm, msg.Role, msg.Content)
+		
+		if msg.Role == "system" {
+			continue
+		}
+
+		msgTokens := getMessageTokens(msg.Role, msg.Content)
 
 		if totalTokens+msgTokens > maxTokens {
-			break // 超过阈值，停止收集
+			break 
 		}
 
 		totalTokens += msgTokens
-		// 插入到结果数组的最前面
-		result = append([]Message{msg}, result...)
+		result = append(result, msg)
 	}
 
-	// 最终组合：System Prompt + 裁剪后的历史
+	// 双指针reverse
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+
 	return append([]Message{systemPrompt}, result...)
 }
 
-// 将内存中的历史记录保存到磁盘
+
 func saveHistoryToFile() {
 	data, _ := json.MarshalIndent(chatHistory, "", "  ")
 	_ = os.WriteFile("history.json", data, 0644)
 }
 
-// 在 main 函数启动时调用：从磁盘加载旧记录
+// main.go init 
 func loadHistoryFromFile() {
 	data, err := os.ReadFile("history.json")
 	if err == nil {
