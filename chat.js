@@ -17,10 +17,10 @@ function toggleDarkMode() {
     // 同时切换自定义变量类名与 Tailwind 官方类名
     document.documentElement.classList.toggle('dark-mode-active');
     const isDark = document.documentElement.classList.toggle('dark');
-    
+
     // 写入本地存储备忘录，以便刷新时读取
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    
+
     // 刷新图标显示
     updateModeIcon(isDark);
 }
@@ -46,7 +46,6 @@ async function send() {
     // 2. 显示加载动画
     chatBox.appendChild(loading);
     loading.classList.remove('hidden');
-
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
     try {
@@ -56,11 +55,26 @@ async function send() {
             body: JSON.stringify({ message: text })
         });
 
+        // ✨【新增防线 1】如果后端状态码不是 200，说明报错了，直接把错误吞掉并抛出
+        if (!response.ok) {
+            let errorText = `请求失败，状态码：${response.status}`;
+            try {
+                // 尝试读取后端返回的 JSON 错误信息
+                const errJson = await response.json();
+                if (errJson.error) errorText += ` (${errJson.error})`;
+                else if (errJson.message) errorText += ` (${errJson.message})`;
+            } catch (e) {
+                // 如果后端返回的不是 JSON（比如纯文本），就直接读取文本
+                try { errorText += ` - ${await response.text()}`; } catch(_) {}
+            }
+            throw new Error(errorText);
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let full = "";
-        let isFirstChunk = true; 
-        let aiBubbleDiv = null; 
+        let isFirstChunk = true;
+        let aiBubbleDiv = null;
 
         while (true) {
             const { done, value } = await reader.read();
@@ -80,16 +94,14 @@ async function send() {
 
                             if (isFirstChunk) {
                                 loading.classList.add('hidden');
-
                                 const id = 'ai-' + Date.now();
                                 const html = `
-                    <div class="flex justify-start mb-4">
-                        <div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
-                            ${marked.parse(full)}
-                        </div>
-                    </div>`;
+                                    <div class="flex justify-start mb-4">
+                                        <div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
+                                            ${marked.parse(full)}
+                                        </div>
+                                    </div>`;
                                 chatBox.insertAdjacentHTML('beforeend', html);
-
                                 aiBubbleDiv = document.getElementById(id);
                                 isFirstChunk = false;
                             } else {
@@ -98,18 +110,29 @@ async function send() {
 
                             aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                             twemoji.parse(aiBubbleDiv, { folder: 'svg', ext: '.svg' });
-
                             chatBox.scrollTop = chatBox.scrollHeight;
                         }
-                    } catch (e) { }
+                    } catch (e) {
+                        // 流解析单行失败，打印到控制台便于排查，不中断整体渲染
+                        console.error("单行流解析失败:", e, line);
+                    }
                 }
             }
         }
     } catch (err) {
+        // ✨【新增防线 2】不管是网络断开、后端 401 还是抛出的错误，全部渲染到网页上！
         loading.classList.add('hidden');
-        chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-4"><div class="ai-bubble p-4 rounded-2xl bg-red-100 text-red-600">连接错误，请检查后端。</div></div>`);
+        const errorHtml = `
+            <div class="flex justify-start mb-4">
+                <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
+                    <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
+                    <div>${err.message || "连接错误，请检查后端。"}</div>
+                </div>
+            </div>`;
+        chatBox.insertAdjacentHTML('beforeend', errorHtml);
+        chatBox.scrollTop = chatBox.scrollHeight;
     } finally {
-        loading.classList.add('hidden'); 
+        loading.classList.add('hidden');
         sendBtn.disabled = false;
     }
 }
@@ -129,10 +152,10 @@ function downloadChat() {
     a.click();
 }
 
-async function newChat() { 
-    if (confirm("清空所有对话？")) { 
+async function newChat() {
+    if (confirm("清空所有对话？")) {
         try {
-            await fetch('/api/new-chat'); 
+            await fetch('/api/new-chat');
             chatBox.innerHTML = `
                 <div class="flex justify-start mb-4">
                     <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
@@ -142,13 +165,13 @@ async function newChat() {
         } catch (e) {
             console.error("清空对话失败:", e);
         }
-    } 
+    }
 }
 
 // 修改：初始化逻辑，全面引入对备忘录的检查
 window.onload = () => {
     const savedTheme = localStorage.getItem('theme');
-    
+
     // 如果备忘录存着黑夜，或者本地没有存过但系统是黑夜模式
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark-mode-active', 'dark');
@@ -157,13 +180,13 @@ window.onload = () => {
         document.documentElement.classList.remove('dark-mode-active', 'dark');
         updateModeIcon(false);
     }
-    
+
     loadHistory();
-    input.addEventListener('keydown', e => { 
-        if (e.key === 'Enter' && !e.shiftKey) { 
-            e.preventDefault(); 
-            send(); 
-        } 
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            send();
+        }
     });
 };
 

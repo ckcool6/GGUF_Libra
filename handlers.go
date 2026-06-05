@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -19,6 +20,8 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	// 将用户输入加入历史
 	chatHistory = append(chatHistory, Message{Role: "user", Content: reqBody.Message})
+	// 记录当前添加后的长度，方便后面失败时回滚
+	userMsgIndex := len(chatHistory) - 1
 	// 裁剪用于发送给 API 的上下文 (4000 Tokens)
 	sendHistory := filterMessagesByToken(chatHistory, 4000)
 	mu.Unlock()
@@ -28,28 +31,36 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		"model":    "x-ai/grok-4.3",
 		"messages": sendHistory,
 		"stream":   true,
-		/* "reasoning": map[string]interface{}{
-			"effort":     "medium", // 降低思考成本
-			"max_tokens": 1000,     // 封顶思考字数
-		}, */
 	}
 	jsonData, _ := json.Marshal(payload)
 
-	// 建议增加超时控制
 	req, _ := http.NewRequestWithContext(r.Context(), "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewBuffer(jsonData))
 	req.Header.Set("Authorization", "Bearer "+OpenRouterKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", "http://localhost:8024") // 你的项目地址
+	req.Header.Set("HTTP-Referer", "http://localhost:8024") 
 	req.Header.Set("X-Title", "MyGrokBotV1")
 
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
+		rollbackHistory(userMsgIndex) // 发生网络错误，回滚历史
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "API 请求失败"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "API 请求网络失败"})
 		return
 	}
 	defer resp.Body.Close()
+
+	// ✨【新增核心防御】检查 OpenRouter 的状态码
+	if resp.StatusCode != http.StatusOK {
+		rollbackHistory(userMsgIndex) // 接口报错，回滚历史，防止连续 user 导致死锁
+
+		// 把 OpenRouter 的具体错误读出来输出给前端
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		w.Write(bodyBytes)
+		return
+	}
 
 	// --- 只有在成功获取 API 响应后，才宣告我们要开始流式传输了 ---
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -95,6 +106,19 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		chatHistory = append(chatHistory, Message{Role: "assistant", Content: aiFullContent})
 		saveHistoryToFile()
 		mu.Unlock()
+	} else {
+		// 如果流传输由于别的原因中断，导致没拿到任何文本，也进行回滚
+		rollbackHistory(userMsgIndex)
+	}
+}
+
+// ✨【新增辅助函数】用于安全回滚历史记录，避免队列被 user 消息污染
+func rollbackHistory(index int) {
+	mu.Lock()
+	defer mu.Unlock()
+	if index >= 0 && index < len(chatHistory) {
+		// 移除触发报错的那条 user 消息
+		chatHistory = append(chatHistory[:index], chatHistory[index+1:]...)
 	}
 }
 
