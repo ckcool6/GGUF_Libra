@@ -18,7 +18,7 @@ var (
 func config_init() {
 	var err error
 
-	stopLoading := StartLoading("正在初始化 Token 编码器（如果是首次运行，可能需要下载词表文件，请稍候）...\n")
+	stopLoading := StartLoading("正在初始化 Token 编码器（如果是首次运行，可能需要下载词表文件，请稍候）...")
 
 	// 初始化 Token 编码器
 	tkm, err = tiktoken.GetEncoding("cl100k_base")
@@ -34,6 +34,7 @@ func config_init() {
 	if err != nil {
 		panic(fmt.Sprintf("加载 System Prompt 失败: %v", err))
 	}
+	fmt.Println()
 	fmt.Printf("【系统】成功加载提示词配置文件\n")
 }
 
