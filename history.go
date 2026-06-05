@@ -15,10 +15,16 @@ var (
 	config SystemPromptConfig
 )
 
-func init() {
+func config_init() {
 	var err error
+
+	stopLoading := StartLoading("正在初始化 Token 编码器（如果是首次运行，可能需要下载词表文件，请稍候）...\n")
+
 	// 初始化 Token 编码器
 	tkm, err = tiktoken.GetEncoding("cl100k_base")
+
+	close(stopLoading)
+
 	if err != nil {
 		panic(fmt.Sprintf("初始化 Token 编码器失败: %v", err))
 	}

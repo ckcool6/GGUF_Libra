@@ -19,6 +19,7 @@ func main() {
 	OpenRouterKey = os.Getenv("OPENROUTER_KEY")
 
 	loadHistoryFromFile() // 启动即加载
+	config_init()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
