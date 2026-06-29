@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -64,6 +65,6 @@ func main() {
 		http.ServeFile(w, r, "chat.js")
 	})
 
-	fmt.Println("服务已启动: http://0.0.0.0:8024")
-	http.ListenAndServe(":8024", nil)
+	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
+	http.ListenAndServe(":8099", nil)
 }
