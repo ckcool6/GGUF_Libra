@@ -224,3 +224,8 @@ async function loadHistory() {
         console.error("加载历史记录失败:", e);
     }
 }
+
+document.getElementById('download-btn').addEventListener('click', downloadChat);
+document.getElementById('theme-btn').addEventListener('click', toggleDarkMode);
+document.getElementById('new-chat-btn').addEventListener('click', newChat);
+document.getElementById('send-btn').addEventListener('click', send);
