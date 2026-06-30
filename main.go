@@ -50,12 +50,14 @@ func main() {
 
 	// 修改 /api/delete-last 路由
 	http.HandleFunc("/api/delete-last", func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock() // 加锁
+		mu.Lock()
+
 		if len(chatHistory) >= 2 {
 			chatHistory = chatHistory[:len(chatHistory)-2]
 			saveHistoryToFile()
 		}
-		mu.Unlock() // 解锁
+
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	})
 

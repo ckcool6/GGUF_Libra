@@ -96,7 +96,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// 打印每一行原始数据，方便你在控制台 debug 格式
+		// 打印每一行原始数据，方便在控制台 debug 格式
 		// fmt.Printf("原始行: %s", string(line))
 
 		if bytes.HasPrefix(line, []byte("data: ")) {
