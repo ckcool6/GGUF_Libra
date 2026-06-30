@@ -58,7 +58,11 @@ async function send() {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text })
+            body: JSON.stringify({
+                message: text,
+                custom_url: localStorage.getItem('custom_api_url') || '',
+                custom_key: localStorage.getItem('custom_api_key') || ''
+            })
         });
 
         // ✨【新增防线 1】如果后端状态码不是 200，说明报错了，直接把错误吞掉并抛出
@@ -229,3 +233,31 @@ document.getElementById('download-btn').addEventListener('click', downloadChat);
 document.getElementById('theme-btn').addEventListener('click', toggleDarkMode);
 document.getElementById('new-chat-btn').addEventListener('click', newChat);
 document.getElementById('send-btn').addEventListener('click', send);
+
+const modal = document.getElementById('settings-modal');
+const customUrlInput = document.getElementById('custom-url');
+const customKeyInput = document.getElementById('custom-key');
+
+// 点击齿轮打开弹窗，并回显之前存的值
+document.getElementById('settings-btn').addEventListener('click', () => {
+    customUrlInput.value = localStorage.getItem('custom_api_url') || '';
+    customKeyInput.value = localStorage.getItem('custom_api_key') || '';
+    modal.classList.remove('hidden');
+});
+
+// 点击取消关闭弹窗
+document.getElementById('close-settings').addEventListener('click', () => {
+    modal.classList.add('hidden');
+});
+
+// 点击空白处也可以关闭弹窗
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+});
+
+// 点击保存，存入 localStorage
+document.getElementById('save-settings').addEventListener('click', () => {
+    localStorage.setItem('custom_api_url', customUrlInput.value.trim());
+    localStorage.setItem('custom_api_key', customKeyInput.value.trim());
+    modal.classList.add('hidden');
+});

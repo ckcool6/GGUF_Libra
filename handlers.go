@@ -12,8 +12,11 @@ import (
 func chatHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. 解析前端输入
 	var reqBody struct {
-		Message string `json:"message"`
+		Message   string `json:"message"`
+		CustomUrl string `json:"custom_url"`
+		CustomKey string `json:"custom_key"`
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		fmt.Println("❌ 解析前端请求失败:", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -37,7 +40,12 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	jsonData, _ := json.Marshal(payload)
 
 	// 4. 创建请求 (请确保这里的端口和路径与你的 llama.cpp 启动参数一致)
-	apiURL := "http://127.0.0.1:8021/v1/chat/completions"
+	// 判断是否使用用户前端填写的自定义地址
+	apiURL := "http://127.0.0.1:8021/v1/chat/completions" // 默认本地地址
+	if reqBody.CustomUrl != "" {
+		apiURL = reqBody.CustomUrl
+	}
+
 	req, err := http.NewRequestWithContext(r.Context(), "POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("❌ 创建请求对象失败:", err)
@@ -45,7 +53,15 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Error", http.StatusInternalServerError)
 		return
 	}
+
+	// 判断是否使用用户前端填写的自定义 Key
+	apiKey := OpenRouterKey // 默认环境变量 Key
+	if reqBody.CustomKey != "" {
+		apiKey = reqBody.CustomKey
+	}
+
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	// 5. 发送请求给 llama.cpp
 	fmt.Println("🚀 正在请求 llama.cpp...")
