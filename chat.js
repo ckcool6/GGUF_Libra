@@ -1,3 +1,9 @@
+import { marked } from 'marked';
+import twemoji from 'twemoji';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/atom-one-dark.min.css';
+
+
 // 初始化配置
 marked.setOptions({
     highlight: (code, lang) => {
@@ -65,7 +71,7 @@ async function send() {
                 else if (errJson.message) errorText += ` (${errJson.message})`;
             } catch (e) {
                 // 如果后端返回的不是 JSON（比如纯文本），就直接读取文本
-                try { errorText += ` - ${await response.text()}`; } catch(_) {}
+                try { errorText += ` - ${await response.text()}`; } catch (_) { }
             }
             throw new Error(errorText);
         }

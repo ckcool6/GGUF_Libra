@@ -1,0 +1,32 @@
+{
+  "name": "my_chat",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/ckcool6/my_chat#readme",
+  "bugs": {
+    "url": "https://github.com/ckcool6/my_chat/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ckcool6/my_chat.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "chat.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
+    "tailwindcss": "^4.3.2",
+    "vite": "^8.1.1"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1",
+    "marked": "^18.0.5",
+    "twemoji": "^14.0.2"
+  }
+}

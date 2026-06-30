@@ -22,25 +22,12 @@ func main() {
 	loadHistoryFromFile() // 启动即加载
 	config_init()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
+	// 核心全权接管：这一行代码会直接托管整个 dist 目录
+	// 不管是普通的网页，还是 manifest.json、sw.js、icon.png，只要在 dist 目录下，它都能自动识别并发送
+	http.Handle("/", http.FileServer(http.Dir("dist")))
 
 	// 聊天接口
 	http.HandleFunc("/api/chat", chatHandler)
-
-	http.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "manifest.json")
-	})
-
-	http.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript")
-		http.ServeFile(w, r, "sw.js")
-	})
-
-	http.HandleFunc("/icon.png", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "icon.png")
-	})
 
 	// 修改 /api/history 路由
 	http.HandleFunc("/api/history", apiHistoryHandler)
@@ -59,12 +46,6 @@ func main() {
 
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
-	})
-
-	// 在 main.go 中添加这一行
-	http.HandleFunc("/chat.js", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript")
-		http.ServeFile(w, r, "chat.js")
 	})
 
 	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")

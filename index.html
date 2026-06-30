@@ -5,13 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mini Gemini</title>
-    <script src="https://cdn.tailwindcss.com"></script>
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
-    </script>
+    <link rel="stylesheet" href="./style.css">
 
     <script>
         if (localStorage.getItem('theme') === 'dark') {
@@ -19,11 +14,6 @@
         }
     </script>
 
-    <script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         :root {
             --bg-main: #f6f6f6;
@@ -187,7 +177,7 @@
         </div>
     </footer>
 
-    <script src="chat.js"></script>
+    <script type="module" src="./chat.js"></script>
 </body>
 
 </html>
