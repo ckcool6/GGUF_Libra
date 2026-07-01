@@ -103,7 +103,20 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	var aiFullContent string
 	streamSuccess := false // 用于标记流是否完整结束
 
+Loop:
 	for {
+		// ✨ 新增防线：每轮循环检查前端是否已经掐断了连接
+		select {
+		case <-r.Context().Done():
+			fmt.Println("\n🛑 检测到前端主动断开连接，停止接收流数据。")
+			break Loop
+		default:
+		}
+		// 如果 Context 已经结束，直接跳出循环
+		if r.Context().Err() != nil {
+			break
+		}
+
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
@@ -112,11 +125,12 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// 打印每一行原始数据，方便在控制台 debug 格式
-		// fmt.Printf("原始行: %s", string(line))
-
 		if bytes.HasPrefix(line, []byte("data: ")) {
-			// 直接转发给前端
+			// 如果前端已经断开了，就不要再往 w 写入了，直接 break
+			if r.Context().Err() != nil {
+				break
+			}
+
 			w.Write(line)
 			w.Write([]byte("\n"))
 			if flusher != nil {
@@ -126,14 +140,12 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			data := bytes.TrimPrefix(line, []byte("data: "))
 			data = bytes.TrimSpace(data)
 
-			// 兼容不同版本的 llama.cpp 结束符判断
 			if bytes.Equal(data, []byte("[DONE]")) || bytes.Contains(data, []byte(`"done":true`)) {
 				fmt.Println("\n✅ 收到完整结束信号 [DONE]")
 				streamSuccess = true
 				break
 			}
 
-			// 解析内容用于后端历史记录存储
 			var streamResp struct {
 				Choices []struct {
 					Delta struct {
@@ -144,7 +156,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal(data, &streamResp); err == nil && len(streamResp.Choices) > 0 {
 				content := streamResp.Choices[0].Delta.Content
 				aiFullContent += content
-				fmt.Print(content) // 在终端实时打印 AI 的回复
+				fmt.Print(content)
 			}
 		}
 	}

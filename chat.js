@@ -13,6 +13,8 @@ marked.setOptions({
     breaks: true, gfm: true
 });
 
+let chatAbortController = null;
+
 const chatBox = document.getElementById('chat-box');
 const input = document.getElementById('user-input');
 const loading = document.getElementById('ai-loading-template');
@@ -39,10 +41,28 @@ function updateModeIcon(isDark) {
 }
 
 async function send() {
-    const text = input.value.trim();
-    if (!text || sendBtn.disabled) return;
+    // 优先拦截：如果当前正在生成，点击它就是执行“停止”
+    if (sendBtn.classList.contains('is-loading')) {
+        if (chatAbortController) {
+            chatAbortController.abort(); // 触发中断信号
+        }
+        return;
+    }
 
-    sendBtn.disabled = true;
+    // 如果是平时状态，再校验输入框空不空
+    const text = input.value.trim();
+    if (!text) return;
+
+    // 立刻进入加载/可停止状态
+    sendBtn.classList.add('is-loading');
+    // 塞入一个精致的“正方形停止块”SVG 图标
+    sendBtn.innerHTML = `
+        <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" />
+        </svg>
+    `;
+
+    // 清空输入框
     input.value = '';
     input.style.height = 'auto';
 
@@ -54,10 +74,14 @@ async function send() {
     loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
+    // 初始化中止控制器
+    chatAbortController = new AbortController();
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: chatAbortController.signal, // 绑定信号
             body: JSON.stringify({
                 message: text,
                 custom_url: localStorage.getItem('custom_api_url') || '',
@@ -65,16 +89,13 @@ async function send() {
             })
         });
 
-        // ✨【新增防线 1】如果后端状态码不是 200，说明报错了，直接把错误吞掉并抛出
         if (!response.ok) {
             let errorText = `请求失败，状态码：${response.status}`;
             try {
-                // 尝试读取后端返回的 JSON 错误信息
                 const errJson = await response.json();
                 if (errJson.error) errorText += ` (${errJson.error})`;
                 else if (errJson.message) errorText += ` (${errJson.message})`;
             } catch (e) {
-                // 如果后端返回的不是 JSON（比如纯文本），就直接读取文本
                 try { errorText += ` - ${await response.text()}`; } catch (_) { }
             }
             throw new Error(errorText);
@@ -123,27 +144,32 @@ async function send() {
                             chatBox.scrollTop = chatBox.scrollHeight;
                         }
                     } catch (e) {
-                        // 流解析单行失败，打印到控制台便于排查，不中断整体渲染
                         console.error("单行流解析失败:", e, line);
                     }
                 }
             }
         }
     } catch (err) {
-        // ✨【新增防线 2】不管是网络断开、后端 401 还是抛出的错误，全部渲染到网页上！
-        loading.classList.add('hidden');
-        const errorHtml = `
-            <div class="flex justify-start mb-4">
-                <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
-                    <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
-                    <div>${err.message || "连接错误，请检查后端。"}</div>
-                </div>
-            </div>`;
-        chatBox.insertAdjacentHTML('beforeend', errorHtml);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        if (err.name === 'AbortError') {
+            console.log("用户中止了 AI 的回复");
+        } else {
+            loading.classList.add('hidden');
+            const errorHtml = `
+                <div class="flex justify-start mb-4">
+                    <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
+                        <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
+                        <div>${err.message || "连接错误，请检查后端。"}</div>
+                    </div>
+                </div>`;
+            chatBox.insertAdjacentHTML('beforeend', errorHtml);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
     } finally {
         loading.classList.add('hidden');
-        sendBtn.disabled = false;
+        // ✨ 【恢复状态】不论成功、失败还是中止，最后都把按钮还原
+        sendBtn.classList.remove('is-loading');
+        sendBtn.innerHTML = '发送';
+        chatAbortController = null;
     }
 }
 
@@ -192,9 +218,19 @@ window.onload = () => {
     }
 
     loadHistory();
+    // 修改键盘事件监听
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
+
+            // 如果 AI 正在生成，敲击 Enter 键也应该能直接中止它！
+            if (sendBtn.classList.contains('is-loading')) {
+                if (chatAbortController) {
+                    chatAbortController.abort();
+                }
+                return;
+            }
+
             send();
         }
     });
