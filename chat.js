@@ -66,10 +66,10 @@ async function send() {
     input.value = '';
     input.style.height = 'auto';
 
-    // 1. 插入用户消息
+    // 插入用户消息
     chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${text}</div></div>`);
 
-    // 2. 显示加载动画
+    // 显示加载动画
     chatBox.appendChild(loading);
     loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
@@ -166,7 +166,7 @@ async function send() {
         }
     } finally {
         loading.classList.add('hidden');
-        // ✨ 【恢复状态】不论成功、失败还是中止，最后都把按钮还原
+        // 【恢复状态】不论成功、失败还是中止，最后都把按钮还原
         sendBtn.classList.remove('is-loading');
         sendBtn.innerHTML = '发送';
         chatAbortController = null;
