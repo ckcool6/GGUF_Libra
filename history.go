@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	chatHistory  []Message          
-	tkm          *tiktoken.Tiktoken 
-	systemPrompt Message            
-	config SystemPromptConfig
+	//chatHistory  []Message
+	tkm          *tiktoken.Tiktoken
+	systemPrompt Message
+	config       SystemPromptConfig
 )
 
 func config_init() {
@@ -29,7 +29,7 @@ func config_init() {
 		panic(fmt.Sprintf("初始化 Token 编码器失败: %v", err))
 	}
 
-	// 从 JSON 文件加载 System Prompt 
+	// 从 JSON 文件加载 System Prompt
 	err = loadSystemPrompt("system_prompt.json")
 	if err != nil {
 		panic(fmt.Sprintf("加载 System Prompt 失败: %v", err))
@@ -79,7 +79,7 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	// 从最新的消息开始往前遍历
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
-		
+
 		if msg.Role == "system" {
 			continue
 		}
@@ -87,7 +87,7 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 		msgTokens := getMessageTokens(msg.Role, msg.Content)
 
 		if totalTokens+msgTokens > maxTokens {
-			break 
+			break
 		}
 
 		totalTokens += msgTokens
@@ -102,17 +102,16 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	return append([]Message{systemPrompt}, result...)
 }
 
-
 func saveHistoryToFile() {
-	data, _ := json.MarshalIndent(chatHistory, "", "  ")
+	data, _ := json.MarshalIndent(globalId.chatHistory, "", "  ")
 	_ = os.WriteFile("history.json", data, 0644)
 }
 
-// main.go init 
+// main.go init
 func loadHistoryFromFile() {
 	data, err := os.ReadFile("history.json")
 	if err == nil {
-		json.Unmarshal(data, &chatHistory)
+		json.Unmarshal(data, &globalId.chatHistory)
 		fmt.Println("已从 history.json 恢复对话记录")
 	}
 }

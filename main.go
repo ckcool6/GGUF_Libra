@@ -39,8 +39,8 @@ func main() {
 	http.HandleFunc("/api/delete-last", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 
-		if len(chatHistory) >= 2 {
-			chatHistory = chatHistory[:len(chatHistory)-2]
+		if len(globalId.chatHistory) >= 2 {
+			globalId.chatHistory = globalId.chatHistory[:len(globalId.chatHistory)-2]
 			saveHistoryToFile()
 		}
 
