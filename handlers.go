@@ -9,22 +9,6 @@ import (
 	"net/http"
 )
 
-type reqBody struct {
-	Message   string `json:"message"`
-	CustomUrl string `json:"custom_url"`
-	CustomKey string `json:"custom_key"`
-}
-
-type chatlist struct {
-	chatHistory  []Message
-	userMsgIndex int
-	sendHistory  []Message
-}
-
-var (
-	globalId *chatlist = &chatlist{chatHistory: []Message{}}
-)
-
 func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		fmt.Println("❌ 解析前端请求失败:", err)

@@ -12,6 +12,7 @@ import (
 var (
 	mu            sync.Mutex
 	OpenRouterKey string
+	globalId      *chatlist = &chatlist{chatHistory: []Message{}}
 )
 
 func main() {
