@@ -23,8 +23,7 @@ func main() {
 	loadHistoryFromFile() // 启动即加载
 	config_init()
 
-	// 核心全权接管：这一行代码会直接托管整个 dist 目录
-	// 不管是普通的网页，还是 manifest.json、sw.js、icon.png，只要在 dist 目录下，它都能自动识别并发送
+	// 托管整个 dist 目录
 	http.Handle("/", http.FileServer(http.Dir("dist")))
 
 	// 聊天接口

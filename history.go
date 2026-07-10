@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	//chatHistory  []Message
 	tkm          *tiktoken.Tiktoken
 	systemPrompt Message
 	config       SystemPromptConfig

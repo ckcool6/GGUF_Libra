@@ -1,4 +1,4 @@
-module my-gemini-ui
+module gguf-player
 
 go 1.22.2
 
