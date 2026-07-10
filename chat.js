@@ -1,8 +1,54 @@
 import { marked } from 'marked';
 import twemoji from 'twemoji';
 import hljs from 'highlight.js';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+
 import 'highlight.js/styles/atom-one-dark.min.css';
 
+// 自定义 marked 扩展，用来精确拦截 $$ 和 $
+const latexExtension = {
+    name: 'inlineLatex',
+    level: 'inline',
+    start(src) { return src.indexOf('$'); },
+    tokenizer(src) {
+        // 1. 优先匹配块级公式 $$...$$
+        const blockMatch = /^\$\$\s*([\s\S]*?)\s*\$\$/.exec(src);
+        if (blockMatch) {
+            return {
+                type: 'inlineLatex',
+                raw: blockMatch[0],
+                text: blockMatch[1],
+                displayMode: true
+            };
+        }
+        // 2. 匹配行内公式 $...$
+        const inlineMatch = /^\$([^\$\n]+?)\$/.exec(src);
+        if (inlineMatch) {
+            return {
+                type: 'inlineLatex',
+                raw: inlineMatch[0],
+                text: inlineMatch[1],
+                displayMode: false
+            };
+        }
+    },
+    renderer(token) {
+        try {
+            return katex.renderToString(token.text, {
+                displayMode: token.displayMode,
+                throwOnError: false
+            });
+        } catch (err) {
+            return token.raw;
+        }
+    }
+};
+
+// 注册公式扩展
+marked.use({
+    extensions: [latexExtension]
+});
 
 // 初始化配置
 marked.setOptions({

@@ -1,18 +1,1 @@
-[
-  {
-    "role": "user",
-    "content": "你好"
-  },
-  {
-    "role": "assistant",
-    "content": "您好！有什么可以帮您的吗？ 😊"
-  },
-  {
-    "role": "user",
-    "content": "没事"
-  },
-  {
-    "role": "assistant",
-    "content": "好的呀。如果您之后有任何问题或者需要聊聊天的时候，随时都可以告诉我哦。祝您今天愉快！"
-  }
-]
+[]
