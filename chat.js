@@ -92,19 +92,15 @@ async function send() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 1. 改变按钮状态与清空输入
     sendBtn.classList.add('is-loading');
-    sendBtn.innerHTML = `
-        <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" />
-        </svg>
-    `;
-
+    sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
     input.value = '';
     input.style.height = 'auto';
 
+    // 2. 渲染用户消息与加载动画
     const safeUserText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
     chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${safeUserText}</div></div>`);
-
     chatBox.appendChild(loading);
     loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
@@ -112,6 +108,7 @@ async function send() {
     chatAbortController = new AbortController();
 
     try {
+        // 3. 发起请求
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -123,19 +120,13 @@ async function send() {
             })
         });
 
+        // 4. 校验状态
         if (!response.ok) {
-            let errorText = `请求失败，状态码：${response.status}`;
-            try {
-                const errJson = await response.json();
-                if (errJson.error) errorText += ` (${errJson.error})`;
-                else if (errJson.message) errorText += ` (${errJson.message})`;
-            } catch (e) {
-                try { errorText += ` - ${await response.text()}`; } catch (_) { }
-            }
-            throw new Error(errorText);
+            const errorMsg = await extractErrorMessage(response);
+            throw new Error(errorMsg);
         }
 
-        // ✨ 核心变化：直接调用拆分出来的流处理函数
+        // 5. 消费流数据
         await handleStreamResponse(response);
 
     } catch (err) {
@@ -211,6 +202,21 @@ async function handleStreamResponse(response) {
             }
         }
     }
+}
+
+async function extractErrorMessage(response) {
+    let errorText = `请求失败，状态码：${response.status}`;
+    try {
+        const errJson = await response.json();
+        if (errJson.error) return `${errorText} (${errJson.error})`;
+        if (errJson.message) return `${errorText} (${errJson.message})`;
+    } catch (_) {
+        try {
+            const text = await response.text();
+            if (text) return `${errorText} - ${text}`;
+        } catch (_) { }
+    }
+    return errorText;
 }
 
 function downloadChat() {
