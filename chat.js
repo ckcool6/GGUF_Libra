@@ -242,7 +242,7 @@ async function newChat() {
             chatBox.innerHTML = `
                 <div class="flex justify-start mb-4">
                     <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
-                        你好！有什么我可以帮你的吗？
+                        你好!
                     </div>
                 </div>`;
         } catch (e) {
