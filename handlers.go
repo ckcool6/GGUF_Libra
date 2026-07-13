@@ -137,6 +137,7 @@ Loop:
 			}
 
 			var streamResp struct {
+				Model   string `json:"model"` // 拦截大模型的名字
 				Choices []struct {
 					Delta struct {
 						Content string `json:"content"`

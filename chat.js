@@ -160,7 +160,12 @@ async function handleStreamResponse(response) {
     let full = "";
     let isFirstChunk = true;
     let aiBubbleDiv = null;
-    let buffer = ""; // 缓冲区避免 chunk 截断
+    let buffer = "";
+
+    let tokenCount = 0;
+    let startTime = null;
+    let modelName = "GGUF Model";
+    let currentBubbleId = "";
 
     while (true) {
         const { done, value } = await reader.read();
@@ -168,39 +173,79 @@ async function handleStreamResponse(response) {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop(); // 留出不完整的一行
+        buffer = lines.pop();
 
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
                 const json = JSON.parse(trimmed.substring(6));
-                const content = json.choices[0].delta.content || "";
+
+                if (json.model) {
+                    modelName = json.model.split('/').pop().split('\\').pop(); // 提取干净的文件名
+                }
+
+                // 拦截最后一包里的官方统计 token 数量
+                if (json.usage && json.usage.completion_tokens) {
+                    tokenCount = json.usage.completion_tokens;
+                }
+
+                const content = json.choices && json.choices[0].delta && json.choices[0].delta.content || "";
 
                 if (content) {
+                    if (!startTime) startTime = Date.now();
+                    if (!json.usage) tokenCount++; // 传输过程中用字符数保底计数
+
                     full += content;
 
                     if (isFirstChunk) {
                         loading.classList.add('hidden');
-                        const id = 'ai-' + Date.now();
+                        currentBubbleId = 'ai-' + Date.now();
                         const html = `
                             <div class="flex justify-start mb-4">
-                                <div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
-                                    ${marked.parse(full)}
+                                <div class="flex flex-col max-w-[90%]">
+                                    <div id="${currentBubbleId}" class="ai-bubble p-4 rounded-2xl shadow-sm markdown-body">
+                                        ${marked.parse(full)}
+                                    </div>
+                                    <!-- 干净版双数据小底栏 -->
+                                    <div id="meta-${currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-500 font-mono opacity-80">
+                                        <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${modelName}</span>
+                                        <span id="speed-${currentBubbleId}">⏱️ 正在计算...</span>
+                                    </div>
                                 </div>
                             </div>`;
                         chatBox.insertAdjacentHTML('beforeend', html);
-                        aiBubbleDiv = document.getElementById(id);
+                        aiBubbleDiv = document.getElementById(currentBubbleId);
                         isFirstChunk = false;
                     } else {
                         aiBubbleDiv.innerHTML = marked.parse(full);
                     }
 
-                    // 局部高亮与表情解析，提升性能
+                    if (startTime) {
+                        const elapsed = (Date.now() - startTime) / 1000;
+                        if (elapsed > 0) {
+                            const speed = (tokenCount / elapsed).toFixed(1);
+                            const speedSpan = document.getElementById(`speed-${currentBubbleId}`);
+                            if (speedSpan) {
+                                speedSpan.innerText = ` ${elapsed.toFixed(1)}s / ${speed} t/s`;
+                            }
+                        }
+                    }
+
                     aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                     twemoji.parse(aiBubbleDiv, { folder: 'svg', ext: '.svg' });
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
             }
+        }
+    }
+
+    // 展示最终精确的 tokens 统计
+    if (startTime && currentBubbleId) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const speed = (tokenCount / (elapsed || 1)).toFixed(1);
+        const speedSpan = document.getElementById(`speed-${currentBubbleId}`);
+        if (speedSpan) {
+            speedSpan.innerHTML = ` 耗时 ${elapsed.toFixed(1)}s  (共 ${tokenCount} tokens / 均速 ${speed} t/s)`;
         }
     }
 }
