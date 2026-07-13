@@ -112,8 +112,9 @@ async function send() {
     input.value = '';
     input.style.height = 'auto';
 
-    // 插入用户消息
-    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${text}</div></div>`);
+    // 在请求发出前，立刻对文本转义并渲染用户消息气泡
+    const safeUserText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${safeUserText}</div></div>`);
 
     // 显示加载动画
     chatBox.appendChild(loading);
@@ -172,6 +173,7 @@ async function send() {
                             if (isFirstChunk) {
                                 loading.classList.add('hidden');
                                 const id = 'ai-' + Date.now();
+                                // ✨【正确位置】第一帧只负责把 AI 容器丢进去
                                 const html = `
                                     <div class="flex justify-start mb-4">
                                         <div id="${id}" class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
@@ -212,7 +214,6 @@ async function send() {
         }
     } finally {
         loading.classList.add('hidden');
-        // 【恢复状态】不论成功、失败还是中止，最后都把按钮还原
         sendBtn.classList.remove('is-loading');
         sendBtn.innerHTML = '发送';
         chatAbortController = null;
@@ -291,7 +292,7 @@ async function loadHistory() {
 
             data.forEach(m => {
                 const isUser = m.role === 'user';
-                const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;") : marked.parse(m.content);
+                const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>") : marked.parse(m.content);
                 const html = `
             <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
                 <div class="${isUser ? 'user-bubble' : 'ai-bubble'} p-4 rounded-2xl max-w-[90%] shadow-sm markdown-body">

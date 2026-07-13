@@ -113,7 +113,17 @@
 
         .ai-bubble,
         .user-bubble {
-            line-height: 1.8;
+            line-height: 2.0;
+        }
+
+        .ai-bubble p {
+            margin-bottom: 1rem;
+            /* 让 AI 输出的每个段落下面都空出固定的一行距离 */
+        }
+
+        .ai-bubble p:last-child {
+            margin-bottom: 0;
+            /* 最后一个段落不需要下边距，防止气泡底部留白过多 */
         }
     </style>
 </head>
@@ -187,7 +197,7 @@
 
     <main id="chat-box" class="p-4 space-y-6 max-w-4xl mx-auto w-full">
         <div class="flex justify-start">
-            <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">你好！有什么我可以帮你的吗？</div>
+            <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">你好！</div>
         </div>
     </main>
 
