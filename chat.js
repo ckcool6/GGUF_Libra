@@ -143,6 +143,7 @@ async function send() {
                 </div>`;
             chatBox.insertAdjacentHTML('beforeend', errorHtml);
             chatBox.scrollTop = chatBox.scrollHeight;
+            checkLlamaConnection();
         }
     } finally {
         loading.classList.add('hidden');
@@ -273,6 +274,8 @@ window.onload = () => {
             send();
         }
     });
+    checkLlamaConnection();
+    setInterval(checkLlamaConnection, 10000);
 };
 
 async function loadHistory() {
@@ -332,3 +335,54 @@ document.getElementById('save-settings').addEventListener('click', () => {
     localStorage.setItem('custom_api_key', customKeyInput.value.trim());
     modal.classList.add('hidden');
 });
+
+const statusDot = document.getElementById('status-dot');
+
+// 检测 llama.cpp 连接状态的函数
+async function checkLlamaConnection() {
+    // 优先获取用户自定义的 API 地址，如果没有则使用你项目默认的后端地址
+    const customUrl = localStorage.getItem('custom_api_url') || '';
+
+    let healthUrl = '/health'; // 默认同域路由
+
+    if (customUrl) {
+        try {
+            // 如果填了自定义的完整的地址，比如 http://127.0.0.1:8080/v1/chat/completions
+            // 我们需要把尾部的路径换成 /health
+            const urlObj = new URL(customUrl);
+            healthUrl = `${urlObj.protocol}//${urlObj.host}/health`;
+        } catch (e) {
+            console.error("解析自定义 URL 失败:", e);
+        }
+    }
+
+    try {
+        // 设置 3 秒超时，防止接口卡死导致状态一直不更新
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const res = await fetch(healthUrl, {
+            method: 'GET',
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        // llama.cpp 的 /health 接口正常情况下会返回 {"status": "ok"}
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'ok') {
+                // 连接成功：变绿，并移除动画
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
+                statusDot.title = "已成功连接到 llama.cpp";
+                return;
+            }
+        }
+        throw new Error("服务状态异常");
+
+    } catch (err) {
+        // 连接失败：变红，并加上闪烁动画提示用户注意
+        statusDot.className = "w-2.5 h-2.5 rounded-full bg-rose-500 transition-colors duration-300 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse";
+        statusDot.title = "无法连接到 llama.cpp，请检查后端服务是否启动";
+    }
+}
