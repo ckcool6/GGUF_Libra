@@ -2,7 +2,7 @@
 
 **What is this**
 
-// todo
+GGUF Player is a local LLM client that requires no account registration, allowing you to chat with your local models simply by entering the `<url>/v1/chat/completions` endpoint. It supports dark mode and enables you to download and save your conversation history locally as a TXT file.
 
 ### How to Setup and Run Locally
 
