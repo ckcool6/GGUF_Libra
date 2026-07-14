@@ -207,7 +207,7 @@ async function handleStreamResponse(response) {
                                         ${marked.parse(full)}
                                     </div>
                                     <!-- 干净版双数据小底栏 -->
-                                    <div id="meta-${currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-500 font-mono opacity-80">
+                                    <div id="meta-${currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
                                         <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${modelName}</span>
                                         <span id="speed-${currentBubbleId}">⏱️ 正在计算...</span>
                                     </div>
