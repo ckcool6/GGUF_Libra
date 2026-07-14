@@ -245,7 +245,7 @@ async function handleStreamResponse(response) {
         const speed = (tokenCount / (elapsed || 1)).toFixed(1);
         const speedSpan = document.getElementById(`speed-${currentBubbleId}`);
         if (speedSpan) {
-            speedSpan.innerHTML = ` 耗时 ${elapsed.toFixed(1)}s  (共 ${tokenCount} tokens / 均速 ${speed} t/s)`;
+            speedSpan.innerHTML = ` takes ${elapsed.toFixed(1)}s  (total ${tokenCount} tokens / speed ${speed} t/s)`;
         }
     }
 }

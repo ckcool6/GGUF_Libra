@@ -16,8 +16,8 @@
 
     <style>
         :root {
-            --bg-main: #f6f6f6;
-            --bg-header: #f6f6f6;
+            --bg-main: #faf8f8;
+            --bg-header: #faf8f8;
             --bg-bubble-ai: #ffffff;
             --bg-bubble-user: #e9eef6;
             --text-main: #1f1f1f;
@@ -42,8 +42,9 @@
             flex-direction: column;
             margin: 0;
             overflow: hidden;
-            transition: background-color 0.3s;
-            font-family: Roboto, "Xhei Intel", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            font-family: Roboto, "Xhei Intel", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
         header {
@@ -57,6 +58,14 @@
             min-height: 0;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            padding-top: 1.5rem;
+            padding-bottom: 2.5rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+        }
+
+        .dark-mode-active #chat-box {
+            scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
         }
 
         #chat-box::-webkit-scrollbar {
@@ -74,11 +83,6 @@
 
         #chat-box::-webkit-scrollbar-track {
             background: transparent;
-        }
-
-        #chat-box {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
         }
 
         footer {
@@ -113,17 +117,30 @@
 
         .ai-bubble,
         .user-bubble {
-            line-height: 2.0;
+            line-height: 1.8;
         }
 
         .ai-bubble p {
-            margin-bottom: 1rem;
-            /* 让 AI 输出的每个段落下面都空出固定的一行距离 */
+            margin-bottom: 0.85rem;
         }
 
         .ai-bubble p:last-child {
             margin-bottom: 0;
-            /* 最后一个段落不需要下边距，防止气泡底部留白过多 */
+        }
+
+        /* 交互细节提升 */
+        #send-btn,
+        header button {
+            transition: all 0.2s ease-in-out;
+        }
+
+        #send-btn:hover:not(.is-loading) {
+            filter: brightness(1.05);
+            box-shadow: 0 4px 12px rgba(11, 87, 208, 0.2);
+        }
+
+        header button:hover {
+            transform: scale(1.05);
         }
     </style>
 </head>
@@ -221,6 +238,10 @@
                 <button id="send-btn"
                     class="ml-2 bg-[#0b57d0] text-white rounded-full font-medium mb-1 shrink-0 active:scale-95 transition-all w-20 h-11 flex items-center justify-center">发送</button>
             </div>
+
+            <p class="mt-2 text-xs text-gray-400 dark:text-gray-500 text-center tracking-wide">
+                AI 的回答未必正确无误,请注意识别。
+            </p>
         </div>
     </footer>
 

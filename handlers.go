@@ -29,7 +29,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("📥 llama.cpp 响应状态码:", resp.StatusCode)
+	fmt.Println("llama.cpp 响应状态码:", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		rollbackHistory(globalId, globalId.userMsgIndex)
@@ -41,17 +41,17 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("🌊 开始流式接收并转发数据...")
+	fmt.Println("开始流式接收并转发数据...")
 	aiFullContent, streamSuccess := forwardStreamData(w, r, resp.Body)
 
 	if streamSuccess || aiFullContent != "" {
-		fmt.Println("\n💾 对话成功，保存历史记录。")
+		fmt.Println("\n> 对话成功，保存历史记录。")
 		mu.Lock()
 		globalId.chatHistory = append(globalId.chatHistory, Message{Role: "assistant", Content: aiFullContent})
 		saveHistoryToFile()
 		mu.Unlock()
 	} else {
-		fmt.Println("\n🚨 流传输异常中断且未获取到内容，执行回滚。")
+		fmt.Println("\n 流传输异常中断且未获取到内容，执行回滚。")
 		rollbackHistory(globalId, globalId.userMsgIndex)
 	}
 }
@@ -131,7 +131,7 @@ Loop:
 			data = bytes.TrimSpace(data)
 
 			if bytes.Equal(data, []byte("[DONE]")) || bytes.Contains(data, []byte(`"done":true`)) {
-				fmt.Println("\n✅ 收到完整结束信号 [DONE]")
+				fmt.Println("\n> [DONE]")
 				streamSuccess = true
 				break
 			}
@@ -187,6 +187,6 @@ func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return err
 	}
-	fmt.Println("👤 用户输入:", body.Message)
+	fmt.Println("> 用户输入:", body.Message)
 	return nil
 }
