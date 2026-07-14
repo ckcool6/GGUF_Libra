@@ -5,6 +5,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.min.css';
 
+// ==================================== init & extensions load =============================
 // 自定义 marked 扩展，用来精确拦截 $$ 和 $
 const latexExtension = {
     name: 'inlineLatex',
@@ -55,6 +56,63 @@ marked.setOptions({
     gfm: true
 });
 
+window.onload = () => {
+    const savedTheme = localStorage.getItem('theme');
+
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark-mode-active', 'dark');
+        updateModeIcon(true);
+    } else {
+        document.documentElement.classList.remove('dark-mode-active', 'dark');
+        updateModeIcon(false);
+    }
+
+    loadHistory();
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (sendBtn.classList.contains('is-loading')) {
+                if (chatAbortController) chatAbortController.abort();
+                return;
+            }
+            send();
+        }
+    });
+    checkLlamaConnection();
+    setInterval(checkLlamaConnection, 10000);
+};
+
+async function loadHistory() {
+    try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        if (data && data.length > 0) {
+            chatBox.innerHTML = '';
+
+            data.forEach(m => {
+                const isUser = m.role === 'user';
+                const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>") : marked.parse(m.content);
+                // 修复：去掉用户气泡上的 markdown-body 类名
+                const html = `
+            <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
+                <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%] shadow-sm">
+                    ${content}
+                </div>
+            </div>`;
+                chatBox.insertAdjacentHTML('beforeend', html);
+            });
+
+            chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
+            twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    } catch (e) {
+        console.error("加载历史记录失败:", e);
+    }
+}
+
+// ==================================== send messages ==============================================
 let chatAbortController = null;
 
 const chatBox = document.getElementById('chat-box');
@@ -70,18 +128,6 @@ if (input) {
     });
 }
 
-function toggleDarkMode() {
-    document.documentElement.classList.toggle('dark-mode-active');
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    updateModeIcon(isDark);
-}
-
-function updateModeIcon(isDark) {
-    document.getElementById('mode-icon').innerHTML = isDark
-        ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path>`
-        : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
-}
 
 async function send() {
     if (sendBtn.classList.contains('is-loading')) {
@@ -92,13 +138,13 @@ async function send() {
     const text = input.value.trim();
     if (!text) return;
 
-    // 1. 改变按钮状态与清空输入
+    // 改变按钮状态与清空输入
     sendBtn.classList.add('is-loading');
     sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
     input.value = '';
     input.style.height = 'auto';
 
-    // 2. 渲染用户消息与加载动画
+    // 渲染用户消息与加载动画
     const safeUserText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
     chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${safeUserText}</div></div>`);
     chatBox.appendChild(loading);
@@ -108,7 +154,7 @@ async function send() {
     chatAbortController = new AbortController();
 
     try {
-        // 3. 发起请求
+        // 发起请求
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -120,13 +166,13 @@ async function send() {
             })
         });
 
-        // 4. 校验状态
+        // 校验状态
         if (!response.ok) {
             const errorMsg = await extractErrorMessage(response);
             throw new Error(errorMsg);
         }
 
-        // 5. 消费流数据
+        // 消费流数据
         await handleStreamResponse(response);
 
     } catch (err) {
@@ -305,6 +351,9 @@ async function extractErrorMessage(response) {
     return errorText;
 }
 
+document.getElementById('send-btn').addEventListener('click', send);
+
+// ============================= buttons ============================================
 function downloadChat() {
     const messages = chatBox.querySelectorAll('.user-bubble, .ai-bubble');
     let content = "--- 聊天记录 ---\n\n";
@@ -336,67 +385,24 @@ async function newChat() {
     }
 }
 
-window.onload = () => {
-    const savedTheme = localStorage.getItem('theme');
+function toggleDarkMode() {
+    document.documentElement.classList.toggle('dark-mode-active');
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    updateModeIcon(isDark);
+}
 
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark-mode-active', 'dark');
-        updateModeIcon(true);
-    } else {
-        document.documentElement.classList.remove('dark-mode-active', 'dark');
-        updateModeIcon(false);
-    }
-
-    loadHistory();
-
-    input.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (sendBtn.classList.contains('is-loading')) {
-                if (chatAbortController) chatAbortController.abort();
-                return;
-            }
-            send();
-        }
-    });
-    checkLlamaConnection();
-    setInterval(checkLlamaConnection, 10000);
-};
-
-async function loadHistory() {
-    try {
-        const res = await fetch('/api/history');
-        const data = await res.json();
-        if (data && data.length > 0) {
-            chatBox.innerHTML = '';
-
-            data.forEach(m => {
-                const isUser = m.role === 'user';
-                const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>") : marked.parse(m.content);
-                // 修复：去掉用户气泡上的 markdown-body 类名
-                const html = `
-            <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
-                <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%] shadow-sm">
-                    ${content}
-                </div>
-            </div>`;
-                chatBox.insertAdjacentHTML('beforeend', html);
-            });
-
-            chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
-            twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-    } catch (e) {
-        console.error("加载历史记录失败:", e);
-    }
+function updateModeIcon(isDark) {
+    document.getElementById('mode-icon').innerHTML = isDark
+        ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path>`
+        : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
 }
 
 document.getElementById('download-btn').addEventListener('click', downloadChat);
 document.getElementById('theme-btn').addEventListener('click', toggleDarkMode);
 document.getElementById('new-chat-btn').addEventListener('click', newChat);
-document.getElementById('send-btn').addEventListener('click', send);
 
+// ========================= settings page =========================================
 const modal = document.getElementById('settings-modal');
 const customUrlInput = document.getElementById('custom-url');
 const customKeyInput = document.getElementById('custom-key');
@@ -421,6 +427,7 @@ document.getElementById('save-settings').addEventListener('click', () => {
     modal.classList.add('hidden');
 });
 
+// ================================= indictor light ==========================================
 const statusDot = document.getElementById('status-dot');
 
 // 检测 llama.cpp 连接状态的函数
