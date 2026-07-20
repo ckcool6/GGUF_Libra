@@ -200,6 +200,8 @@ async function send() {
 }
 
 // 核心处理器对象：查表法替代多重 if
+let isRenderPending = false;
+
 const streamChunkHandlers = {
     model: (json, ctx) => {
         ctx.modelName = json.model.split('/').pop().split('\\').pop();
@@ -214,14 +216,12 @@ const streamChunkHandlers = {
         const content = json.choices?.[0]?.delta?.content || "";
         if (!content) return;
 
-        // 初始化计时器
         if (!ctx.startTime) ctx.startTime = Date.now();
-        // 如果后端还没给最终的 usage 统计，就按字符数保底计数
         if (!ctx.hasOfficialUsage) ctx.tokenCount++;
 
         ctx.fullText += content;
 
-        // 首次输出：创建气泡架构
+        // 首次收到消息：立即创建气泡框架
         if (ctx.isFirstChunk) {
             loading.classList.add('hidden');
             ctx.currentBubbleId = 'ai-' + Date.now();
@@ -240,15 +240,22 @@ const streamChunkHandlers = {
             chatBox.insertAdjacentHTML('beforeend', html);
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
-        } else {
-            // 传输中只做基础的高速 Markdown 渲染
-            ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
         }
-        // 实时高亮
-        ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
-        // 更新打字机速度与滚动
-        updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
-        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // 流传输过程中的高频渲染：使用 rAF 节流，避免阻塞主线程
+        if (!isRenderPending) {
+            isRenderPending = true;
+            requestAnimationFrame(() => {
+                if (ctx.aiBubbleDiv) {
+                    ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
+                    // 传输中只做必要的代码高亮
+                    ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                    updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+                isRenderPending = false;
+            });
+        }
     }
 };
 

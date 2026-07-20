@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 func chatHandler(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +97,9 @@ func forwardStreamData(w http.ResponseWriter, r *http.Request, respBody io.ReadC
 	flusher, _ := w.(http.Flusher)
 
 	reader := bufio.NewReader(respBody)
-	var aiFullContent string
+
+	// 使用 strings.Builder 替换频繁的 += 字符串拼接
+	var aiFullContent strings.Builder
 	streamSuccess := false
 
 Loop:
@@ -137,7 +140,7 @@ Loop:
 			}
 
 			var streamResp struct {
-				Model   string `json:"model"` // 拦截大模型的名字
+				Model   string `json:"model"`
 				Choices []struct {
 					Delta struct {
 						Content string `json:"content"`
@@ -146,14 +149,14 @@ Loop:
 			}
 			if err := json.Unmarshal(data, &streamResp); err == nil && len(streamResp.Choices) > 0 {
 				content := streamResp.Choices[0].Delta.Content
-				aiFullContent += content
+				aiFullContent.WriteString(content) // 高效写入
 				fmt.Print(content)
 			}
 		}
 	}
 
 	io.Copy(io.Discard, respBody)
-	return aiFullContent, streamSuccess
+	return aiFullContent.String(), streamSuccess
 }
 
 func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*http.Response, error) {
