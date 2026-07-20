@@ -5,6 +5,26 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.min.css';
 
+// ==================================== 工具函数 =============================================
+// 标准 HTML 转义函数，防止 XSS 注入
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, match => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[match]));
+}
+
+// 智能滚动：只有当用户处于底部附近时才自动滚动
+function scrollToBottomIfNear() {
+    const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 120;
+    if (isAtBottom) {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+}
+
 // ==================================== init & extensions load =============================
 // 自定义 marked 扩展，用来精确拦截 $$ 和 $
 const latexExtension = {
@@ -12,7 +32,7 @@ const latexExtension = {
     level: 'inline',
     start(src) { return src.indexOf('$'); },
     tokenizer(src) {
-        // 1. 优先匹配块级公式 $$...$$
+        // 优先匹配块级公式 $$...$$
         const blockMatch = /^\$\$\s*([\s\S]*?)\s*\$\$/.exec(src);
         if (blockMatch) {
             return {
@@ -22,7 +42,7 @@ const latexExtension = {
                 displayMode: true
             };
         }
-        // 2. 匹配行内公式 $...$
+        // 匹配行内公式 $...$
         const inlineMatch = /^\$([^\$\n]+?)\$/.exec(src);
         if (inlineMatch) {
             return {
@@ -92,8 +112,7 @@ async function loadHistory() {
 
             data.forEach(m => {
                 const isUser = m.role === 'user';
-                const content = isUser ? m.content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>") : marked.parse(m.content);
-                // 修复：去掉用户气泡上的 markdown-body 类名
+                const content = isUser ? escapeHTML(m.content).replace(/\n/g, "<br>") : marked.parse(m.content);
                 const html = `
             <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
                 <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%] shadow-sm">
@@ -120,14 +139,12 @@ const input = document.getElementById('user-input');
 const loading = document.getElementById('ai-loading-template');
 const sendBtn = document.getElementById('send-btn');
 
-// 自适应输入框高度逻辑
 if (input) {
     input.addEventListener('input', () => {
         input.style.height = 'auto';
         input.style.height = input.scrollHeight + 'px';
     });
 }
-
 
 async function send() {
     if (sendBtn.classList.contains('is-loading')) {
@@ -138,14 +155,12 @@ async function send() {
     const text = input.value.trim();
     if (!text) return;
 
-    // 改变按钮状态与清空输入
     sendBtn.classList.add('is-loading');
     sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
     input.value = '';
     input.style.height = 'auto';
 
-    // 渲染用户消息与加载动画
-    const safeUserText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+    const safeUserText = escapeHTML(text).replace(/\n/g, "<br>");
     chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${safeUserText}</div></div>`);
     chatBox.appendChild(loading);
     loading.classList.remove('hidden');
@@ -154,7 +169,6 @@ async function send() {
     chatAbortController = new AbortController();
 
     try {
-        // 发起请求
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -166,13 +180,11 @@ async function send() {
             })
         });
 
-        // 校验状态
         if (!response.ok) {
             const errorMsg = await extractErrorMessage(response);
             throw new Error(errorMsg);
         }
 
-        // 消费流数据
         await handleStreamResponse(response);
 
     } catch (err) {
@@ -184,7 +196,7 @@ async function send() {
                 <div class="flex justify-start mb-4">
                     <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
                         <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
-                        <div>${err.message || "连接错误，请检查后端。"}</div>
+                        <div>${escapeHTML(err.message || "连接错误，请检查后端。")}</div>
                     </div>
                 </div>`;
             chatBox.insertAdjacentHTML('beforeend', errorHtml);
@@ -199,9 +211,7 @@ async function send() {
     }
 }
 
-// 核心处理器对象：查表法替代多重 if
-let isRenderPending = false;
-
+// 核心处理器对象
 const streamChunkHandlers = {
     model: (json, ctx) => {
         ctx.modelName = json.model.split('/').pop().split('\\').pop();
@@ -221,7 +231,7 @@ const streamChunkHandlers = {
 
         ctx.fullText += content;
 
-        // 首次收到消息：立即创建气泡框架
+        // 首次收到消息：创建气泡框架
         if (ctx.isFirstChunk) {
             loading.classList.add('hidden');
             ctx.currentBubbleId = 'ai-' + Date.now();
@@ -243,23 +253,21 @@ const streamChunkHandlers = {
         }
 
         // 流传输过程中的高频渲染：使用 rAF 节流，避免阻塞主线程
-        if (!isRenderPending) {
-            isRenderPending = true;
+        if (!ctx.isRenderPending) {
+            ctx.isRenderPending = true;
             requestAnimationFrame(() => {
                 if (ctx.aiBubbleDiv) {
                     ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
-                    // 传输中只做必要的代码高亮
                     ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                     updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                    scrollToBottomIfNear();
                 }
-                isRenderPending = false;
+                ctx.isRenderPending = false;
             });
         }
     }
 };
 
-// 辅助函数：更新打字机速度与耗时提示
 function updateStreamingSpeed(currentBubbleId, startTime, tokenCount) {
     if (!startTime) return;
     const elapsed = (Date.now() - startTime) / 1000;
@@ -272,15 +280,17 @@ function updateStreamingSpeed(currentBubbleId, startTime, tokenCount) {
     }
 }
 
-// 辅助函数：流完全结束后的最终全量高亮与统计
 function finalizeAiBubble(ctx) {
     if (!ctx.aiBubbleDiv) return;
 
-    // 一次性执行高亮和表情包解析
+    // 1. 进行最终无死角的全量 Markdown 解析，补齐最后一帧
+    ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
+
+    // 2. 补齐代码高亮与表情包解析
     ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
     twemoji.parse(ctx.aiBubbleDiv, { folder: 'svg', ext: '.svg' });
 
-    // 展示最终精确的 tokens 统计
+    // 3. 统计展示
     if (ctx.startTime && ctx.currentBubbleId) {
         const elapsed = (Date.now() - ctx.startTime) / 1000;
         const speed = (ctx.tokenCount / (elapsed || 1)).toFixed(1);
@@ -291,13 +301,11 @@ function finalizeAiBubble(ctx) {
     }
 }
 
-// 主流式响应处理函数
 async function handleStreamResponse(response) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
-    // 状态上下文对象：传递给每个处理器，用于共享流状态
     const ctx = {
         fullText: "",
         isFirstChunk: true,
@@ -306,7 +314,8 @@ async function handleStreamResponse(response) {
         startTime: null,
         modelName: "GGUF Model",
         currentBubbleId: "",
-        hasOfficialUsage: false
+        hasOfficialUsage: false,
+        isRenderPending: false
     };
 
     try {
@@ -324,7 +333,6 @@ async function handleStreamResponse(response) {
 
                 const json = JSON.parse(trimmed.substring(6));
 
-                // 核心分发逻辑：遍历对象中的 key，存在即处理
                 for (const key in streamChunkHandlers) {
                     if (json[key] !== undefined) {
                         streamChunkHandlers[key](json, ctx);
@@ -333,9 +341,8 @@ async function handleStreamResponse(response) {
             }
         }
 
-        // 流结束后的收尾工作
         finalizeAiBubble(ctx);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        scrollToBottomIfNear();
 
     } catch (streamError) {
         console.error("流式读取过程中发生错误:", streamError);
@@ -437,17 +444,12 @@ document.getElementById('save-settings').addEventListener('click', () => {
 // ================================= indictor light ==========================================
 const statusDot = document.getElementById('status-dot');
 
-// 检测 llama.cpp 连接状态的函数
 async function checkLlamaConnection() {
-    // 优先获取用户自定义的 API 地址，如果没有则使用你项目默认的后端地址
     const customUrl = localStorage.getItem('custom_api_url') || '';
-
-    let healthUrl = '/health'; // 默认同域路由
+    let healthUrl = '/health';
 
     if (customUrl) {
         try {
-            // 如果填了自定义的完整的地址，比如 http://127.0.0.1:8080/v1/chat/completions
-            // 我们需要把尾部的路径换成 /health
             const urlObj = new URL(customUrl);
             healthUrl = `${urlObj.protocol}//${urlObj.host}/health`;
         } catch (e) {
@@ -456,7 +458,6 @@ async function checkLlamaConnection() {
     }
 
     try {
-        // 设置 3 秒超时，防止接口卡死导致状态一直不更新
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
@@ -467,11 +468,9 @@ async function checkLlamaConnection() {
 
         clearTimeout(timeoutId);
 
-        // llama.cpp 的 /health 接口正常情况下会返回 {"status": "ok"}
         if (res.ok) {
             const data = await res.json();
             if (data.status === 'ok') {
-                // 连接成功：变绿，并移除动画
                 statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                 statusDot.title = "已成功连接到 llama.cpp";
                 return;
@@ -480,7 +479,6 @@ async function checkLlamaConnection() {
         throw new Error("服务状态异常");
 
     } catch (err) {
-        // 连接失败：变红，并加上闪烁动画提示用户注意
         statusDot.className = "w-2.5 h-2.5 rounded-full bg-rose-500 transition-colors duration-300 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse";
         statusDot.title = "无法连接到 llama.cpp，请检查后端服务是否启动";
     }
