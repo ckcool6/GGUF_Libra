@@ -3,10 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
-
-	"github.com/joho/godotenv"
 )
 
 var (
@@ -16,9 +13,6 @@ var (
 )
 
 func main() {
-
-	godotenv.Load() // 自动读取 .env 文件并加载到环境变量
-	OpenRouterKey = os.Getenv("OPENROUTER_KEY")
 
 	loadHistoryFromFile() // 启动即加载
 	config_init()
