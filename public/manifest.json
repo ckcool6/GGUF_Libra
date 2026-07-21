@@ -1,17 +1,17 @@
 {
-    "name": "Mini Gemini",
-    "short_name": "Gemini",
-    "description": "极简 AI 聊天客户端",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#131314",
-    "theme_color": "#0b57d0",
-    "icons": [
-      {
-        "src": "icon.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any maskable"
-      }
-    ]
-  }
+  "name": "GGUF Player",
+  "short_name": "GPlayer",
+  "description": "极简 AI 聊天客户端",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131314",
+  "theme_color": "#0b57d0",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
