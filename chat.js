@@ -366,19 +366,34 @@ async function extractErrorMessage(response) {
 document.getElementById('send-btn').addEventListener('click', send);
 
 // ============================= buttons ============================================
-function downloadChat() {
-    const messages = chatBox.querySelectorAll('.user-bubble, .ai-bubble');
-    let content = "--- 聊天记录 ---\n\n";
-    messages.forEach(el => {
-        const role = el.classList.contains('user-bubble') ? "【用户】" : "【AI】";
-        content += `${role}\n${el.innerText.trim()}\n\n`;
-    });
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chat-${Date.now()}.txt`;
-    a.click();
+async function downloadChat() {
+    try {
+        // 从后端获取真实的原始 Markdown 对话历史
+        const res = await fetch('/api/history');
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+            alert("暂无聊天记录可导出");
+            return;
+        }
+
+        let content = "--- 聊天记录 ---\n\n";
+        data.forEach(m => {
+            const role = m.role === 'user' ? "【用户】" : "【AI】";
+            content += `${role}\n${m.content.trim()}\n\n`;
+        });
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat-${Date.now()}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error("导出聊天记录失败:", e);
+        alert("导出失败，请重试");
+    }
 }
 
 async function newChat() {
