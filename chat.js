@@ -114,11 +114,11 @@ async function loadHistory() {
                 const isUser = m.role === 'user';
                 const content = isUser ? escapeHTML(m.content).replace(/\n/g, "<br>") : marked.parse(m.content);
                 const html = `
-            <div class="flex ${isUser ? 'justify-end' : 'justify-start'} mb-4">
-                <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%] shadow-sm">
-                    ${content}
-                </div>
-            </div>`;
+                    <div class="flex justify-start mb-8">
+                        <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%]">
+                            ${content}
+                        </div>
+                    </div>`;
                 chatBox.insertAdjacentHTML('beforeend', html);
             });
 
@@ -161,9 +161,7 @@ async function send() {
     input.style.height = 'auto';
 
     const safeUserText = escapeHTML(text).replace(/\n/g, "<br>");
-    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-end mb-4"><div class="user-bubble p-4 rounded-2xl max-w-[85%] shadow-sm">${safeUserText}</div></div>`);
-    chatBox.appendChild(loading);
-    loading.classList.remove('hidden');
+    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`); loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
     chatAbortController = new AbortController();
@@ -236,17 +234,17 @@ const streamChunkHandlers = {
             loading.classList.add('hidden');
             ctx.currentBubbleId = 'ai-' + Date.now();
             const html = `
-                <div class="flex justify-start mb-4">
-                    <div class="flex flex-col max-w-[90%]">
-                        <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl shadow-sm markdown-body">
-                            ${marked.parse(ctx.fullText)}
-                        </div>
-                        <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
-                            <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
-                            <span id="speed-${ctx.currentBubbleId}">⏱️ 正在计算...</span>
-                        </div>
-                    </div>
-                </div>`;
+                        <div class="flex justify-start mb-8">
+                            <div class="flex flex-col max-w-[90%]">
+                                <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
+                                    ${marked.parse(ctx.fullText)}
+                                </div>
+                                <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
+                                    <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
+                                    <span id="speed-${ctx.currentBubbleId}">⏱️ 正在计算...</span>
+                                </div>
+                            </div>
+                        </div>`;
             chatBox.insertAdjacentHTML('beforeend', html);
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
@@ -388,11 +386,11 @@ async function newChat() {
         try {
             await fetch('/api/new-chat');
             chatBox.innerHTML = `
-                <div class="flex justify-start mb-4">
-                    <div class="ai-bubble p-4 rounded-2xl shadow-sm max-w-[90%] markdown-body">
-                        你好!
-                    </div>
-                </div>`;
+                            <div class="flex justify-start mb-8">
+                                <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
+                                    你好!
+                                </div>
+                            </div>`;
         } catch (e) {
             console.error("清空对话失败:", e);
         }

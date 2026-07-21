@@ -5,19 +5,15 @@
 :root {
     --bg-main: #fcfcfb;
     --bg-header: #fcfcfb;
-    --bg-bubble-ai: #ffffff;
-    --bg-bubble-user: #eff5f9;
     --text-main: #1f1f1f;
-    --border-color: #e5e7eb;
+    --border-color: #5e6062;
 }
 
 .dark-mode-active {
     --bg-main: #131314;
     --bg-header: #131314;
-    --bg-bubble-ai: #1e1f20;
-    --bg-bubble-user: #0b57d0;
     --text-main: #e3e3e3;
-    --border-color: #333537;
+    --border-color: #4b5563;
 }
 
 body {
@@ -36,7 +32,6 @@ body {
 
 header {
     background-color: var(--bg-header);
-    border-bottom: 1px solid var(--border-color) !important;
     flex-shrink: 0;
 }
 
@@ -78,15 +73,17 @@ footer {
     padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 
-.ai-bubble {
-    background-color: var(--bg-bubble-ai) !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-main) !important;
+/* 透明边框气泡 */
+#chat-box .ai-bubble,
+#chat-box .user-bubble {
+    background-color: transparent;
+    border: 1.5px solid var(--border-color);
+    color: var(--text-main);
+    line-height: 1.6;
 }
 
-.user-bubble {
-    background-color: var(--bg-bubble-user) !important;
-    color: var(--text-main) !important;
+#chat-box .user-bubble {
+    border-color: #0b57d0;
 }
 
 .markdown-body pre {
@@ -102,11 +99,6 @@ img.emoji {
     display: inline-block;
 }
 
-.ai-bubble,
-.user-bubble {
-    line-height: 1.8;
-}
-
 .ai-bubble p {
     margin-bottom: 0.85rem;
 }
@@ -115,7 +107,6 @@ img.emoji {
     margin-bottom: 0;
 }
 
-/* 交互细节提升 */
 #send-btn,
 header button {
     transition: all 0.2s ease-in-out;
