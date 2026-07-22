@@ -12,8 +12,9 @@ type chatChain struct {
 	dialogAbstract string
 
 	// node states
-	isBlueNode  bool
-	isGreenNode bool
+	isBlueNode  bool // main fork
+	isGreenNode bool // branch fork
+	isForked    bool
 }
 
 // todo
