@@ -1,7 +1,8 @@
 type chatChain struct {
 	index int
-	next *chatlist
-	pre *chatlist
+	next *chatChain
+	pre *chatChain
+	dialog_content *chatlist
 	abstract string
 }
 
