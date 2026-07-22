@@ -160,6 +160,7 @@ Loop:
 		select {
 		case <-r.Context().Done():
 			fmt.Println("\n🛑 检测到前端主动断开连接，停止接收流数据。")
+			respBody.Close()
 			break Loop
 		default:
 		}

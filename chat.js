@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import twemoji from 'twemoji';
 import hljs from 'highlight.js';
@@ -6,15 +7,20 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.min.css';
 
 // ==================================== 工具函数 =============================================
-// 标准 HTML 转义函数，防止 XSS 注入
-function escapeHTML(str) {
-    return str.replace(/[&<>"']/g, match => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    }[match]));
+// 用户纯文本转义与换行处理
+function formatUserText(str) {
+    // 先做净化，再把换行替换为 <br>
+    const cleanStr = DOMPurify.sanitize(str);
+    return cleanStr.replace(/\n/g, "<br>");
+}
+
+// AI Markdown 渲染与 XSS 边界防护
+function safeMarkdownParse(content) {
+    const rawHtml = marked.parse(content);
+    return DOMPurify.sanitize(rawHtml, {
+        ADD_TAGS: ['use', 'path', 'svg'], // 容许 KaTeX / Math 相关的 SVG 标签
+        ADD_ATTR: ['target', 'allow']
+    });
 }
 
 // 智能滚动：只有当用户处于底部附近时才自动滚动
@@ -116,7 +122,7 @@ async function loadHistory() {
 
             data.forEach(m => {
                 const isUser = m.role === 'user';
-                const content = isUser ? escapeHTML(m.content).replace(/\n/g, "<br>") : marked.parse(m.content);
+                const content = isUser ? formatUserText(m.content) : safeMarkdownParse(m.content);
                 const html = `
                     <div class="flex justify-start mb-8">
                         <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%]">
@@ -166,8 +172,9 @@ async function send() {
     input.value = '';
     input.style.height = 'auto';
 
-    const safeUserText = escapeHTML(text).replace(/\n/g, "<br>");
-    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`); loading.classList.remove('hidden');
+    const safeUserText = formatUserText(text);
+    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`);
+    loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
     chatAbortController = new AbortController();
@@ -200,7 +207,7 @@ async function send() {
                 <div class="flex justify-start mb-4">
                     <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
                         <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
-                        <div>${escapeHTML(err.message || "连接错误，请检查后端。")}</div>
+                        <div>${formatUserText(err.message || "连接错误，请检查后端。")}</div>
                     </div>
                 </div>`;
             chatBox.insertAdjacentHTML('beforeend', errorHtml);
@@ -244,7 +251,7 @@ const streamChunkHandlers = {
                         <div class="flex justify-start mb-8">
                             <div class="flex flex-col max-w-[90%]">
                                 <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
-                                    ${marked.parse(ctx.fullText)}
+                                    ${safeMarkdownParse(ctx.fullText)}
                                 </div>
                                 <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
                                     <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
@@ -262,7 +269,7 @@ const streamChunkHandlers = {
             ctx.isRenderPending = true;
             requestAnimationFrame(() => {
                 if (ctx.aiBubbleDiv) {
-                    ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
+                    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
                     ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
                     updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
                     scrollToBottomIfNear();
@@ -288,8 +295,8 @@ function updateStreamingSpeed(currentBubbleId, startTime, tokenCount) {
 function finalizeAiBubble(ctx) {
     if (!ctx.aiBubbleDiv) return;
 
-    // 1. 进行最终无死角的全量 Markdown 解析，补齐最后一帧
-    ctx.aiBubbleDiv.innerHTML = marked.parse(ctx.fullText);
+    // 1. 进行最终无死角的安全 Markdown 解析，补齐最后一帧
+    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
 
     // 2. 补齐代码高亮与表情包解析
     ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
@@ -404,15 +411,26 @@ async function downloadChat() {
 
 async function newChat() {
     if (confirm("清空所有对话？")) {
+        // 如果当前正在生成回复，强行打断请求
+        if (chatAbortController) {
+            chatAbortController.abort();
+            chatAbortController = null;
+        }
+
+        // 还原按钮与加载状态
+        loading.classList.add('hidden');
+        sendBtn.classList.remove('is-loading');
+        sendBtn.innerHTML = '发送';
+
         try {
             await fetch('/api/new-chat');
             chatBox.innerHTML = `
-                            <div class="flex justify-start mb-8">
-                                <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
-                                    你好!
-                                </div>
-                            </div>`;
-            get_ctx_usage(); // 清空对话后刷新 Context
+                <div class="flex justify-start mb-8">
+                    <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
+                        你好!
+                    </div>
+                </div>`;
+            get_ctx_usage(); // 刷新的同时重置 Context 计算
         } catch (e) {
             console.error("清空对话失败:", e);
         }
