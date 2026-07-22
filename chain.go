@@ -10,6 +10,10 @@ type chatChain struct {
 	// data
 	dialogContent  *chatlist
 	dialogAbstract string
+
+	// node states
+	isBlueNode  bool
+	isGreenNode bool
 }
 
 // todo
