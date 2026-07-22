@@ -377,7 +377,7 @@ async function extractErrorMessage(response) {
     return errorText;
 }
 
-
+document.getElementById('send-btn').addEventListener('click', send);
 // ============================= buttons ============================================
 async function downloadChat() {
     try {
