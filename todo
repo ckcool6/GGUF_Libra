@@ -6,28 +6,20 @@ type chatChain struct {
 	abstract string
 }
 
+* initChatChain
 
-围绕这个双向链表结构的会话管理，主要需要以下几个核心操作函数：
+// GenerateAbstract
+* AppendNode
 
-### 链表基础节点操作
+* DeleteNode
 
-* `NewChatChain(index int) *chatChain`
-* `AppendNode(head *chatChain, data *chatlist) *chatChain`
-* `InsertNodeAfter(target *chatChain, data *chatlist) *chatChain`
-* `DeleteNode(node *chatChain) *chatChain`
-* `GetNodeByIndex(head *chatChain, index int) *chatChain`
+// GetHistoryList
+* GetNodeByIndex
 
----
+// UpdateAbstract
+* UpdateNode
 
-### 会话与摘要管理
-
-* `GenerateAbstract(data *chatlist) string`
-* `UpdateAbstract(node *chatChain, abstract string)`
-* `GetHistoryList(head *chatChain) []map[string]interface{}`
 
 ---
-
-### 数据持久化与恢复
-
-* `SaveChainToFile(head *chatChain, filePath string) error`
-* `LoadChainFromFile(filePath string) (*chatChain, error)`
+* SaveChainToFile
+* LoadChainFromFile
