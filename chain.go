@@ -1,9 +1,13 @@
 package main
 
 type chatChain struct {
-	dialogIndex    int
-	dialogNext     *chatChain
-	dialogPre      *chatChain
+	// structure
+	dialogIndex  int
+	dialogMain   *chatChain
+	dialogFork   *chatChain
+	dialogParent *chatChain
+
+	// data
 	dialogContent  *chatlist
 	dialogAbstract string
 }
