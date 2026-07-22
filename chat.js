@@ -93,7 +93,6 @@ window.onload = () => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (sendBtn.classList.contains('is-loading')) {
-                if (chatAbortController) chatAbortController.abort();
                 return;
             }
             send();
@@ -148,7 +147,9 @@ if (input) {
 
 async function send() {
     if (sendBtn.classList.contains('is-loading')) {
-        if (chatAbortController) chatAbortController.abort();
+        if (chatAbortController) {
+            chatAbortController.abort();
+        }
         return;
     }
 
@@ -363,7 +364,6 @@ async function extractErrorMessage(response) {
     return errorText;
 }
 
-document.getElementById('send-btn').addEventListener('click', send);
 
 // ============================= buttons ============================================
 async function downloadChat() {
