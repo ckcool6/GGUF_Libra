@@ -29,6 +29,9 @@ func main() {
 	// 修改 /api/new-chat 路由
 	http.HandleFunc("/api/new-chat", apiNewChatHandler)
 
+	// 获取ctx
+	http.HandleFunc("/api/llama-props", apiLlamaPropsHandler)
+
 	// 修改 /api/delete-last 路由
 	http.HandleFunc("/api/delete-last", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()

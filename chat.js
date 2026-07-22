@@ -99,7 +99,12 @@ window.onload = () => {
         }
     });
     checkLlamaConnection();
-    setInterval(checkLlamaConnection, 10000);
+    get_ctx_usage();
+
+    setInterval(() => {
+        checkLlamaConnection();
+        get_ctx_usage();
+    }, 10000);
 };
 
 async function loadHistory() {
@@ -207,6 +212,7 @@ async function send() {
         sendBtn.classList.remove('is-loading');
         sendBtn.innerHTML = '发送';
         chatAbortController = null;
+        get_ctx_usage();
     }
 }
 
@@ -406,6 +412,7 @@ async function newChat() {
                                     你好!
                                 </div>
                             </div>`;
+            get_ctx_usage(); // 清空对话后刷新 Context
         } catch (e) {
             console.error("清空对话失败:", e);
         }
@@ -494,5 +501,47 @@ async function checkLlamaConnection() {
     } catch (err) {
         statusDot.className = "w-2.5 h-2.5 rounded-full bg-rose-500 transition-colors duration-300 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse";
         statusDot.title = "无法连接到 llama.cpp，请检查后端服务是否启动";
+    }
+}
+
+// 获取并更新当前 llama.cpp 的上下文 Token 使用状态
+async function get_ctx_usage() {
+    const customUrl = localStorage.getItem('custom_api_url') || '';
+    const tokenDisplay = document.getElementById('token-usage');
+    if (!tokenDisplay) return;
+
+    try {
+        const propsUrl = `/api/llama-props?custom_url=${encodeURIComponent(customUrl)}`;
+        const res = await fetch(propsUrl);
+
+        if (res.ok) {
+            const data = await res.json();
+            const maxCtx = data.default_generation_settings?.n_ctx || 0;
+            let currentCtx = 0;
+
+            if (data.slots && data.slots.length > 0) {
+                currentCtx = data.slots[0].n_past || 0;
+            }
+
+            // 拿不到有效 maxCtx 时，直接优雅回退
+            if (maxCtx <= 0) {
+                tokenDisplay.innerText = `-- / -- (0%)`;
+                tokenDisplay.classList.remove('text-rose-500');
+                return;
+            }
+
+            const percentage = Math.min(100, Math.round((currentCtx / maxCtx) * 100));
+            tokenDisplay.innerText = `${currentCtx} tokens / ${maxCtx} tokens (${percentage}%)`;
+
+            if (percentage > 85) {
+                tokenDisplay.classList.add('text-rose-500');
+            } else {
+                tokenDisplay.classList.remove('text-rose-500');
+            }
+        }
+    } catch (err) {
+        console.error("获取 Context 失败:", err);
+        tokenDisplay.innerText = `-- / -- (0%)`;
+        tokenDisplay.classList.remove('text-rose-500');
     }
 }

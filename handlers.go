@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
 
 func chatHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +89,57 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	saveHistoryToFile()
 	mu.Unlock()
 	w.WriteHeader(http.StatusOK)
+}
+
+// 请求 llama.cpp 的 /props 接口获取真实的 context 占用
+func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	maxCtx := 0
+	apiURL := "http://127.0.0.1:8021/props"
+
+	customURL := r.URL.Query().Get("custom_url")
+	if customURL != "" {
+		if parsedURL, err := url.Parse(customURL); err == nil && parsedURL.Host != "" {
+			apiURL = fmt.Sprintf("%s://%s/props", parsedURL.Scheme, parsedURL.Host)
+		}
+	}
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(apiURL)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var propsData struct {
+			DefaultGenerationSettings struct {
+				NCtx int `json:"n_ctx"`
+			} `json:"default_generation_settings"`
+		}
+		if json.NewDecoder(resp.Body).Decode(&propsData) == nil {
+			maxCtx = propsData.DefaultGenerationSettings.NCtx
+		}
+		resp.Body.Close()
+	}
+
+	// 算当前实际聊天历史在使用的 Token 开销
+	mu.Lock()
+	filteredMsgs := filterMessagesByToken(globalId.chatHistory, maxCtx)
+	currentTokens := 0
+	for _, msg := range filteredMsgs {
+		currentTokens += getMessageTokens(msg.Role, msg.Content)
+	}
+	mu.Unlock()
+
+	responseData := map[string]interface{}{
+		"default_generation_settings": map[string]interface{}{
+			"n_ctx": maxCtx, // 拿不到时为 0
+		},
+		"slots": []map[string]interface{}{
+			{
+				"n_past": currentTokens,
+			},
+		},
+	}
+
+	json.NewEncoder(w).Encode(responseData)
 }
 
 // tool functions
