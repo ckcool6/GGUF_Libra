@@ -1,20 +1,25 @@
 package main
 
-type chatChain struct {
-	// structure
-	dialogIndex  int
-	dialogMain   *chatChain
-	dialogFork   *chatChain
-	dialogParent *chatChain
+// enum
+type nodeColor int
 
+const (
+	YellowNode nodeColor = iota // 0
+	GreenNode
+)
+
+type chatChain struct {
 	// data
 	dialogContent  *chatlist
 	dialogAbstract string
 
-	// node states
-	isBlueNode  bool // main fork
-	isGreenNode bool // branch fork
-	isForked    bool
+	// structure
+	dialogMain *chatChain
+	dialogSide *chatChain
+	dialogPre  *chatChain
+
+	branchColor nodeColor
+	isForkdNode bool
 }
 
 // todo
@@ -27,13 +32,13 @@ func (chain *chatChain) AppendNode() {
 
 }
 
-// todo
-func (chain *chatChain) DeleteNode() {
+// walkthrough
+func (chain *chatChain) TraverseChian() {
 
 }
 
 // todo
-func (chain *chatChain) GetNodeByIndex() {
+func (chain *chatChain) DeleteNode() {
 
 }
 
@@ -41,8 +46,6 @@ func (chain *chatChain) GetNodeByIndex() {
 func (chain *chatChain) UpdateNode() {
 
 }
-
-//
 
 // todo
 /* SaveChainToFile
