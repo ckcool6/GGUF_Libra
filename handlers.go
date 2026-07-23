@@ -65,7 +65,7 @@ func load_history(cl *chatlist, body *reqBody) {
 	cl.chatHistory = append(cl.chatHistory, Message{Role: "user", Content: body.Message})
 	cl.userMsgIndex = len(cl.chatHistory) - 1
 
-	cl.sendHistory = filterMessagesByToken(cl.chatHistory, 4096)
+	cl.sendHistory = filterMessagesByToken(cl.chatHistory, 16384)
 }
 
 func rollbackHistory(cl *chatlist, index int) {
