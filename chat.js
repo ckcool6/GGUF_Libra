@@ -31,6 +31,7 @@ function scrollToBottomIfNear() {
     }
 }
 
+// 初始化提示词下拉框
 async function initPromptSelect() {
     const select = document.getElementById('prompt-select');
     if (!select) return;
@@ -48,18 +49,50 @@ async function initPromptSelect() {
             select.appendChild(opt);
         });
 
-        // 绑定切换事件
+        // 监听切换事件
         select.addEventListener('change', async (e) => {
             const newId = e.target.value;
-            await fetch('/api/switch-prompt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: newId })
-            });
 
-            // 可选：切换提示词后刷新 token 使用量提示
-            get_ctx_usage();
+            // 1. 如果当前正在生成回复，强行中断请求
+            if (chatAbortController) {
+                chatAbortController.abort();
+                chatAbortController = null;
+            }
+
+            // 2. 还原按钮与加载状态
+            loading.classList.add('hidden');
+            sendBtn.classList.remove('is-loading');
+            sendBtn.innerHTML = '发送';
+
+            try {
+                // 3. 通知后端切换提示词
+                const switchRes = await fetch('/api/switch-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: newId })
+                });
+
+                if (!switchRes.ok) throw new Error("切换提示词失败");
+
+                // 4. 自动调用清空后端对话历史[cite: 2]
+                await fetch('/api/new-chat');
+
+                // 5. 重置前端 UI[cite: 2]
+                chatBox.innerHTML = `
+                    <div class="flex justify-start mb-8">
+                        <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
+                            你好！
+                        </div>
+                    </div>`;
+
+                // 6. 重新刷新 Context 内存计算[cite: 2]
+                get_ctx_usage();
+
+            } catch (err) {
+                console.error("切换提示词或清空对话失败:", err);
+            }
         });
+
     } catch (e) {
         console.error("加载提示词列表失败:", e);
     }
