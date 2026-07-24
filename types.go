@@ -6,8 +6,13 @@ type Message struct {
 }
 
 type SystemPromptConfig struct {
+	Active  string       `json:"active"`
+	Prompts []PromptItem `json:"prompts"`
+}
+
+type PromptItem struct {
+	ID      string `json:"id"`
 	Name    string `json:"name"`
-	Version string `json:"version"`
 	Content string `json:"content"`
 }
 

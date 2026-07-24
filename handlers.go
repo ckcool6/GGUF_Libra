@@ -247,3 +247,37 @@ func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 	fmt.Println("> 用户输入:", body.Message)
 	return nil
 }
+
+// 获取提示词列表及当前选中的 ID
+func apiGetPromptsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	mu.Lock()
+	defer mu.Unlock()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active":  config.Active,
+		"prompts": config.Prompts,
+	})
+}
+
+// 切换提示词
+func apiSwitchPromptHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	mu.Lock()
+	success := setActivePrompt(body.ID)
+	mu.Unlock()
+
+	if !success {
+		http.Error(w, "Prompt not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}

@@ -47,11 +47,24 @@ func loadSystemPrompt(filePath string) error {
 		return err
 	}
 
-	systemPrompt = Message{
-		Role:    "system",
-		Content: config.Content,
-	}
+	// 查找 active 的提示词
+	setActivePrompt(config.Active)
 	return nil
+}
+
+// setActivePrompt 根据 ID 切换当前的系统提示词
+func setActivePrompt(id string) bool {
+	for _, p := range config.Prompts {
+		if p.ID == id {
+			config.Active = id
+			systemPrompt = Message{
+				Role:    "system",
+				Content: p.Content,
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // 计算单条消息的大致 Token 数（直接使用全局变量 tkm）

@@ -31,6 +31,40 @@ function scrollToBottomIfNear() {
     }
 }
 
+async function initPromptSelect() {
+    const select = document.getElementById('prompt-select');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/prompts');
+        const data = await res.json();
+
+        select.innerHTML = '';
+        data.prompts.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.innerText = p.name;
+            if (p.id === data.active) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        // 绑定切换事件
+        select.addEventListener('change', async (e) => {
+            const newId = e.target.value;
+            await fetch('/api/switch-prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: newId })
+            });
+
+            // 可选：切换提示词后刷新 token 使用量提示
+            get_ctx_usage();
+        });
+    } catch (e) {
+        console.error("加载提示词列表失败:", e);
+    }
+}
+
 // ==================================== init & extensions load =============================
 // 自定义 marked 扩展，用来精确拦截 $$ 和 $
 const latexExtension = {
@@ -83,6 +117,7 @@ marked.setOptions({
 });
 
 window.onload = () => {
+    initPromptSelect();
     const savedTheme = localStorage.getItem('theme');
 
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
