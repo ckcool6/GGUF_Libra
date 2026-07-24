@@ -38,28 +38,35 @@ async function initPromptSelect() {
 
     try {
         const res = await fetch('/api/prompts');
+        if (!res.ok) throw new Error(`HTTP 状态异常: ${res.status}`);
+
         const data = await res.json();
 
         select.innerHTML = '';
-        data.prompts.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.innerText = p.name;
-            if (p.id === data.active) opt.selected = true;
-            select.appendChild(opt);
-        });
+        if (data.prompts && data.prompts.length > 0) {
+            data.prompts.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = p.name;
+                if (p.id === data.active) opt.selected = true;
+                select.appendChild(opt);
+            });
+            select.disabled = false; // 正常启用下拉框
+        } else {
+            showPromptError(select, "无可用提示词");
+        }
 
-        // 监听切换事件
-        select.addEventListener('change', async (e) => {
+        // 监听切换事件（使用 addEventListener 确保只绑定一次，或者直接覆盖 onchange）
+        select.onchange = async (e) => {
             const newId = e.target.value;
 
-            // 1. 如果当前正在生成回复，强行中断请求
+            // 1. 如果当前正在生成回复，强行中断请求[cite: 2]
             if (chatAbortController) {
                 chatAbortController.abort();
                 chatAbortController = null;
             }
 
-            // 2. 还原按钮与加载状态
+            // 2. 还原按钮与加载状态[cite: 2]
             loading.classList.add('hidden');
             sendBtn.classList.remove('is-loading');
             sendBtn.innerHTML = '发送';
@@ -91,11 +98,18 @@ async function initPromptSelect() {
             } catch (err) {
                 console.error("切换提示词或清空对话失败:", err);
             }
-        });
+        };
 
     } catch (e) {
         console.error("加载提示词列表失败:", e);
+        showPromptError(select, "未连接服务");
     }
+}
+
+// 未连接或无数据时的显示提示词辅助函数
+function showPromptError(select, message) {
+    select.innerHTML = `<option value="" disabled selected>⚠️ ${message}</option>`;
+    select.disabled = true;
 }
 
 // ==================================== init & extensions load =============================
