@@ -16,7 +16,6 @@ type chatChain struct {
 	// structure
 	dialogMain *chatChain
 	dialogSide *chatChain
-	dialogPre  *chatChain
 
 	branchColor nodeColor
 	isForkdNode bool
