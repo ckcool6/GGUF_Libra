@@ -81,8 +81,9 @@ async function initPromptSelect() {
 
                 if (!switchRes.ok) throw new Error("切换提示词失败");
 
-                // 4. 自动调用清空后端对话历史
-                await fetch('/api/new-chat');
+                // 4. 读取本地 custom_url，带上参数去调用清空后端对话历史
+                const customUrl = localStorage.getItem('custom_api_url') || '';
+                await fetch(`/api/new-chat?custom_url=${encodeURIComponent(customUrl)}`);
 
                 // 5. 重置前端 UI
                 chatBox.innerHTML = `
@@ -205,13 +206,30 @@ async function loadHistory() {
             data.forEach(m => {
                 const isUser = m.role === 'user';
                 const content = isUser ? formatUserText(m.content) : safeMarkdownParse(m.content);
-                const html = `
-                    <div class="flex justify-start mb-8">
-                        <div class="${isUser ? 'user-bubble' : 'ai-bubble markdown-body'} p-4 rounded-2xl max-w-[90%]">
-                            ${content}
-                        </div>
-                    </div>`;
-                chatBox.insertAdjacentHTML('beforeend', html);
+
+                if (isUser) {
+                    const html = `
+                        <div class="flex justify-start mb-8">
+                            <div class="user-bubble p-4 rounded-2xl max-w-[90%]">
+                                ${content}
+                            </div>
+                        </div>`;
+                    chatBox.insertAdjacentHTML('beforeend', html);
+                } else {
+                    // 为 AI 消息构造 DOM 结构并插入 Notebook Bar
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex justify-start mb-8';
+                    wrapper.innerHTML = `
+                        <div class="flex flex-col max-w-[90%] w-full">
+                            <div class="ai-bubble p-4 rounded-2xl markdown-body">
+                                ${content}
+                            </div>
+                        </div>`;
+
+                    const notebookBar = createNotebookBar();
+                    wrapper.querySelector('.flex-col').appendChild(notebookBar);
+                    chatBox.appendChild(wrapper);
+                }
             });
 
             chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
@@ -460,8 +478,113 @@ function finalizeAiBubble(ctx) {
             speedSpan.innerHTML = ` takes ${elapsed.toFixed(1)}s  (total ${ctx.tokenCount} tokens / speed ${speed} t/s)`;
         }
     }
+
+    // 4. 追加 Notebook 悬浮控制条
+    const notebookBar = createNotebookBar();
+    // 插入到消息容器的最下方
+    ctx.aiBubbleDiv.parentElement.appendChild(notebookBar);
 }
 
+function createNotebookBar() {
+    const notebookBar = document.createElement('div');
+    notebookBar.className = 'notebook-bar group relative flex flex-col items-center justify-center my-4 opacity-40 hover:opacity-100 transition-opacity duration-200';
+
+    notebookBar.innerHTML = `
+        <div class="w-full relative flex items-center justify-center">
+            <!-- 背景横线 -->
+            <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-200 dark:border-gray-800"></div>
+            </div>
+            
+            <!-- 悬浮按钮组 -->
+            <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
+                <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-emerald-500 font-bold">+</span> Side Chat
+                </button>
+                <span class="text-gray-300 dark:text-gray-700">|</span>
+                <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-amber-500 font-bold">⚡</span> Summary
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 绑定 Fork Side 事件
+    notebookBar.querySelector('.fork-side-btn').addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/fork-side', { method: 'POST' });
+            if (res.ok) {
+                const notice = document.createElement('div');
+                notice.className = 'text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50';
+                notice.innerText = '🌿 已切换至侧线分支 (Side Chat)';
+                chatBox.appendChild(notice);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (e) {
+            console.error('Fork Side 失败:', e);
+        }
+    });
+
+    // 绑定 Summary 事件
+    notebookBar.querySelector('.summary-btn').addEventListener('click', async () => {
+        const btn = notebookBar.querySelector('.summary-btn');
+
+        // 1. 如果已经存在总结框，再次点击可以切换展开/隐藏
+        let summaryBox = notebookBar.parentElement?.querySelector('.summary-box');
+        if (summaryBox) {
+            summaryBox.classList.toggle('hidden');
+            return;
+        }
+
+        // 2. 创建黄色虚线框容器
+        summaryBox = document.createElement('div');
+        summaryBox.className = 'summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all';
+        summaryBox.innerHTML = `
+            <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium mb-1.5">
+                <span>⚡</span> 对话摘要
+            </div>
+            <div class="summary-content markdown-body text-xs opacity-90">正在生成总结...</div>
+        `;
+
+        if (notebookBar.parentElement) {
+            notebookBar.parentElement.appendChild(summaryBox);
+        } else {
+            notebookBar.appendChild(summaryBox);
+        }
+
+        const contentDiv = summaryBox.querySelector('.summary-content');
+        const customUrl = localStorage.getItem('custom_api_url') || '';
+        const customKey = localStorage.getItem('custom_api_key') || '';
+
+        try {
+            btn.innerHTML = `<span class="text-amber-500 animate-spin">⏳</span> Summarizing...`;
+
+            const res = await fetch('/api/generate-abstract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ custom_url: customUrl, custom_key: customKey })
+            });
+
+            if (!res.ok) throw new Error("生成总结失败");
+
+            // 同步直接解析 JSON
+            const data = await res.json();
+
+            // 假设 Go 后端同步返回格式为 {"abstract": "摘要内容"} 或 {"DialogAbstract": "摘要内容"}
+            const textResult = data.abstract || data.DialogAbstract || "暂无摘要内容";
+
+            contentDiv.innerHTML = safeMarkdownParse(textResult);
+            btn.innerHTML = `<span class="text-amber-500 font-bold">✓</span> Summary`;
+
+        } catch (e) {
+            console.error('Summary 失败:', e);
+            contentDiv.innerHTML = `<span class="text-rose-500">生成总结时出现错误：${e.message}</span>`;
+            btn.innerHTML = `<span class="text-amber-500 font-bold">⚡</span> Summary`;
+        }
+    });
+
+    return notebookBar;
+}
 
 async function extractErrorMessage(response) {
     let errorText = `请求失败，状态码：${response.status}`;
@@ -493,6 +616,8 @@ async function downloadChat() {
 
         let content = "--- 聊天记录 ---\n\n";
         data.forEach(m => {
+            if (m.role === 'system') return; // 忽略系统提示词，只导出用户和 AI 的对话
+
             const role = m.role === 'user' ? "【用户】" : "【AI】";
             content += `${role}\n${m.content.trim()}\n\n`;
         });

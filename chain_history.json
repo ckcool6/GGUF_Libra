@@ -1,0 +1,12 @@
+{
+  "DialogContent": {
+    "ChatHistory": [],
+    "UserMsgIndex": -1,
+    "SendHistory": []
+  },
+  "DialogAbstract": "",
+  "DialogMain": null,
+  "DialogSide": null,
+  "BranchColor": 0,
+  "IsForkedNode": false
+}

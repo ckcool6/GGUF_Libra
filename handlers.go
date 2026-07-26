@@ -47,12 +47,24 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	load_history(globalId, &body)
+	// 1. 在请求刚进来时，加锁锁定当前节点并赋值给局部变量 localChain
+	mu.Lock()
+	localChain := currentChain
+	mu.Unlock()
 
-	resp, err := sendRequestToLlama(r, &body, globalId.sendHistory)
+	if localChain == nil {
+		http.Error(w, "No active chain", http.StatusBadRequest)
+		return
+	}
+
+	// 2. 传入局部变量 localChain 载入历史记录
+	load_history(localChain, &body)
+
+	// 3. 发送 localChain 节点里的 SendHistory
+	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
 		fmt.Println("❌ 无法连接到 llama.cpp 服务:", err)
-		rollbackHistory(globalId, globalId.userMsgIndex)
+		rollbackHistory(localChain)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "本地 API 请求失败"})
@@ -63,7 +75,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("llama.cpp 响应状态码:", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
-		rollbackHistory(globalId, globalId.userMsgIndex)
+		rollbackHistory(localChain)
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		fmt.Printf("❌ llama.cpp 报错返回: %s\n", string(bodyBytes))
 		w.Header().Set("Content-Type", "application/json")
@@ -78,43 +90,57 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	if streamSuccess || aiFullContent != "" {
 		fmt.Println("\n> 对话成功，保存历史记录。")
 		mu.Lock()
-		globalId.chatHistory = append(globalId.chatHistory, Message{Role: "assistant", Content: aiFullContent})
-		saveHistoryToFile()
+		// 4. 将 AI 的回复追加到 localChain（而不是全局 currentChain）
+		localChain.DialogContent.ChatHistory = append(localChain.DialogContent.ChatHistory, Message{Role: "assistant", Content: aiFullContent})
+		// 保存整条树状链结构
+		rootChain.SaveChainToFile("chain_history.json")
 		mu.Unlock()
 	} else {
 		fmt.Println("\n 流传输异常中断且未获取到内容，执行回滚。")
-		rollbackHistory(globalId, globalId.userMsgIndex)
+		rollbackHistory(localChain)
 	}
 }
 
-func load_history(cl *chatlist, body *reqBody) {
+func load_history(chain *chatChain, body *reqBody) {
 	mu.Lock()
 	defer mu.Unlock()
-	cl.chatHistory = append(cl.chatHistory, Message{Role: "user", Content: body.Message})
-	cl.userMsgIndex = len(cl.chatHistory) - 1
 
-	// 获取真实 n_ctx
+	if chain == nil || chain.DialogContent == nil {
+		return
+	}
+
+	// 将用户消息存入当前节点的 ChatHistory
+	chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory, Message{Role: "user", Content: body.Message})
+	chain.DialogContent.UserMsgIndex = len(chain.DialogContent.ChatHistory) - 1
+
+	// 计算当前节点发送给模型时的 safeMaxTokens
 	maxCtx := getLlamaMaxCtx(body.CustomUrl)
 
-	// 动态计算预留空间：最多预留 2048，但如果总 context 较小，则预留 20% 的空间给 AI 输出
 	reserveTokens := 2048
 	if maxCtx/5 < reserveTokens {
-		reserveTokens = maxCtx / 5 // 当 n_ctx 很小时，预留 20%
+		reserveTokens = maxCtx / 5
 	}
 
 	safeMaxTokens := maxCtx - reserveTokens
 	if safeMaxTokens < 100 {
-		safeMaxTokens = 100 // 保底值不能超过 maxCtx 本身
+		safeMaxTokens = 100
 	}
 
-	cl.sendHistory = filterMessagesByToken(cl.chatHistory, safeMaxTokens)
+	// 过滤消息填入 SendHistory
+	chain.DialogContent.SendHistory = filterMessagesByToken(chain.DialogContent.ChatHistory, safeMaxTokens)
 }
 
-func rollbackHistory(cl *chatlist, index int) {
+func rollbackHistory(chain *chatChain) {
 	mu.Lock()
 	defer mu.Unlock()
-	if index >= 0 && index < len(cl.chatHistory) {
-		cl.chatHistory = append(cl.chatHistory[:index], cl.chatHistory[index+1:]...)
+
+	if chain == nil || chain.DialogContent == nil {
+		return
+	}
+
+	idx := chain.DialogContent.UserMsgIndex
+	if idx >= 0 && idx < len(chain.DialogContent.ChatHistory) {
+		chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory[:idx], chain.DialogContent.ChatHistory[idx+1:]...)
 	}
 }
 
@@ -122,7 +148,26 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	mu.Lock()
 	defer mu.Unlock()
-	json.NewEncoder(w).Encode(globalId.chatHistory)
+
+	history := []Message{}
+	if currentChain != nil && currentChain.DialogContent != nil {
+		// 过滤掉 system 消息，保持结构依然是 Message 数组
+		for _, msg := range currentChain.DialogContent.ChatHistory {
+			if msg.Role != "system" {
+				history = append(history, msg)
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(history)
+}
+
+// 辅助方法：安全获取当前节点的 ChatHistory
+func (chain *chatChain) dialogChainContentOrDefault() []Message {
+	if chain == nil || chain.DialogContent == nil {
+		return []Message{}
+	}
+	return chain.DialogContent.ChatHistory
 }
 
 // 动态清除 llama.cpp 指定 slot 的 KV 缓存
@@ -149,14 +194,16 @@ func eraseLlamaSlot(customURL string, slotID int) {
 
 func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
-	globalId.chatHistory = []Message{}
-	saveHistoryToFile()
+	// 1. 在内存中彻底创建一个全新的干净树节点
+	rootChain = NewChatChain()
+	currentChain = rootChain
+
+	// 2. 将这棵空树覆盖写入 chain_history.json 文件
+	rootChain.SaveChainToFile("chain_history.json")
 	mu.Unlock()
 
-	// 获取前端传过来的 custom_url（如果有）
+	// 3. 动态清理 llama.cpp 的 slot 0 缓存
 	customURL := r.URL.Query().Get("custom_url")
-
-	// 动态清理 slot 0
 	eraseLlamaSlot(customURL, 0)
 
 	w.WriteHeader(http.StatusOK)
@@ -169,12 +216,14 @@ func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
 	customURL := r.URL.Query().Get("custom_url")
 	maxCtx := getLlamaMaxCtx(customURL)
 
-	// 算当前实际聊天历史在使用的 Token 开销
+	// 计算 currentChain 当前实际聊天历史在使用的 Token 开销
 	mu.Lock()
-	filteredMsgs := filterMessagesByToken(globalId.chatHistory, maxCtx)
 	currentTokens := 0
-	for _, msg := range filteredMsgs {
-		currentTokens += getMessageTokens(msg.Role, msg.Content)
+	if currentChain != nil && currentChain.DialogContent != nil {
+		filteredMsgs := filterMessagesByToken(currentChain.DialogContent.ChatHistory, maxCtx)
+		for _, msg := range filteredMsgs {
+			currentTokens += getMessageTokens(msg.Role, msg.Content)
+		}
 	}
 	mu.Unlock()
 

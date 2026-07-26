@@ -108,16 +108,3 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	}
 	return result
 }
-
-func saveHistoryToFile() {
-	data, _ := json.MarshalIndent(globalId.chatHistory, "", "  ")
-	_ = os.WriteFile("history.json", data, 0644)
-}
-
-func loadHistoryFromFile() {
-	data, err := os.ReadFile("history.json")
-	if err == nil {
-		json.Unmarshal(data, &globalId.chatHistory)
-		fmt.Println("已从 history.json 恢复对话记录")
-	}
-}

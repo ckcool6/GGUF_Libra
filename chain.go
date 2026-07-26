@@ -7,28 +7,32 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
+// 定义读写锁，保证并发安全
+var chainMu sync.RWMutex
+
 // enum
-type nodeColor int
+type NodeColor int
 
 const (
-	YellowNode nodeColor = iota // 0
-	GreenNode
+	YellowNode NodeColor = iota // 0: 主线
+	GreenNode                   // 1: 侧线
 )
 
 type chatChain struct {
 	// data
-	dialogContent  *chatlist
-	dialogAbstract string
+	DialogContent  *chatlist
+	DialogAbstract string
 
 	// structure
-	dialogMain *chatChain
-	dialogSide *chatChain
+	DialogMain *chatChain
+	DialogSide *chatChain
 
-	branchColor  nodeColor
-	isForkedNode bool
+	BranchColor  NodeColor
+	IsForkedNode bool
 }
 
 // init
@@ -38,22 +42,17 @@ func (chain *chatChain) initChatChain() {
 	}
 
 	// 初始化当前节点的对话列表容器
-	chain.dialogContent = &chatlist{
-		chatHistory:  make([]Message, 0),
-		sendHistory:  make([]Message, 0),
-		userMsgIndex: -1,
+	chain.DialogContent = &chatlist{
+		ChatHistory:  make([]Message, 0),
+		SendHistory:  make([]Message, 0),
+		UserMsgIndex: -1,
 	}
 
-	//  初始化节点的摘要信息
-	chain.dialogAbstract = ""
-
-	//  重置主线和侧线指针
-	chain.dialogMain = nil
-	chain.dialogSide = nil
-
-	//  设置节点属性
-	chain.branchColor = YellowNode // 默认设为主线颜色
-	chain.isForkedNode = false
+	chain.DialogAbstract = ""
+	chain.DialogMain = nil
+	chain.DialogSide = nil
+	chain.BranchColor = YellowNode
+	chain.IsForkedNode = false
 }
 
 // NewChatChain 创建并返回一个初始化好的 chatChain 节点指针
@@ -63,44 +62,45 @@ func NewChatChain() *chatChain {
 	return chain
 }
 
-// eval context
+// GenerateAbstract 提取摘要（网络请求不持锁，解锁后再操作）
 func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
-	if chain == nil || chain.dialogContent == nil || len(chain.dialogContent.chatHistory) == 0 {
+	if chain == nil {
 		return ""
 	}
 
-	mu.Lock()
-	// 提取当前节点保存的所有对话内容
-	history := chain.dialogContent.chatHistory
-	mu.Unlock()
+	// 1. 简短读取历史记录，立即释放锁
+	chainMu.RLock()
+	if chain.DialogContent == nil || len(chain.DialogContent.ChatHistory) == 0 {
+		chainMu.RUnlock()
+		return ""
+	}
+	history := make([]Message, len(chain.DialogContent.ChatHistory))
+	copy(history, chain.DialogContent.ChatHistory)
+	chainMu.RUnlock()
 
-	// 构造专门用于总结的 Prompt
+	// 2. 构造专门用于总结的 Prompt
 	promptMessages := []Message{
 		{
 			Role:    "system",
 			Content: "你是一个精炼的文本总结助手。请用简明扼要的语言总结以下对话的核心要点与关键上下文，字数控制在100-200字以内，不要有多余的客套话。",
 		},
 	}
-
-	// 将当前 Block 的历史记录追加进来
 	promptMessages = append(promptMessages, history...)
 	promptMessages = append(promptMessages, Message{
 		Role:    "user",
 		Content: "请为以上的对话生成一份简短的上下文摘要总结。",
 	})
 
-	// 构造请求 Payload（总结不使用流式）
 	payload := map[string]interface{}{
 		"messages": promptMessages,
 		"stream":   false,
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Println("❌ 序列化总结请求失败:", err)
+		fmt.Println("❌ 总结请求失败:", err)
 		return ""
 	}
 
-	// 解析与拼接 API 请求地址[cite: 3]
 	apiURL := "http://127.0.0.1:8021/v1/chat/completions"
 	if customUrl != "" {
 		apiURL = customUrl
@@ -112,13 +112,10 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 		return ""
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	// 如果设置了 customKey，加上 Bearer 鉴权[cite: 3]
 	if customKey != "" {
 		req.Header.Set("Authorization", "Bearer "+customKey)
 	}
 
-	// 发送请求（设置 30 秒超时）
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -133,7 +130,6 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 		return ""
 	}
 
-	// 解析响应
 	var result struct {
 		Choices []struct {
 			Message struct {
@@ -150,10 +146,10 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 	if len(result.Choices) > 0 {
 		abstract := result.Choices[0].Message.Content
 
-		// 7. 保存摘要到当前节点[cite: 4]
-		mu.Lock()
-		chain.dialogAbstract = abstract
-		mu.Unlock()
+		// 3. 写锁更新摘要
+		chainMu.Lock()
+		chain.DialogAbstract = abstract
+		chainMu.Unlock()
 
 		return abstract
 	}
@@ -161,183 +157,156 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 	return ""
 }
 
-// AppendMainBranchNode 为当前节点追加一个新的主线子节点，并返回新创建的节点指针
+// AppendMainBranchNode 为当前节点追加一个新的主线子节点
 func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	if chain == nil {
 		return nil
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.Lock()
+	defer chainMu.Unlock()
 
-	// 创建并初始化一个新的 ChatChain 节点
 	newNode := NewChatChain()
+	chain.DialogMain = newNode
+	newNode.BranchColor = chain.BranchColor
 
-	// 将主线指针指向新节点
-	chain.dialogMain = newNode
-
-	// 新节点继承当前节点的 branchColor，保持主线颜色一致
-	newNode.branchColor = chain.branchColor
-
-	// 如果当前节点已经生成了摘要，将摘要传递给新节点的起始背景
-	// 这样下一个 Context Block 在向 llamacpp 发送请求时，就能带上上一个 Block 的总结
-	if chain.dialogAbstract != "" {
-		newNode.dialogContent.chatHistory = append(newNode.dialogContent.chatHistory, Message{
+	if chain.DialogAbstract != "" {
+		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
 			Role:    "system",
-			Content: "【前情提要/历史上下文总结】：\n" + chain.dialogAbstract,
+			Content: "【前情提要/历史上下文总结】：\n" + chain.DialogAbstract,
 		})
 	}
 
 	return newNode
 }
 
-// AppendSideBranchNode 为当前节点追加一个新的侧线（分支）节点，并返回新创建的节点指针
+// AppendSideBranchNode 为当前节点追加一个新的侧线分支节点
 func (chain *chatChain) AppendSideBranchNode() *chatChain {
 	if chain == nil {
 		return nil
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.Lock()
+	defer chainMu.Unlock()
 
-	// 创建并初始化一个新的 ChatChain 节点
 	newNode := NewChatChain()
+	chain.DialogSide = newNode
+	newNode.IsForkedNode = true
+	newNode.BranchColor = GreenNode
 
-	// 将侧线指针指向新节点，并将新节点标记为 Fork 节点
-	chain.dialogSide = newNode
-	newNode.isForkedNode = true
-
-	// 将侧线节点的颜色区分开（设为绿色的 GreenNode）
-	newNode.branchColor = GreenNode
-
-	// 新节点继承当前节点的摘要信息（如果有的话），保证上下文不断层
-	if chain.dialogAbstract != "" {
-		newNode.dialogContent.chatHistory = append(newNode.dialogContent.chatHistory, Message{
+	if chain.DialogAbstract != "" {
+		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
 			Role:    "system",
-			Content: "【前情提要/历史上下文总结】：\n" + chain.dialogAbstract,
+			Content: "【前情提要/历史上下文总结】：\n" + chain.DialogAbstract,
 		})
 	}
 
 	return newNode
 }
 
-// sidebranch status
-// BackToLastForkedNode 查找并返回离当前节点最近的上一个分叉节点指针
+// BackToLastForkedNode 查找并返回离当前节点最近的上一个分叉节点指针（无递归版，防止死锁）
 func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 	if root == nil || currentNode == nil || root == currentNode {
 		return nil
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.RLock()
+	defer chainMu.RUnlock()
 
-	var lastForked *chatChain
-
-	// 使用 DFS 路径追踪找到通往 currentNode 的路径
-	var path []*chatChain
-	var findPath func(node *chatChain) bool
-
-	findPath = func(node *chatChain) bool {
-		if node == nil {
-			return false
-		}
-
-		path = append(path, node)
-
-		if node == currentNode {
-			return true
-		}
-
-		// 优先走主线
-		if findPath(node.dialogMain) {
-			return true
-		}
-
-		// 再走侧线
-		if findPath(node.dialogSide) {
-			return true
-		}
-
-		// 没找到则回溯
-		path = path[:len(path)-1]
-		return false
+	type pathNode struct {
+		node *chatChain
+		path []*chatChain
 	}
 
-	// 1. 寻找从根节点到当前节点的路径
-	if findPath(root) {
-		// 2. 从路径倒数第二个节点往回找，找到第一个 isForkedNode 为 true 的节点
-		for i := len(path) - 2; i >= 0; i-- {
-			if path[i].isForkedNode || path[i].dialogSide != nil {
-				lastForked = path[i]
-				break
+	stack := []pathNode{{node: root, path: []*chatChain{root}}}
+
+	for len(stack) > 0 {
+		curr := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		if curr.node == currentNode {
+			for i := len(curr.path) - 2; i >= 0; i-- {
+				if curr.path[i].IsForkedNode || curr.path[i].DialogSide != nil {
+					return curr.path[i]
+				}
 			}
+			return nil
+		}
+
+		if curr.node.DialogSide != nil {
+			newPath := append(append([]*chatChain{}, curr.path...), curr.node.DialogSide)
+			stack = append(stack, pathNode{node: curr.node.DialogSide, path: newPath})
+		}
+		if curr.node.DialogMain != nil {
+			newPath := append(append([]*chatChain{}, curr.path...), curr.node.DialogMain)
+			stack = append(stack, pathNode{node: curr.node.DialogMain, path: newPath})
 		}
 	}
 
-	return lastForked
+	return nil
 }
 
-// RebaseAllSideToMain 将当前节点下的侧线分支全部合并（压平）到主线末尾
+// RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基压平）到主线末尾，不丢失任何后续节点
 func (chain *chatChain) RebaseAllSideToMain() {
-	if chain == nil || chain.dialogSide == nil {
+	if chain == nil {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.Lock()
+	defer chainMu.Unlock()
 
-	// 拿到侧线分支的头节点
-	sideHead := chain.dialogSide
+	if chain.DialogSide == nil {
+		return
+	}
 
-	// 遍历侧线，把所有侧线节点的属性修正为主线属性
+	sideHead := chain.DialogSide
+
+	// 1. 遍历侧线，修饰节点属性并找到侧线的最深末尾
 	sideTail := sideHead
-	for sideTail != nil {
-		sideTail.branchColor = YellowNode
-		sideTail.isForkedNode = false
+	for {
+		sideTail.BranchColor = YellowNode
+		sideTail.IsForkedNode = false
 
-		// 如果侧线节点自身还有子主线，优先顺着主线摸到侧线的最深末尾
-		if sideTail.dialogMain != nil {
-			sideTail = sideTail.dialogMain
-		} else if sideTail.dialogSide != nil {
-			// 如果侧线节点上又套了侧线，顺手接上
-			sideTail = sideTail.dialogSide
+		if sideTail.DialogMain != nil {
+			sideTail = sideTail.DialogMain
+		} else if sideTail.DialogSide != nil {
+			sideTail = sideTail.DialogSide
 		} else {
 			break
 		}
 	}
 
-	// 寻找当前主线的末尾节点 (Main Tail)
+	// 2. 找到主线最深的尾巴 (Main Tail)
 	mainTail := chain
-	for mainTail.dialogMain != nil {
-		mainTail = mainTail.dialogMain
+	for mainTail.DialogMain != nil {
+		mainTail = mainTail.DialogMain
 	}
 
-	// 将侧线链条整体挂载到主线末尾，并清空原节点的 dialogSide 指针
-	mainTail.dialogMain = sideHead
-	chain.dialogSide = nil
+	// 3. 把侧线整体接在主线最末尾，并清空原本的 DialogSide
+	mainTail.DialogMain = sideHead
+	chain.DialogSide = nil
 }
 
-// EditAbstract 允许用户或前端手动覆盖修改当前节点的摘要内容
+// EditAbstract 手动覆盖修改摘要
 func (chain *chatChain) EditAbstract(newAbstract string) {
 	if chain == nil {
 		return
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.Lock()
+	defer chainMu.Unlock()
 
-	// 直接覆盖当前节点的摘要
-	chain.dialogAbstract = newAbstract
+	chain.DialogAbstract = newAbstract
 }
 
-// SaveChainToFile 将整棵树/链序列化保存到 JSON 文件
+// SaveChainToFile 序列化保存到 JSON 文件
 func (chain *chatChain) SaveChainToFile(filePath string) error {
 	if chain == nil {
 		return nil
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.RLock()
+	defer chainMu.RUnlock()
 
 	data, err := json.MarshalIndent(chain, "", "  ")
 	if err != nil {
@@ -348,15 +317,15 @@ func (chain *chatChain) SaveChainToFile(filePath string) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
-// LoadChainFromFile 从 JSON 文件还原整个 chatChain 结构
+// LoadChainFromFile 从 JSON 文件还原
 func LoadChainFromFile(filePath string) (*chatChain, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	chainMu.Lock()
+	defer chainMu.Unlock()
 
 	var root chatChain
 	if err := json.Unmarshal(data, &root); err != nil {
@@ -366,50 +335,3 @@ func LoadChainFromFile(filePath string) (*chatChain, error) {
 
 	return &root, nil
 }
-
-//
-/* // BackToLastForkedNode 迭代（非递归）版本的广度/深度优先遍历
-func (root *chatChain) BackToLastForkedNodeIterative(currentNode *chatChain) *chatChain {
-	if root == nil || currentNode == nil || root == currentNode {
-		return nil
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	// 用 slice 模拟手动的栈/队列，避免任何函数递归调用栈开销
-	type pathNode struct {
-		node *chatChain
-		path []*chatChain
-	}
-
-	stack := []pathNode{{node: root, path: []*chatChain{root}}}
-
-	for len(stack) > 0 {
-		// 弹出栈顶
-		curr := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-
-		if curr.node == currentNode {
-			// 找到路径，从倒数第二个节点往回找分叉点
-			for i := len(curr.path) - 2; i >= 0; i-- {
-				if curr.path[i].isForkedNode || curr.path[i].dialogSide != nil {
-					return curr.path[i]
-				}
-			}
-			return nil
-		}
-
-		// 将侧线和主线入栈
-		if curr.node.dialogSide != nil {
-			newPath := append(append([]*chatChain{}, curr.path...), curr.node.dialogSide)
-			stack = append(stack, pathNode{node: curr.node.dialogSide, path: newPath})
-		}
-		if curr.node.dialogMain != nil {
-			newPath := append(append([]*chatChain{}, curr.path...), curr.node.dialogMain)
-			stack = append(stack, pathNode{node: curr.node.dialogMain, path: newPath})
-		}
-	}
-
-	return nil
-} */

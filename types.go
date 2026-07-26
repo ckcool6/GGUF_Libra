@@ -23,7 +23,7 @@ type reqBody struct {
 }
 
 type chatlist struct {
-	chatHistory  []Message
-	userMsgIndex int
-	sendHistory  []Message
+	ChatHistory  []Message
+	UserMsgIndex int
+	SendHistory  []Message
 }
