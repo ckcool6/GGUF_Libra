@@ -32,6 +32,10 @@ func main() {
 	// 获取ctx
 	http.HandleFunc("/api/llama-props", apiLlamaPropsHandler)
 
+	// switch prompt
+	http.HandleFunc("/api/prompts", apiGetPromptsHandler)
+	http.HandleFunc("/api/switch-prompt", apiSwitchPromptHandler)
+
 	// 修改 /api/delete-last 路由
 	http.HandleFunc("/api/delete-last", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
