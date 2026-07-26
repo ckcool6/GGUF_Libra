@@ -60,13 +60,13 @@ async function initPromptSelect() {
         select.onchange = async (e) => {
             const newId = e.target.value;
 
-            // 1. 如果当前正在生成回复，强行中断请求[cite: 2]
+            // 1. 如果当前正在生成回复，强行中断请求
             if (chatAbortController) {
                 chatAbortController.abort();
                 chatAbortController = null;
             }
 
-            // 2. 还原按钮与加载状态[cite: 2]
+            // 2. 还原按钮与加载状态
             loading.classList.add('hidden');
             sendBtn.classList.remove('is-loading');
             sendBtn.innerHTML = '发送';
@@ -81,10 +81,10 @@ async function initPromptSelect() {
 
                 if (!switchRes.ok) throw new Error("切换提示词失败");
 
-                // 4. 自动调用清空后端对话历史[cite: 2]
+                // 4. 自动调用清空后端对话历史
                 await fetch('/api/new-chat');
 
-                // 5. 重置前端 UI[cite: 2]
+                // 5. 重置前端 UI
                 chatBox.innerHTML = `
                     <div class="flex justify-start mb-8">
                         <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
@@ -92,7 +92,7 @@ async function initPromptSelect() {
                         </div>
                     </div>`;
 
-                // 6. 重新刷新 Context 内存计算[cite: 2]
+                // 6. 重新刷新 Context 内存计算
                 get_ctx_usage();
 
             } catch (err) {
@@ -325,7 +325,10 @@ const streamChunkHandlers = {
 
         ctx.fullText += content;
 
-        // 首次收到消息：创建气泡框架
+        // 1. 将新收到的字符压入 Buffer 缓冲队列
+        ctx.charBuffer.push(...content.split(''));
+
+        // 2. 首次收到消息：创建 AI 气泡 DOM
         if (ctx.isFirstChunk) {
             loading.classList.add('hidden');
             ctx.currentBubbleId = 'ai-' + Date.now();
@@ -333,7 +336,6 @@ const streamChunkHandlers = {
                         <div class="flex justify-start mb-8">
                             <div class="flex flex-col max-w-[90%]">
                                 <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
-                                    ${safeMarkdownParse(ctx.fullText)}
                                 </div>
                                 <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
                                     <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
@@ -345,22 +347,87 @@ const streamChunkHandlers = {
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
         }
+    }
+};
 
-        // 流传输过程中的高频渲染：使用 rAF 节流，避免阻塞主线程
-        if (!ctx.isRenderPending) {
+async function handleStreamResponse(response) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const ctx = {
+        fullText: "",
+        displayedText: "", // 已经渲染出来的字符
+        charBuffer: [],    // Buffer 字符队列
+        isFirstChunk: true,
+        aiBubbleDiv: null,
+        tokenCount: 0,
+        startTime: null,
+        modelName: "GGUF Model",
+        currentBubbleId: "",
+        hasOfficialUsage: false,
+        isRenderPending: false
+    };
+
+    // 启动 Buffer 平滑渲染定时器（按 16ms 频率消费队列，结合 rAF 渲染）
+    const bufferTimer = setInterval(() => {
+        if (ctx.charBuffer.length > 0 && ctx.aiBubbleDiv && !ctx.isRenderPending) {
             ctx.isRenderPending = true;
+
             requestAnimationFrame(() => {
                 if (ctx.aiBubbleDiv) {
-                    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
-                    ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                    // 动态步长：根据堆积量决定消费速度，积压多就一次多吐几个字，避免延迟过大
+                    const step = ctx.charBuffer.length > 30 ? 4 : (ctx.charBuffer.length > 10 ? 2 : 1);
+                    const chunk = ctx.charBuffer.splice(0, step).join('');
+                    ctx.displayedText += chunk;
+
+                    // 渲染解析后的 Markdown
+                    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.displayedText);
                     updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
                     scrollToBottomIfNear();
                 }
                 ctx.isRenderPending = false;
             });
         }
+    }, 16);
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ') || trimmed === 'data: [DONE]') continue;
+
+                const json = JSON.parse(trimmed.substring(6));
+
+                for (const key in streamChunkHandlers) {
+                    if (json[key] !== undefined) {
+                        streamChunkHandlers[key](json, ctx);
+                    }
+                }
+            }
+        }
+
+        // 等待队列里的剩余字符全部消费完毕
+        while (ctx.charBuffer.length > 0) {
+            await new Promise(r => setTimeout(r, 16));
+        }
+
+    } catch (streamError) {
+        console.error("流式读取过程中发生错误:", streamError);
+        throw streamError;
+    } finally {
+        clearInterval(bufferTimer); // 消费完成，销毁定时器
+        finalizeAiBubble(ctx);
+        scrollToBottomIfNear();
     }
-};
+}
 
 function updateStreamingSpeed(currentBubbleId, startTime, tokenCount) {
     if (!startTime) return;
@@ -395,54 +462,6 @@ function finalizeAiBubble(ctx) {
     }
 }
 
-async function handleStreamResponse(response) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    const ctx = {
-        fullText: "",
-        isFirstChunk: true,
-        aiBubbleDiv: null,
-        tokenCount: 0,
-        startTime: null,
-        modelName: "GGUF Model",
-        currentBubbleId: "",
-        hasOfficialUsage: false,
-        isRenderPending: false
-    };
-
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith('data: ') || trimmed === 'data: [DONE]') continue;
-
-                const json = JSON.parse(trimmed.substring(6));
-
-                for (const key in streamChunkHandlers) {
-                    if (json[key] !== undefined) {
-                        streamChunkHandlers[key](json, ctx);
-                    }
-                }
-            }
-        }
-
-        finalizeAiBubble(ctx);
-        scrollToBottomIfNear();
-
-    } catch (streamError) {
-        console.error("流式读取过程中发生错误:", streamError);
-        throw streamError;
-    }
-}
 
 async function extractErrorMessage(response) {
     let errorText = `请求失败，状态码：${response.status}`;
