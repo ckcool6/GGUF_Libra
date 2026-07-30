@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // 动态获取当前模型的 n_ctx 上限
@@ -21,8 +20,8 @@ func getLlamaMaxCtx(customURL string) int {
 		}
 	}
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(apiURL)
+	// 使用全局复用的 httpTimeoutClient 发起请求
+	resp, err := httpTimeoutClient.Get(apiURL)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return 512 // 拿不到时，使用 llama.cpp 的默认最小值 512 保底
 	}
@@ -33,6 +32,8 @@ func getLlamaMaxCtx(customURL string) int {
 			NCtx int `json:"n_ctx"`
 		} `json:"default_generation_settings"`
 	}
+
+	// 解析响应 JSON
 	if err := json.NewDecoder(resp.Body).Decode(&propsData); err == nil && propsData.DefaultGenerationSettings.NCtx > 0 {
 		return propsData.DefaultGenerationSettings.NCtx
 	}
@@ -42,12 +43,11 @@ func getLlamaMaxCtx(customURL string) int {
 
 func chatHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqBody
-
 	if err := parse_input(r, w, &body); err != nil {
 		return
 	}
 
-	// 1. 在请求刚进来时，加锁锁定当前节点并赋值给局部变量 localChain
+	// 1. 获取本地局部引用，立刻释放全局锁
 	mu.Lock()
 	localChain := currentChain
 	mu.Unlock()
@@ -57,10 +57,10 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. 传入局部变量 localChain 载入历史记录
+	// 2. 载入历史记录
 	load_history(localChain, &body)
 
-	// 3. 发送 localChain 节点里的 SendHistory
+	// 3. 网络请求完全无锁运行
 	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
 		fmt.Println("❌ 无法连接到 llama.cpp 服务:", err)
@@ -72,31 +72,21 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("llama.cpp 响应状态码:", resp.StatusCode)
-
-	if resp.StatusCode != http.StatusOK {
-		rollbackHistory(localChain)
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		fmt.Printf("❌ llama.cpp 报错返回: %s\n", string(bodyBytes))
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		w.Write(bodyBytes)
-		return
-	}
-
-	fmt.Println("开始流式接收并转发数据...")
+	// 4. 流式传输与后续更新
 	aiFullContent, streamSuccess := forwardStreamData(w, r, resp.Body)
 
 	if streamSuccess || aiFullContent != "" {
-		fmt.Println("\n> 对话成功，保存历史记录。")
+		// 追加 AI 回复文本到历史记录
+		localChain.DialogContent.ChatHistory = append(localChain.DialogContent.ChatHistory, Message{
+			Role:    "assistant",
+			Content: aiFullContent,
+		})
+
+		// 写文件时用全局锁守护整棵树的序列化
 		mu.Lock()
-		// 4. 将 AI 的回复追加到 localChain（而不是全局 currentChain）
-		localChain.DialogContent.ChatHistory = append(localChain.DialogContent.ChatHistory, Message{Role: "assistant", Content: aiFullContent})
-		// 保存整条树状链结构
 		rootChain.SaveChainToFile("chain_history.json")
 		mu.Unlock()
 	} else {
-		fmt.Println("\n 流传输异常中断且未获取到内容，执行回滚。")
 		rollbackHistory(localChain)
 	}
 }
@@ -181,14 +171,20 @@ func eraseLlamaSlot(customURL string, slotID int) {
 	}
 
 	go func() {
-		client := &http.Client{Timeout: 2 * time.Second}
 		req, err := http.NewRequest("POST", apiURL, nil)
-		if err == nil {
-			resp, err := client.Do(req)
-			if err == nil {
-				resp.Body.Close()
-			}
+		if err != nil {
+			return
 		}
+
+		// 使用全局复用的 httpTimeoutClient 发起异步清理请求
+		resp, err := httpTimeoutClient.Do(req)
+		if err != nil {
+			return
+		}
+
+		// 确保把 Body 读完并关闭，TCP 连接才能被 client 正确回收重用
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
 	}()
 }
 
@@ -333,7 +329,7 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 		req.Header.Set("Authorization", "Bearer "+body.CustomKey)
 	}
 
-	return (&http.Client{}).Do(req)
+	return httpClient.Do(req)
 }
 
 func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {

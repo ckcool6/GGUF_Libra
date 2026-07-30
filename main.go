@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var (
@@ -12,6 +13,27 @@ var (
 	OpenRouterKey string
 	rootChain     *chatChain // 链表的根节点
 	currentChain  *chatChain // 当前用户所在对话节点
+)
+
+var (
+	// 用于长连接/流式对话请求
+	httpClient = &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
+	// 用于常规超时请求（如生成摘要、获取 props）
+	httpTimeoutClient = &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        20,
+			MaxIdleConnsPerHost: 5,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
 )
 
 func main() {
@@ -91,7 +113,6 @@ func main() {
 	})
 
 	//  手动触发生成当前节点的上下文摘要
-	// main.go
 	http.HandleFunc("/api/generate-abstract", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			CustomUrl string `json:"custom_url"`
@@ -99,16 +120,21 @@ func main() {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 
-		w.Header().Set("Content-Type", "application/json")
-		if currentChain != nil {
-			// 同步等待摘要生成完成
-			abstract := currentChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
+		// 1. 快速读取当前节点指针后立即释放全局锁，不阻塞其他请求
+		mu.Lock()
+		targetChain := currentChain
+		mu.Unlock()
 
+		w.Header().Set("Content-Type", "application/json")
+		if targetChain != nil {
+			// 2. 耗时的 AI 摘要生成过程在锁外并发执行，内部使用 chainMu 保证节点安全
+			abstract := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
+
+			// 3. 摘要生成完毕后再快速持锁落盘
 			mu.Lock()
 			rootChain.SaveChainToFile("chain_history.json")
 			mu.Unlock()
 
-			// 将结果返回给前端
 			json.NewEncoder(w).Encode(map[string]string{
 				"abstract": abstract,
 			})

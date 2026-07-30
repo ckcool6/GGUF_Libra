@@ -7,12 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
-	"time"
 )
-
-// 定义读写锁，保证并发安全
-var chainMu sync.RWMutex
 
 // enum
 type NodeColor int
@@ -62,21 +57,15 @@ func NewChatChain() *chatChain {
 	return chain
 }
 
-// GenerateAbstract 提取摘要（网络请求不持锁，解锁后再操作）
+// GenerateAbstract 提取摘要
 func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
-	if chain == nil {
+	if chain == nil || chain.DialogContent == nil || len(chain.DialogContent.ChatHistory) == 0 {
 		return ""
 	}
 
-	// 1. 简短读取历史记录，立即释放锁
-	chainMu.RLock()
-	if chain.DialogContent == nil || len(chain.DialogContent.ChatHistory) == 0 {
-		chainMu.RUnlock()
-		return ""
-	}
+	// 1. 读取历史记录
 	history := make([]Message, len(chain.DialogContent.ChatHistory))
 	copy(history, chain.DialogContent.ChatHistory)
-	chainMu.RUnlock()
 
 	// 2. 构造专门用于总结的 Prompt
 	promptMessages := []Message{
@@ -116,8 +105,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 		req.Header.Set("Authorization", "Bearer "+customKey)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpTimeoutClient.Do(req)
 	if err != nil {
 		fmt.Println("❌ 请求总结 API 失败:", err)
 		return ""
@@ -140,17 +128,13 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Println("❌ 解析总结响应失败:", err)
+		io.Copy(io.Discard, resp.Body)
 		return ""
 	}
 
 	if len(result.Choices) > 0 {
 		abstract := result.Choices[0].Message.Content
-
-		// 3. 写锁更新摘要
-		chainMu.Lock()
 		chain.DialogAbstract = abstract
-		chainMu.Unlock()
-
 		return abstract
 	}
 
@@ -162,9 +146,6 @@ func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	if chain == nil {
 		return nil
 	}
-
-	chainMu.Lock()
-	defer chainMu.Unlock()
 
 	newNode := NewChatChain()
 	chain.DialogMain = newNode
@@ -186,9 +167,6 @@ func (chain *chatChain) AppendSideBranchNode() *chatChain {
 		return nil
 	}
 
-	chainMu.Lock()
-	defer chainMu.Unlock()
-
 	newNode := NewChatChain()
 	chain.DialogSide = newNode
 	newNode.IsForkedNode = true
@@ -204,14 +182,11 @@ func (chain *chatChain) AppendSideBranchNode() *chatChain {
 	return newNode
 }
 
-// BackToLastForkedNode 查找并返回离当前节点最近的上一个分叉节点指针（无递归版，防止死锁）
+// BackToLastForkedNode 查找并返回离当前节点最近的上一个分叉节点指针
 func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 	if root == nil || currentNode == nil || root == currentNode {
 		return nil
 	}
-
-	chainMu.RLock()
-	defer chainMu.RUnlock()
 
 	type pathNode struct {
 		node *chatChain
@@ -248,14 +223,7 @@ func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 
 // RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基压平）到主线末尾，不丢失任何后续节点
 func (chain *chatChain) RebaseAllSideToMain() {
-	if chain == nil {
-		return
-	}
-
-	chainMu.Lock()
-	defer chainMu.Unlock()
-
-	if chain.DialogSide == nil {
+	if chain == nil || chain.DialogSide == nil {
 		return
 	}
 
@@ -292,10 +260,6 @@ func (chain *chatChain) EditAbstract(newAbstract string) {
 	if chain == nil {
 		return
 	}
-
-	chainMu.Lock()
-	defer chainMu.Unlock()
-
 	chain.DialogAbstract = newAbstract
 }
 
@@ -304,9 +268,6 @@ func (chain *chatChain) SaveChainToFile(filePath string) error {
 	if chain == nil {
 		return nil
 	}
-
-	chainMu.RLock()
-	defer chainMu.RUnlock()
 
 	data, err := json.MarshalIndent(chain, "", "  ")
 	if err != nil {
@@ -323,9 +284,6 @@ func LoadChainFromFile(filePath string) (*chatChain, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	chainMu.Lock()
-	defer chainMu.Unlock()
 
 	var root chatChain
 	if err := json.Unmarshal(data, &root); err != nil {
