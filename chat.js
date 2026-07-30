@@ -387,6 +387,17 @@ async function handleStreamResponse(response) {
         isRenderPending: false
     };
 
+    // 检查并自动补全 Markdown 中未闭合的代码块 (```)
+    function fixUnclosedCodeBlocks(markdownText) {
+        // 匹配所有的 ```
+        const matches = markdownText.match(/```/g);
+        // 如果匹配到了奇数个 ```，说明当前有一个代码块处于开启且未闭合状态
+        if (matches && matches.length % 2 !== 0) {
+            return markdownText + '\n```'; // 临时补齐结尾的 ```
+        }
+        return markdownText;
+    }
+
     // 启动 Buffer 平滑渲染定时器（按 16ms 频率消费队列，结合 rAF 渲染）
     const bufferTimer = setInterval(() => {
         if (ctx.charBuffer.length > 0 && ctx.aiBubbleDiv && !ctx.isRenderPending) {
@@ -399,15 +410,20 @@ async function handleStreamResponse(response) {
                     const chunk = ctx.charBuffer.splice(0, step).join('');
                     ctx.displayedText += chunk;
 
-                    // 渲染解析后的 Markdown
-                    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.displayedText);
+                    // 在解析前先补齐可能存在的未闭合代码块，让 marked 能正确识别出 <pre><code>
+                    const streamMarkdown = fixUnclosedCodeBlocks(ctx.displayedText);
+                    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(streamMarkdown);
+
+                    // 每一帧解析完成后，立刻为当前气泡内的代码块添加高亮
+                    ctx.aiBubbleDiv.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+
                     updateStreamingSpeed(ctx.currentBubbleId, ctx.startTime, ctx.tokenCount);
                     scrollToBottomIfNear();
                 }
                 ctx.isRenderPending = false;
             });
         }
-    }, 16);
+    }, 16); //
 
     try {
         while (true) {

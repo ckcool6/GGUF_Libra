@@ -11,8 +11,8 @@ import (
 var (
 	mu            sync.Mutex
 	OpenRouterKey string
-	rootChain     *chatChain // 链表的根节点
-	currentChain  *chatChain // 当前用户所在对话节点
+	rootChain     *chatChain
+	currentChain  *chatChain
 )
 
 var (

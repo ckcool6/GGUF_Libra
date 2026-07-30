@@ -221,6 +221,45 @@ func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
+// BackToMainForkedNode 忽略侧线内部的所有微型分叉，直接回退到主线上最近的那个分叉点
+func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
+	if root == nil || currentNode == nil || root == currentNode {
+		return nil
+	}
+
+	var path []*chatChain
+	var findPath func(node *chatChain) bool
+
+	findPath = func(node *chatChain) bool {
+		if node == nil {
+			return false
+		}
+		path = append(path, node)
+		if node == currentNode {
+			return true
+		}
+		if findPath(node.DialogMain) || findPath(node.DialogSide) {
+			return true
+		}
+		path = path[:len(path)-1]
+		return false
+	}
+
+	if !findPath(root) {
+		return nil
+	}
+
+	// 从父节点开始倒序查找，必须同时满足：是 YellowNode（主线）且拥有分叉特征
+	for i := len(path) - 2; i >= 0; i-- {
+		n := path[i]
+		if n.BranchColor == YellowNode && (n.IsForkedNode || n.DialogSide != nil) {
+			return n
+		}
+	}
+
+	return nil
+}
+
 // RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基压平）到主线末尾，不丢失任何后续节点
 func (chain *chatChain) RebaseAllSideToMain() {
 	if chain == nil || chain.DialogSide == nil {
