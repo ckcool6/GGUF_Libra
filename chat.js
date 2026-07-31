@@ -9,9 +9,13 @@ import 'highlight.js/styles/atom-one-dark.min.css';
 // ==================================== 工具函数 =============================================
 // 用户纯文本转义与换行处理
 function formatUserText(str) {
-    // 先做净化，再把换行替换为 <br>
-    const cleanStr = DOMPurify.sanitize(str);
-    return cleanStr.replace(/\n/g, "<br>");
+    // 创建一个临时的 div，利用浏览器的 innerText/textContent 特性进行转义
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    const escapedStr = temp.innerHTML; // 这会将 < 变成 &lt; 等
+
+    // 然后再把换行符替换为 <br>
+    return escapedStr.replace(/\n/g, "<br>");
 }
 
 // AI Markdown 渲染与 XSS 边界防护
@@ -491,7 +495,7 @@ function finalizeAiBubble(ctx) {
         const speed = (ctx.tokenCount / (elapsed || 1)).toFixed(1);
         const speedSpan = document.getElementById(`speed-${ctx.currentBubbleId}`);
         if (speedSpan) {
-            speedSpan.innerHTML = ` takes ${elapsed.toFixed(1)}s  (total ${ctx.tokenCount} tokens / speed ${speed} t/s)`;
+            speedSpan.innerHTML = ` took ${elapsed.toFixed(1)}s  (total ${ctx.tokenCount} tokens / speed ${speed} t/s)`;
         }
     }
 
