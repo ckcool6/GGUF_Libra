@@ -124,3 +124,11 @@ header button {
 header button:hover {
     transform: scale(1.05);
 }
+
+/* 每一条消息的容器 */
+.message-row {
+    content-visibility: auto;
+    /* 赋予一个预估高度，防止消息没渲染时滚动条乱跳 */
+    /* 100px 是消息的平均高度 */
+    contain-intrinsic-size: auto 100px;
+}

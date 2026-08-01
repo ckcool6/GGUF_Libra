@@ -213,7 +213,7 @@ async function loadHistory() {
 
                 if (isUser) {
                     const html = `
-                        <div class="flex justify-start mb-8">
+                        <div class="message-row flex justify-start mb-8">
                             <div class="user-bubble p-4 rounded-2xl max-w-[90%]">
                                 ${content}
                             </div>
@@ -222,7 +222,7 @@ async function loadHistory() {
                 } else {
                     // 为 AI 消息构造 DOM 结构并插入 Notebook Bar
                     const wrapper = document.createElement('div');
-                    wrapper.className = 'flex justify-start mb-8';
+                    wrapper.className = 'message-row flex justify-start mb-8';
                     wrapper.innerHTML = `
                         <div class="flex flex-col max-w-[90%] w-full">
                             <div class="ai-bubble p-4 rounded-2xl markdown-body">
@@ -277,7 +277,7 @@ async function send() {
     input.style.height = 'auto';
 
     const safeUserText = formatUserText(text);
-    chatBox.insertAdjacentHTML('beforeend', `<div class="flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`);
+    chatBox.insertAdjacentHTML('beforeend', `<div class="message-row flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`);
     loading.classList.remove('hidden');
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
 
@@ -355,7 +355,7 @@ const streamChunkHandlers = {
             loading.classList.add('hidden');
             ctx.currentBubbleId = 'ai-' + Date.now();
             const html = `
-                        <div class="flex justify-start mb-8">
+                        <div class="message-row flex justify-start mb-8">
                             <div class="flex flex-col max-w-[90%]">
                                 <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
                                 </div>
