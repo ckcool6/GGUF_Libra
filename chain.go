@@ -260,7 +260,7 @@ func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
-// RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基压平）到主线末尾，不丢失任何后续节点
+// RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基）到主线末尾
 func (chain *chatChain) RebaseAllSideToMain() {
 	if chain == nil || chain.DialogSide == nil {
 		return
@@ -268,30 +268,34 @@ func (chain *chatChain) RebaseAllSideToMain() {
 
 	sideHead := chain.DialogSide
 
-	// 1. 遍历侧线，修饰节点属性并找到侧线的最深末尾
-	sideTail := sideHead
-	for {
-		sideTail.BranchColor = YellowNode
-		sideTail.IsForkedNode = false
-
-		if sideTail.DialogMain != nil {
-			sideTail = sideTail.DialogMain
-		} else if sideTail.DialogSide != nil {
-			sideTail = sideTail.DialogSide
-		} else {
-			break
-		}
-	}
-
-	// 2. 找到主线最深的尾巴 (Main Tail)
+	// 1. 找到当前主线最深的尾巴 (Main Tail)
 	mainTail := chain
 	for mainTail.DialogMain != nil {
 		mainTail = mainTail.DialogMain
 	}
 
-	// 3. 把侧线整体接在主线最末尾，并清空原本的 DialogSide
+	// 2. 把侧线整体嫁接到主线最末尾
 	mainTail.DialogMain = sideHead
-	chain.DialogSide = nil
+	chain.DialogSide = nil // 嫁接完毕，断开原本的侧线连接
+
+	// 3. 准备一个递归函数，用于遍历并重置整棵侧线子树的属性
+	var resetTree func(node *chatChain)
+	resetTree = func(node *chatChain) {
+		if node == nil {
+			return
+		}
+
+		// 洗白身份：全部变成主线颜色，并移除分叉标记
+		node.BranchColor = YellowNode
+		node.IsForkedNode = false
+
+		// 继续向深处蔓延，不管它原本是主线还是侧线
+		resetTree(node.DialogMain)
+		resetTree(node.DialogSide)
+	}
+
+	// 启动递归，把搬过来的这部分彻底同化
+	resetTree(sideHead)
 }
 
 // EditAbstract 手动覆盖修改摘要
