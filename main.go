@@ -37,22 +37,6 @@ var (
 )
 
 func main() {
-	var err error
-
-	// 尝试从本地加载已保存的树状历史
-	rootChain, err = LoadChainFromFile("chain_history.json")
-	if err != nil || rootChain == nil {
-		fmt.Println("未找到历史链文件，初始化新链...")
-		rootChain = NewChatChain()
-	} else {
-		fmt.Println("成功加载历史链结构")
-	}
-
-	// 默认将 currentChain 指向主线最深处的末尾节点
-	currentChain = rootChain
-	for currentChain.DialogMain != nil {
-		currentChain = currentChain.DialogMain
-	}
 
 	config_init()
 
