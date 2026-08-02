@@ -8,7 +8,7 @@ import (
 // StartLoading 启动一个加载动画，返回一个用于停止的 channel
 func StartLoading(message string) chan struct{} {
 	stopChan := make(chan struct{})
-	
+
 	go func() {
 		// 动画帧
 		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -17,16 +17,16 @@ func StartLoading(message string) chan struct{} {
 			select {
 			case <-stopChan:
 				// 收到停止信号，清除当前行并退出
-				fmt.Print("\r\033[K") 
+				fmt.Print("\r\033[K")
 				return
 			default:
 				// \r 让光标回到行首，\033[K 清除光标后的内容
-				fmt.Printf("\r\033[K%s %s", frames[i%len(frames)], message)
+				fmt.Printf("\r\033[K\033[36m%s\033[0m %s", frames[i%len(frames)], message)
 				i++
 				time.Sleep(100 * time.Millisecond) // 每 100 毫秒刷新一次
 			}
 		}
 	}()
-	
+
 	return stopChan
 }
