@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -104,6 +105,10 @@ func main() {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 
+		if body.CustomKey == "" {
+			authHeader := r.Header.Get("Authorization")
+			body.CustomKey = strings.TrimPrefix(authHeader, "Bearer ")
+		}
 		// 1. 快速读取当前节点指针后立即释放全局锁，不阻塞其他请求
 		mu.Lock()
 		targetChain := currentChain
@@ -112,7 +117,14 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		if targetChain != nil {
 			// 2. 耗时的 AI 摘要生成过程在锁外并发执行，内部使用 chainMu 保证节点安全
-			abstract := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
+			// 改为用两个变量接收返回值
+			abstract, err := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
+
+			// 如果发生了鉴权错误，直接返回 401 状态码给前端
+			if err != nil && err.Error() == "AUTH_ERROR" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 
 			// 3. 摘要生成完毕后再快速持锁落盘
 			mu.Lock()

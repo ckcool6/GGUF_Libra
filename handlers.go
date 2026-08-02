@@ -72,6 +72,13 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// 如果下游（Nginx/llamacpp）返回 401，立刻回滚历史并传给前端
+	if resp.StatusCode == http.StatusUnauthorized {
+		rollbackHistory(localChain)
+		w.WriteHeader(http.StatusUnauthorized) // 发送 401，让前端触发“鉴权失败”提示
+		return
+	}
+
 	// 4. 流式传输与后续更新
 	aiFullContent, streamSuccess := forwardStreamData(w, r, resp.Body)
 
@@ -325,8 +332,16 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
+	// 1. 优先尝试从 JSON Body 获取（兼容老逻辑）
 	if body.CustomKey != "" {
 		req.Header.Set("Authorization", "Bearer "+body.CustomKey)
+	} else {
+		// 2. 如果 Body 里没传，则直接转发前端发给 Go 的 Authorization Header
+		// 这就是你前端 getHeaders() 函数发送的内容： "Bearer your_key"
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
 	}
 
 	return httpClient.Do(req)

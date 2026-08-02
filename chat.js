@@ -41,7 +41,8 @@ async function initPromptSelect() {
     if (!select) return;
 
     try {
-        const res = await fetch('/api/prompts');
+        const res = await fetch('/api/prompts', { headers: getHeaders() });
+
         if (!res.ok) throw new Error(`HTTP 状态异常: ${res.status}`);
 
         const data = await res.json();
@@ -115,6 +116,15 @@ async function initPromptSelect() {
 function showPromptError(select, message) {
     select.innerHTML = `<option value="" disabled selected>⚠️ ${message}</option>`;
     select.disabled = true;
+}
+
+// 获取统一的请求头
+function getHeaders() {
+    const key = localStorage.getItem('custom_api_key') || '';
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}` // 很多后端（包括 OpenAI 格式）都检查这个
+    };
 }
 
 // ==================================== init & extensions load =============================
@@ -202,7 +212,7 @@ window.onload = () => {
 
 async function loadHistory() {
     try {
-        const res = await fetch('/api/history');
+        const res = await fetch('/api/history', { headers: getHeaders() });
         const data = await res.json();
         if (data && data.length > 0) {
             chatBox.innerHTML = '';
@@ -286,14 +296,19 @@ async function send() {
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            // getHeaders 会获取 Key，即使为空也会发送（Authorization: Bearer ）
+            headers: getHeaders(),
             signal: chatAbortController.signal,
             body: JSON.stringify({
                 message: text,
-                custom_url: localStorage.getItem('custom_api_url') || '',
-                custom_key: localStorage.getItem('custom_api_key') || ''
+                custom_url: localStorage.getItem('custom_api_url') || ''
             })
         });
+
+        // --- 识别 401 错误 ---
+        if (response.status === 401) {
+            throw new Error("401_UNAUTHORIZED");
+        }
 
         if (!response.ok) {
             const errorMsg = await extractErrorMessage(response);
@@ -307,13 +322,25 @@ async function send() {
             console.log("用户中止了 AI 的回复");
         } else {
             loading.classList.add('hidden');
+
+            // 默认错误信息
+            let displayTitle = "⚠️ 遇到系统错误";
+            let displayMsg = formatUserText(err.message || "连接错误，请检查后端。");
+
+            // --- 针对 401 自定义显示内容 ---
+            if (err.message === "401_UNAUTHORIZED") {
+                displayTitle = "🔑 鉴权失败";
+                displayMsg = "后端需要有效的 API Key 才能继续，请在设置中检查。";
+            }
+
             const errorHtml = `
                 <div class="flex justify-start mb-4">
                     <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
-                        <div class="font-bold mb-1">⚠️ 遇到系统错误</div>
-                        <div>${formatUserText(err.message || "连接错误，请检查后端。")}</div>
+                        <div class="font-bold mb-1">${displayTitle}</div>
+                        <div>${displayMsg}</div>
                     </div>
                 </div>`;
+
             chatBox.insertAdjacentHTML('beforeend', errorHtml);
             chatBox.scrollTop = chatBox.scrollHeight;
             checkLlamaConnection();
@@ -572,6 +599,8 @@ function createNotebookBar() {
             notebookBar.appendChild(summaryBox);
         }
 
+        scrollToBottomIfNear()
+
         const contentDiv = summaryBox.querySelector('.summary-content');
         const customUrl = localStorage.getItem('custom_api_url') || '';
         const customKey = localStorage.getItem('custom_api_key') || '';
@@ -581,7 +610,7 @@ function createNotebookBar() {
 
             const res = await fetch('/api/generate-abstract', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ custom_url: customUrl, custom_key: customKey })
             });
 
@@ -669,7 +698,7 @@ async function newChat() {
         sendBtn.innerHTML = '发送';
 
         try {
-            await fetch('/api/new-chat');
+            await fetch('/api/new-chat', { headers: getHeaders() });
             chatBox.innerHTML = `
                 <div class="flex justify-start mb-8">
                     <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
@@ -747,7 +776,8 @@ async function checkLlamaConnection() {
 
         const res = await fetch(healthUrl, {
             method: 'GET',
-            signal: controller.signal
+            signal: controller.signal,
+            headers: getHeaders()
         });
 
         clearTimeout(timeoutId);
@@ -776,7 +806,9 @@ async function get_ctx_usage() {
 
     try {
         const propsUrl = `/api/llama-props?custom_url=${encodeURIComponent(customUrl)}`;
-        const res = await fetch(propsUrl);
+        const res = await fetch(propsUrl, {
+            headers: getHeaders()
+        });
 
         if (res.ok) {
             const data = await res.json();

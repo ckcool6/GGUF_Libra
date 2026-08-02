@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // enum
@@ -58,16 +59,16 @@ func NewChatChain() *chatChain {
 }
 
 // GenerateAbstract 提取摘要
-func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
+func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, error) {
 	if chain == nil || chain.DialogContent == nil || len(chain.DialogContent.ChatHistory) == 0 {
-		return ""
+		return "", fmt.Errorf("没有对话记录")
 	}
 
-	// 1. 读取历史记录
+	//  读取历史记录
 	history := make([]Message, len(chain.DialogContent.ChatHistory))
 	copy(history, chain.DialogContent.ChatHistory)
 
-	// 2. 构造专门用于总结的 Prompt
+	// 构造专门用于总结的 Prompt
 	promptMessages := []Message{
 		{
 			Role:    "system",
@@ -86,8 +87,8 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Println("❌ 总结请求失败:", err)
-		return ""
+		fmt.Println("❌ 总结请求序列化失败:", err)
+		return "", err
 	}
 
 	apiURL := "http://127.0.0.1:8021/v1/chat/completions"
@@ -98,24 +99,35 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("❌ 创建总结请求失败:", err)
-		return ""
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	// 处理 Key 的转发
 	if customKey != "" {
-		req.Header.Set("Authorization", "Bearer "+customKey)
+		if strings.HasPrefix(customKey, "Bearer ") {
+			req.Header.Set("Authorization", customKey)
+		} else {
+			req.Header.Set("Authorization", "Bearer "+customKey)
+		}
 	}
 
 	resp, err := httpTimeoutClient.Do(req)
 	if err != nil {
 		fmt.Println("❌ 请求总结 API 失败:", err)
-		return ""
+		return "", err
 	}
 	defer resp.Body.Close()
+
+	// --- 处理 401 错误 ---
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", fmt.Errorf("AUTH_ERROR") // 返回特定错误，让 Handler 能够识别
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		fmt.Printf("❌ 生成总结失败，响应码 %d: %s\n", resp.StatusCode, string(bodyBytes))
-		return ""
+		return "", fmt.Errorf("API 响应错误: %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -128,17 +140,16 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) string {
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Println("❌ 解析总结响应失败:", err)
-		io.Copy(io.Discard, resp.Body)
-		return ""
+		return "", err
 	}
 
 	if len(result.Choices) > 0 {
 		abstract := result.Choices[0].Message.Content
 		chain.DialogAbstract = abstract
-		return abstract
+		return abstract, nil // 成功返回摘要和 nil 错误
 	}
 
-	return ""
+	return "", fmt.Errorf("API 返回了空的选择列表")
 }
 
 // AppendMainBranchNode 为当前节点追加一个新的主线子节点
