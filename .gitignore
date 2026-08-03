@@ -6,3 +6,5 @@ my-gemini-ui
 system_prompt.json
 node_modules/
 dist/
+todo
+gguf-player.exe
