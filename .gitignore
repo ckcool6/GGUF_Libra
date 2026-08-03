@@ -3,7 +3,6 @@
 
 # 忽略编译后的二进制文件
 my-gemini-ui
-system_prompt.json
 node_modules/
 dist/
 todo
