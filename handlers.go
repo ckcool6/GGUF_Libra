@@ -106,8 +106,12 @@ func load_history(chain *chatChain, body *reqBody) {
 		return
 	}
 
-	// 将用户消息存入当前节点的 ChatHistory
-	chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory, Message{Role: "user", Content: body.Message})
+	// 存入消息时必须包含 Image
+	chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory, Message{
+		Role:    "user",
+		Content: body.Message,
+		Image:   body.Image, // 必须把图片 Base64 存入历史
+	})
 	chain.DialogContent.UserMsgIndex = len(chain.DialogContent.ChatHistory) - 1
 
 	// 计算当前节点发送给模型时的 safeMaxTokens
@@ -225,7 +229,7 @@ func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
 	if currentChain != nil && currentChain.DialogContent != nil {
 		filteredMsgs := filterMessagesByToken(currentChain.DialogContent.ChatHistory, maxCtx)
 		for _, msg := range filteredMsgs {
-			currentTokens += getMessageTokens(msg.Role, msg.Content)
+			currentTokens += getMessageTokens(msg)
 		}
 	}
 	mu.Unlock()
@@ -315,8 +319,35 @@ Loop:
 }
 
 func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*http.Response, error) {
+	formattedMessages := make([]LlamaMessage, 0, len(history))
+
+	for _, m := range history {
+		if m.Image != "" {
+			// 有图片，组装为 []LlamaContent 数组
+			contentArray := []LlamaContent{
+				{Type: "text", Text: m.Content},
+				{
+					Type: "image_url",
+					ImageURL: &LlamaImageDetail{
+						URL: "data:image/jpeg;base64," + m.Image,
+					},
+				},
+			}
+			formattedMessages = append(formattedMessages, LlamaMessage{
+				Role:    m.Role,
+				Content: contentArray, // interface{} 可以接收 slice
+			})
+		} else {
+			// 没图片，直接用字符串
+			formattedMessages = append(formattedMessages, LlamaMessage{
+				Role:    m.Role,
+				Content: m.Content, // interface{} 可以接收 string
+			})
+		}
+	}
+
 	payload := map[string]interface{}{
-		"messages": history,
+		"messages": formattedMessages,
 		"stream":   true,
 	}
 	jsonData, _ := json.Marshal(payload)
@@ -333,11 +364,11 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// 1. 优先尝试从 JSON Body 获取（兼容老逻辑）
+	// 优先尝试从 JSON Body 获取
 	if body.CustomKey != "" {
 		req.Header.Set("Authorization", "Bearer "+body.CustomKey)
 	} else {
-		// 2. 如果 Body 里没传，则直接转发前端发给 Go 的 Authorization Header
+		// 如果 Body 里没传，则直接转发前端发给 Go 的 Authorization Header
 		// 这就是你前端 getHeaders() 函数发送的内容： "Bearer your_key"
 		if auth := r.Header.Get("Authorization"); auth != "" {
 			req.Header.Set("Authorization", auth)

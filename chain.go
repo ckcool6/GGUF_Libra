@@ -64,19 +64,28 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 		return "", fmt.Errorf("没有对话记录")
 	}
 
-	//  读取历史记录
-	history := make([]Message, len(chain.DialogContent.ChatHistory))
-	copy(history, chain.DialogContent.ChatHistory)
-
 	// 构造专门用于总结的 Prompt
-	promptMessages := []Message{
-		{
-			Role:    "system",
-			Content: "你是一个精炼的文本总结助手。请用简明扼要的语言总结以下对话的核心要点与关键上下文，字数控制在100-200字以内，不要有多余的客套话。",
-		},
+	var promptMessages []LlamaMessage
+	promptMessages = append(promptMessages, LlamaMessage{
+		Role:    "system",
+		Content: "你是一个精炼的文本总结助手。请总结对话核心要点，字数控制在100-200字以内。",
+	})
+
+	for _, m := range chain.DialogContent.ChatHistory {
+		if m.Role == "system" {
+			continue
+		}
+		content := m.Content
+		if m.Image != "" {
+			content = "[图片消息] " + content // 仅保留占位符
+		}
+		promptMessages = append(promptMessages, LlamaMessage{
+			Role:    m.Role,
+			Content: content,
+		})
 	}
-	promptMessages = append(promptMessages, history...)
-	promptMessages = append(promptMessages, Message{
+
+	promptMessages = append(promptMessages, LlamaMessage{
 		Role:    "user",
 		Content: "请为以上的对话生成一份简短的上下文摘要总结。",
 	})
@@ -87,7 +96,6 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	}
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Println("❌ 总结请求序列化失败:", err)
 		return "", err
 	}
 

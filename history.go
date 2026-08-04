@@ -78,10 +78,18 @@ func setActivePrompt(id string) bool {
 	return false
 }
 
-func getMessageTokens(role, content string) int {
+func getMessageTokens(msg Message) int {
+	// 基础 Token (Role + Content)
 	tokens := 4
-	tokens += len(tkm.Encode(role, nil, nil))
-	tokens += len(tkm.Encode(content, nil, nil))
+	tokens += len(tkm.Encode(msg.Role, nil, nil))
+	tokens += len(tkm.Encode(msg.Content, nil, nil))
+
+	//  图片 Token
+	if msg.Image != "" {
+		// 图片经过 mmproj 处理后会占用固定的视觉 Token 槽位。
+		// 1024 是一个比较通用的保守估算值。
+		tokens += 1024
+	}
 	return tokens
 }
 
@@ -89,8 +97,10 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	var result []Message
 	totalTokens := 0
 
+	// 计算系统提示词
 	if systemPrompt.Content != "" {
-		totalTokens += getMessageTokens(systemPrompt.Role, systemPrompt.Content)
+		// 这里的 systemPrompt 也是 Message 类型
+		totalTokens += getMessageTokens(systemPrompt)
 	}
 
 	if totalTokens > maxTokens {
@@ -104,7 +114,8 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 			continue
 		}
 
-		msgTokens := getMessageTokens(msg.Role, msg.Content)
+		// 传入整个 msg 结构体
+		msgTokens := getMessageTokens(msg)
 
 		if totalTokens+msgTokens > maxTokens {
 			break

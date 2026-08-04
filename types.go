@@ -3,6 +3,9 @@ package main
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+	// 用于在历史记录中存储图片的 Base64 数据
+	// omitempty 表示如果没有图片，生成的 JSON 就不包含这个字段
+	Image string `json:"image,omitempty"`
 }
 
 type SystemPromptConfig struct {
@@ -17,7 +20,9 @@ type PromptItem struct {
 }
 
 type reqBody struct {
-	Message   string `json:"message"`
+	Message string `json:"message"`
+	// 接收前端 JS 发来的图片 Base64
+	Image     string `json:"image"`
 	CustomUrl string `json:"custom_url"`
 	CustomKey string `json:"custom_key"`
 }
@@ -26,4 +31,19 @@ type chatlist struct {
 	ChatHistory  []Message
 	UserMsgIndex int
 	SendHistory  []Message
+}
+
+type LlamaContent struct {
+	Type     string            `json:"type"`
+	Text     string            `json:"text,omitempty"`
+	ImageURL *LlamaImageDetail `json:"image_url,omitempty"`
+}
+
+type LlamaImageDetail struct {
+	URL string `json:"url"` // 格式: "data:image/jpeg;base64,xxxx"
+}
+
+type LlamaMessage struct {
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"` // 这里可以是 string 或 []LlamaContent
 }

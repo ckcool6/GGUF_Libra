@@ -279,33 +279,66 @@ async function send() {
     }
 
     const text = input.value.trim();
-    if (!text) return;
+    // 修改：如果没有文字 且 没有图片，则不发送
+    if (!text && !currentImageBase64) return;
 
     sendBtn.classList.add('is-loading');
+    // 修改按钮 UI 为停止图标
     sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
+
+    // 暂存图片并清空输入
+    const imageToSend = currentImageBase64;
     input.value = '';
     input.style.height = 'auto';
+    clearImage(); // 调用你之前写的清理图片预览的函数
 
+    // --- 构建用户 UI 气泡 ---
     const safeUserText = formatUserText(text);
-    chatBox.insertAdjacentHTML('beforeend', `<div class="message-row flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">${safeUserText}</div></div>`);
+    let userBubbleHtml = `<div class="message-row flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">`;
+
+    // 如果有图片，先插入图片节点
+    if (imageToSend) {
+        userBubbleHtml += `<img src="${imageToSend}" class="max-w-full rounded-lg mb-2 shadow-sm border border-black/5 dark:border-white/5">`;
+    }
+
+    // 插入文字（如果有）
+    if (safeUserText) {
+        userBubbleHtml += `<div>${safeUserText}</div>`;
+    }
+
+    userBubbleHtml += `</div></div>`;
+
+    chatBox.insertAdjacentHTML('beforeend', userBubbleHtml);
     loading.classList.remove('hidden');
-    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+
+    // 滚动
+    const lastMessageImg = chatBox.querySelector('.message-row:last-child img');
+
+    if (lastMessageImg) {
+        // 如果有图片，等图片加载完再滚
+        lastMessageImg.onload = () => {
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        };
+    } else {
+        // 没图片（纯文字），直接滚
+        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+    }
 
     chatAbortController = new AbortController();
 
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
-            // getHeaders 会获取 Key，即使为空也会发送（Authorization: Bearer ）
             headers: getHeaders(),
             signal: chatAbortController.signal,
             body: JSON.stringify({
                 message: text,
+                // 修改：如果存在图片，去掉 "data:image/jpeg;base64," 的前缀只发内容
+                image: imageToSend ? imageToSend.split(',')[1] : null,
                 custom_url: localStorage.getItem('custom_api_url') || ''
             })
         });
 
-        // --- 识别 401 错误 ---
         if (response.status === 401) {
             throw new Error("401_UNAUTHORIZED");
         }
@@ -322,12 +355,9 @@ async function send() {
             console.log("用户中止了 AI 的回复");
         } else {
             loading.classList.add('hidden');
-
-            // 默认错误信息
             let displayTitle = "⚠️ 遇到系统错误";
             let displayMsg = formatUserText(err.message || "连接错误，请检查后端。");
 
-            // --- 针对 401 自定义显示内容 ---
             if (err.message === "401_UNAUTHORIZED") {
                 displayTitle = "🔑 鉴权失败";
                 displayMsg = "后端需要有效的 API Key 才能继续，请在设置中检查。";
@@ -652,6 +682,98 @@ async function extractErrorMessage(response) {
 
 document.getElementById('send-btn').addEventListener('click', send);
 // ============================= buttons ============================================
+
+// 图片处理相关 DOM
+const imageInput = document.getElementById('image-input');
+const imagePreviewWrapper = document.getElementById('image-preview-wrapper');
+const imagePreview = document.getElementById('image-preview');
+const removeImageBtn = document.getElementById('remove-image');
+
+let currentImageBase64 = null; // 用于存储待发送的图片数据
+
+// 处理并缩放图片
+async function processImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                let width = img.width;
+                let height = img.height;
+                const maxSide = 512; // 目标最大边长
+
+                // 计算等比例缩放后的尺寸
+                if (width > height) {
+                    if (width > maxSide) {
+                        height = Math.round(height * (maxSide / width));
+                        width = maxSide;
+                    }
+                } else {
+                    if (height > maxSide) {
+                        width = Math.round(width * (maxSide / height));
+                        height = maxSide;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                // 在画布上绘制缩放后的图像
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 导出为 JPEG (体积更小，且对 AI 友好)
+                // 0.8 是质量压缩比，可以根据需要调整 (0.1 ~ 1.0)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                resolve(dataUrl);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+}
+
+// 监听图片选择
+imageInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        // 显示加载状态（可选）
+        imagePreview.style.opacity = '0.5';
+
+        // 自动转换尺寸
+        const resizedBase64 = await processImage(file);
+
+        currentImageBase64 = resizedBase64;
+        imagePreview.src = resizedBase64;
+        imagePreview.style.opacity = '1';
+        imagePreviewWrapper.classList.remove('hidden');
+
+        console.log("图片已处理为 256x256");
+    } catch (err) {
+        console.error("图片处理失败:", err);
+        alert("图片处理失败");
+    }
+});
+
+// 移除图片
+removeImageBtn.addEventListener('click', () => {
+    clearImage();
+});
+
+function clearImage() {
+    currentImageBase64 = null;
+    imagePreview.src = '';
+    imagePreviewWrapper.classList.add('hidden');
+    imageInput.value = '';
+}
+
+// 下载导出
 async function downloadChat() {
     try {
         // 从后端获取真实的原始 Markdown 对话历史
