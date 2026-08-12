@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -150,15 +151,41 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	data, err := os.ReadFile("chain_history.json")
+	if err != nil {
+		json.NewEncoder(w).Encode([]Message{})
+		return
+	}
+
+	var root chatChain
+	if err := json.Unmarshal(data, &root); err != nil {
+		http.Error(w, "解析历史 JSON 失败", http.StatusInternalServerError)
+		return
+	}
+
 	history := []Message{}
-	if currentChain != nil && currentChain.DialogContent != nil {
-		// 过滤掉 system 消息，保持结构依然是 Message 数组
-		for _, msg := range currentChain.DialogContent.ChatHistory {
-			if msg.Role != "system" {
-				history = append(history, msg)
+
+	// 深度遍历整棵树（主线 + 侧线），按顺序搜集所有非 system 消息
+	var collectMessages func(node *chatChain)
+	collectMessages = func(node *chatChain) {
+		if node == nil {
+			return
+		}
+
+		if node.DialogContent != nil {
+			for _, msg := range node.DialogContent.ChatHistory {
+				if msg.Role != "system" {
+					history = append(history, msg)
+				}
 			}
 		}
+
+		// 依次搜集主线和侧线
+		collectMessages(node.DialogMain)
+		collectMessages(node.DialogSide)
 	}
+
+	collectMessages(&root)
 
 	json.NewEncoder(w).Encode(history)
 }

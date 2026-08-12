@@ -210,7 +210,7 @@ window.onload = () => {
     }, 10000);
 };
 
-async function loadHistory() {
+/* async function loadHistory() {
     try {
         const res = await fetch('/api/history', { headers: getHeaders() });
         const data = await res.json();
@@ -254,7 +254,61 @@ async function loadHistory() {
         console.error("加载历史记录失败:", e);
     }
 }
+ */
 
+async function loadHistory() {
+    try {
+        const res = await fetch('/api/history', { headers: getHeaders() });
+        const historyList = await res.json();
+
+        if (Array.isArray(historyList) && historyList.length > 0) {
+            chatBox.innerHTML = '';
+
+            historyList.forEach(m => {
+                const isUser = m.role === 'user';
+                const content = isUser ? formatUserText(m.content) : safeMarkdownParse(m.content);
+
+                if (isUser) {
+                    let userBubbleInner = '';
+                    if (m.image) {
+                        userBubbleInner += `<img src="data:image/jpeg;base64,${m.image}" class="max-w-full rounded-lg mb-2 border border-black/5 dark:border-white/5 shadow-sm">`;
+                    }
+                    if (m.content) {
+                        userBubbleInner += `<div>${content}</div>`;
+                    }
+
+                    const html = `
+                        <div class="message-row flex justify-start mb-8">
+                            <div class="user-bubble p-4 rounded-2xl max-w-[90%]">
+                                ${userBubbleInner}
+                            </div>
+                        </div>`;
+                    chatBox.insertAdjacentHTML('beforeend', html);
+                } else {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'message-row flex justify-start mb-8';
+                    wrapper.innerHTML = `
+                        <div class="flex flex-col max-w-[90%] w-full">
+                            <div class="ai-bubble p-4 rounded-2xl markdown-body">
+                                ${content}
+                            </div>
+                        </div>`;
+
+                    const notebookBar = createNotebookBar();
+                    wrapper.querySelector('.flex-col').appendChild(notebookBar);
+                    chatBox.appendChild(wrapper);
+                }
+            });
+
+            // 高亮与排版处理
+            chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
+            twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    } catch (e) {
+        console.error("加载历史记录失败:", e);
+    }
+}
 // ==================================== send messages ==============================================
 let chatAbortController = null;
 
