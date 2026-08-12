@@ -227,7 +227,18 @@ func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	currentTokens := 0
 	if currentChain != nil && currentChain.DialogContent != nil {
-		filteredMsgs := filterMessagesByToken(currentChain.DialogContent.ChatHistory, maxCtx)
+		// 扣掉预留给 AI 输出的空间
+		reserveTokens := 2048
+		if maxCtx/5 < reserveTokens {
+			reserveTokens = maxCtx / 5
+		}
+		safeMaxTokens := maxCtx - reserveTokens
+		if safeMaxTokens < 100 {
+			safeMaxTokens = 100
+		}
+
+		// 用 safeMaxTokens 来裁剪计算，这样算出来的就是“真正会发给 AI 的有效上下文 Token”
+		filteredMsgs := filterMessagesByToken(currentChain.DialogContent.ChatHistory, safeMaxTokens)
 		for _, msg := range filteredMsgs {
 			currentTokens += getMessageTokens(msg)
 		}
