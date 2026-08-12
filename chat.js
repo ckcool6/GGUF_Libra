@@ -210,52 +210,6 @@ window.onload = () => {
     }, 10000);
 };
 
-/* async function loadHistory() {
-    try {
-        const res = await fetch('/api/history', { headers: getHeaders() });
-        const data = await res.json();
-        if (data && data.length > 0) {
-            chatBox.innerHTML = '';
-
-            data.forEach(m => {
-                const isUser = m.role === 'user';
-                const content = isUser ? formatUserText(m.content) : safeMarkdownParse(m.content);
-
-                if (isUser) {
-                    const html = `
-                        <div class="message-row flex justify-start mb-8">
-                            <div class="user-bubble p-4 rounded-2xl max-w-[90%]">
-                                ${content}
-                            </div>
-                        </div>`;
-                    chatBox.insertAdjacentHTML('beforeend', html);
-                } else {
-                    // 为 AI 消息构造 DOM 结构并插入 Notebook Bar
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'message-row flex justify-start mb-8';
-                    wrapper.innerHTML = `
-                        <div class="flex flex-col max-w-[90%] w-full">
-                            <div class="ai-bubble p-4 rounded-2xl markdown-body">
-                                ${content}
-                            </div>
-                        </div>`;
-
-                    const notebookBar = createNotebookBar();
-                    wrapper.querySelector('.flex-col').appendChild(notebookBar);
-                    chatBox.appendChild(wrapper);
-                }
-            });
-
-            chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
-            twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-    } catch (e) {
-        console.error("加载历史记录失败:", e);
-    }
-}
- */
-
 async function loadHistory() {
     try {
         const res = await fetch('/api/history', { headers: getHeaders() });
