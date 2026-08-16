@@ -590,6 +590,9 @@ function createNotebookBar() {
                 <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-amber-500 font-bold">⚡</span> Summary
                 </button>
+                 <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-purple-500 font-bold">m</span> Merge
+                </button>
             </div>
         </div>
     `;
@@ -670,7 +673,70 @@ function createNotebookBar() {
         }
     });
 
+    // 绑定 Merge 事件 
+    const mergeBtn = notebookBar.querySelector('.merge-btn');
+    mergeBtn.addEventListener('click', async () => {
+        // 执行合并操作
+        await handleMergeAction(mergeBtn);
+    });
+
     return notebookBar;
+}
+
+async function handleMergeAction(btn) {
+    const originalContent = btn.innerHTML;
+
+    try {
+        btn.innerHTML = `<span class="text-purple-500 animate-spin">⏳</span> Merging...`;
+        btn.disabled = true;
+
+        const customUrl = localStorage.getItem('custom_api_url') || '';
+        const customKey = localStorage.getItem('custom_api_key') || '';
+
+        // 1. 尝试执行合并
+        let res = await fetch('/api/merge', {
+            method: 'POST',
+            headers: getHeaders()
+        });
+
+        // 2. 如果后端返回 412 (Precondition Failed)，说明还没摘要，我们自动触发一次摘要生成
+        if (res.status === 412) {
+            btn.innerHTML = `<span class="text-amber-500 animate-pulse">📝</span> Summarizing first...`;
+
+            const sumRes = await fetch('/api/generate-abstract', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ custom_url: customUrl, custom_key: customKey })
+            });
+
+            if (!sumRes.ok) throw new Error("自动生成摘要失败，请手动点击 Summary");
+
+            // 摘要生成成功后，再次尝试合并
+            res = await fetch('/api/merge', {
+                method: 'POST',
+                headers: getHeaders()
+            });
+        }
+
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || "合并失败");
+        }
+
+        // 3. 合并成功，刷新整个界面
+        btn.innerHTML = `<span class="text-purple-500">✓</span> Done`;
+
+        // 延迟一小下让用户看清“Done”，然后刷新
+        setTimeout(() => {
+            loadHistory(); // 重新加载历史，这时 currentChain 已经在主线末尾了
+        }, 500);
+
+    } catch (e) {
+        console.error("Merge 失败:", e);
+        alert("合并失败: " + e.message);
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
 }
 
 async function extractErrorMessage(response) {

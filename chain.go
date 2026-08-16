@@ -279,50 +279,53 @@ func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
-// Merge 将侧线分支的成果通过摘要形式合并回主线
-func (chain *chatChain) Merge() (*chatChain, error) {
-	if chain == nil {
-		return nil, fmt.Errorf("节点为空")
-	}
-	if chain.DialogSide == nil {
-		return nil, fmt.Errorf("当前节点没有侧线分支可以合并")
+// Merge 执行合并逻辑：找到分叉点 -> 找到主线末尾 -> 嫁接摘要节点
+func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
+	if root == nil || currentNode == nil {
+		return nil, fmt.Errorf("节点不能为空")
 	}
 
-	// 1. 确保侧线已经有了摘要
-	// 如果你希望在 Merge 时自动生成摘要，可以在这里调用 chain.DialogSide.GenerateAbstract(...)
-	// 这里假设侧线的摘要已经生成并存储在 DialogAbstract 中
-	sideSummary := chain.DialogSide.DialogAbstract
-	if sideSummary == "" {
-		return nil, fmt.Errorf("侧线尚未生成摘要，请先执行总结操作")
+	// 1. 获取侧线摘要 (前提是已经在前端触发了 generate-abstract)
+	summary := currentNode.DialogAbstract
+	if summary == "" {
+		return nil, fmt.Errorf("侧线尚未生成摘要，请先生成摘要再合并")
 	}
 
-	// 2. 找到主线的尽头 (Main Tail)
-	// 我们要保证合并后的节点是接在主线最后面的
-	mainTail := chain
+	// 2. 回溯寻找该侧线是从哪个主线分叉点出来的
+	forkNode := root.BackToMainForkedNode(currentNode)
+	if forkNode == nil {
+		return nil, fmt.Errorf("无法定位该侧线的分叉源头")
+	}
+
+	// 3. 寻找当前主线（正史）的最深末尾
+	// 我们要保证合并成果是接在主线最下方的
+	mainTail := root
 	for mainTail.DialogMain != nil {
 		mainTail = mainTail.DialogMain
 	}
 
-	// 3. 在主线末尾创建一个新的主线节点
-	// 我们可以复用你之前的 NewChatChain 或 AppendMainBranchNode 逻辑
+	// 4. 创建全新的合并节点
+	// 这个节点将承载侧线的成果，并作为主线的延伸
 	mergedNode := NewChatChain()
-	mergedNode.BranchColor = YellowNode // 确保合并后属于主线颜色
-	mergedNode.IsForkedNode = false     // 合并节点是一个汇聚点，不再是分叉点
+	mergedNode.BranchColor = YellowNode // 回归主线
+	mergedNode.IsForkedNode = false     // 它是汇聚点
 
-	// 4. 将侧线的摘要包装成一条系统消息，塞入新节点的历史记录
-	mergeInfo := Message{
-		Role:    "system",
-		Content: "【分支合并摘要】来自侧线探索的结论：\n\n" + sideSummary,
+	// 5. 组装合并消息
+	mergeMsg := Message{
+		Role:    "assistant",
+		Content: "【背景】刚才我们深入探讨了以下内容,以此为基础继续对话:\n\n" + summary,
 	}
-	mergedNode.DialogContent.ChatHistory = append(mergedNode.DialogContent.ChatHistory, mergeInfo)
+	mergedNode.DialogContent.ChatHistory = append(mergedNode.DialogContent.ChatHistory, mergeMsg)
 
-	// 5. 正式挂载：将主线末尾指向这个新节点
+	// 6. 物理执行合并（原子操作）
+	// a. 将主线末尾指向新节点
 	mainTail.DialogMain = mergedNode
 
-	// 6. 断开侧线连接 (或者保留，取决于你是否想在 UI 上继续显示分叉)
-	// 通常 Merge 之后，侧线的使命就完成了
-	chain.DialogSide = nil
+	// b. 收割侧线：断开分叉点与侧线的连接
+	// 这样整棵侧线在逻辑上就“消失”了，只有摘要留在了主线里
+	forkNode.DialogSide = nil
 
+	// 返回这个新产生的主线节点，以便 main.go 更新 currentChain
 	return mergedNode, nil
 }
 

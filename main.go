@@ -87,43 +87,35 @@ func main() {
 	})
 
 	// 将侧线合并（Merge）回主线：将侧线摘要作为新节点插入主线末尾
+	// 修改 /api/merge 路由
 	http.HandleFunc("/api/merge", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		if currentChain == nil {
-			http.Error(w, "当前节点为空", http.StatusBadRequest)
-			return
-		}
-
-		// 检查是否有侧线可以合并
-		if currentChain.DialogSide == nil {
-			http.Error(w, "当前位置没有侧线分支", http.StatusBadRequest)
-			return
-		}
-
-		// 检查侧线是否已经有了摘要 (前端应先调用 generate-abstract)
-		if currentChain.DialogSide.DialogAbstract == "" {
-			http.Error(w, "侧线尚未生成总结，请先生成总结再合并", http.StatusPreconditionFailed)
+		if rootChain == nil || currentChain == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "对话未初始化"})
 			return
 		}
 
 		// 执行合并逻辑
-		// newNode 是合并后在主线末尾产生的那个携带摘要的新节点
-		newNode, err := currentChain.Merge()
+		// 传入 rootChain 是因为需要它来做 DFS 路径搜索
+		// 传入 currentChain 是因为它是侧线的终点，承载着摘要
+		newNode, err := rootChain.Merge(currentChain)
+
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 
-		// 重要：合并后，将当前的操作指针 currentChain 移动到这个新的主线节点上
+		// 这一步非常关键：合并后，将用户的操作指针指回主线的新节点
 		currentChain = newNode
 
-		// 持久化保存
+		// 保存状态到文件
 		rootChain.SaveChainToFile("chain_history.json")
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "success",
 			"message": "已将侧线成果合并至主线末尾",
