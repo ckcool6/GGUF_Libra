@@ -86,15 +86,48 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// 将侧线变基（Rebase）合并回主线
-	http.HandleFunc("/api/rebase-side", func(w http.ResponseWriter, r *http.Request) {
+	// 将侧线合并（Merge）回主线：将侧线摘要作为新节点插入主线末尾
+	http.HandleFunc("/api/merge", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		if currentChain != nil {
-			currentChain.RebaseAllSideToMain()
-			rootChain.SaveChainToFile("chain_history.json")
+		defer mu.Unlock()
+
+		if currentChain == nil {
+			http.Error(w, "当前节点为空", http.StatusBadRequest)
+			return
 		}
-		mu.Unlock()
+
+		// 检查是否有侧线可以合并
+		if currentChain.DialogSide == nil {
+			http.Error(w, "当前位置没有侧线分支", http.StatusBadRequest)
+			return
+		}
+
+		// 检查侧线是否已经有了摘要 (前端应先调用 generate-abstract)
+		if currentChain.DialogSide.DialogAbstract == "" {
+			http.Error(w, "侧线尚未生成总结，请先生成总结再合并", http.StatusPreconditionFailed)
+			return
+		}
+
+		// 执行合并逻辑
+		// newNode 是合并后在主线末尾产生的那个携带摘要的新节点
+		newNode, err := currentChain.Merge()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// 重要：合并后，将当前的操作指针 currentChain 移动到这个新的主线节点上
+		currentChain = newNode
+
+		// 持久化保存
+		rootChain.SaveChainToFile("chain_history.json")
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": "已将侧线成果合并至主线末尾",
+		})
 	})
 
 	//  手动触发生成当前节点的上下文摘要

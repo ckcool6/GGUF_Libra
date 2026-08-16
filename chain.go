@@ -279,42 +279,51 @@ func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
-// RebaseAllSideToMain 将当前节点下的侧线分支完整合并（变基）到主线末尾
-func (chain *chatChain) RebaseAllSideToMain() {
-	if chain == nil || chain.DialogSide == nil {
-		return
+// Merge 将侧线分支的成果通过摘要形式合并回主线
+func (chain *chatChain) Merge() (*chatChain, error) {
+	if chain == nil {
+		return nil, fmt.Errorf("节点为空")
+	}
+	if chain.DialogSide == nil {
+		return nil, fmt.Errorf("当前节点没有侧线分支可以合并")
 	}
 
-	sideHead := chain.DialogSide
+	// 1. 确保侧线已经有了摘要
+	// 如果你希望在 Merge 时自动生成摘要，可以在这里调用 chain.DialogSide.GenerateAbstract(...)
+	// 这里假设侧线的摘要已经生成并存储在 DialogAbstract 中
+	sideSummary := chain.DialogSide.DialogAbstract
+	if sideSummary == "" {
+		return nil, fmt.Errorf("侧线尚未生成摘要，请先执行总结操作")
+	}
 
-	// 1. 找到当前主线最深的尾巴 (Main Tail)
+	// 2. 找到主线的尽头 (Main Tail)
+	// 我们要保证合并后的节点是接在主线最后面的
 	mainTail := chain
 	for mainTail.DialogMain != nil {
 		mainTail = mainTail.DialogMain
 	}
 
-	// 2. 把侧线整体嫁接到主线最末尾
-	mainTail.DialogMain = sideHead
-	chain.DialogSide = nil // 嫁接完毕，断开原本的侧线连接
+	// 3. 在主线末尾创建一个新的主线节点
+	// 我们可以复用你之前的 NewChatChain 或 AppendMainBranchNode 逻辑
+	mergedNode := NewChatChain()
+	mergedNode.BranchColor = YellowNode // 确保合并后属于主线颜色
+	mergedNode.IsForkedNode = false     // 合并节点是一个汇聚点，不再是分叉点
 
-	// 3. 准备一个递归函数，用于遍历并重置整棵侧线子树的属性
-	var resetTree func(node *chatChain)
-	resetTree = func(node *chatChain) {
-		if node == nil {
-			return
-		}
-
-		// 洗白身份：全部变成主线颜色，并移除分叉标记
-		node.BranchColor = YellowNode
-		node.IsForkedNode = false
-
-		// 继续向深处蔓延，不管它原本是主线还是侧线
-		resetTree(node.DialogMain)
-		resetTree(node.DialogSide)
+	// 4. 将侧线的摘要包装成一条系统消息，塞入新节点的历史记录
+	mergeInfo := Message{
+		Role:    "system",
+		Content: "【分支合并摘要】来自侧线探索的结论：\n\n" + sideSummary,
 	}
+	mergedNode.DialogContent.ChatHistory = append(mergedNode.DialogContent.ChatHistory, mergeInfo)
 
-	// 启动递归，把搬过来的这部分彻底同化
-	resetTree(sideHead)
+	// 5. 正式挂载：将主线末尾指向这个新节点
+	mainTail.DialogMain = mergedNode
+
+	// 6. 断开侧线连接 (或者保留，取决于你是否想在 UI 上继续显示分叉)
+	// 通常 Merge 之后，侧线的使命就完成了
+	chain.DialogSide = nil
+
+	return mergedNode, nil
 }
 
 // EditAbstract 手动覆盖修改摘要
