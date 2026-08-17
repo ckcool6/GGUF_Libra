@@ -273,8 +273,22 @@ const sendBtn = document.getElementById('send-btn');
 
 if (input) {
     input.addEventListener('input', () => {
+        // 先重置高度，让 scrollHeight 重新计算
         input.style.height = 'auto';
-        input.style.height = input.scrollHeight + 'px';
+
+        // 设定最大高度（需与 CSS 一致）
+        const maxHeight = 200;
+        const currentScrollHeight = input.scrollHeight;
+
+        if (currentScrollHeight > maxHeight) {
+            // 达到上限，固定高度并显示滚动条
+            input.style.height = maxHeight + 'px';
+            input.style.overflowY = 'auto';
+        } else {
+            // 未达上限，自适应高度并隐藏滚动条
+            input.style.height = currentScrollHeight + 'px';
+            input.style.overflowY = 'hidden';
+        }
     });
 }
 

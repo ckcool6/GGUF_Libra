@@ -132,3 +132,25 @@ header button:hover {
     /* 100px 是消息的平均高度 */
     contain-intrinsic-size: auto 100px;
 }
+
+/* 限制输入框最大高度，超过则内部滚动 */
+#user-input {
+    max-height: 200px;
+    /* 根据需要调整这个值，比如 160px 或 200px */
+    overflow-y: hidden;
+    /* 默认隐藏滚动条，由 JS 控制显示 */
+    scrollbar-width: thin;
+}
+
+/* 确保发送按钮在输入框变高时不会变形 */
+#send-btn {
+    flex-shrink: 0;
+    margin-bottom: 2px;
+    /* 微调对齐 */
+}
+
+/* 上传图标也要防止缩放 */
+label[for="image-input"] {
+    flex-shrink: 0;
+    margin-bottom: 2px;
+}
