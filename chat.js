@@ -590,6 +590,7 @@ function createNotebookBar() {
                 <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-amber-500 font-bold">⚡</span> Summary
                 </button>
+                <span class="text-gray-300 dark:text-gray-700">|</span>
                  <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-purple-500 font-bold">m</span> Merge
                 </button>
