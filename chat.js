@@ -702,12 +702,6 @@ function createNotebookBar() {
         // 2. 创建黄色虚线框容器
         summaryBox = document.createElement('div');
         summaryBox.className = 'summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all';
-        /*  summaryBox.innerHTML = `
-             <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium mb-1.5">
-                 <span>⚡</span> 对话摘要
-             </div>
-             <div class="summary-content markdown-body text-xs opacity-90">正在生成总结...</div>
-         `; */
 
         // --- 结构微调：增加一个放置操作按钮的 header ---
         summaryBox.innerHTML = `
