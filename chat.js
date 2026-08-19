@@ -664,9 +664,22 @@ function createNotebookBar() {
         // 2. 创建黄色虚线框容器
         summaryBox = document.createElement('div');
         summaryBox.className = 'summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all';
+        /*  summaryBox.innerHTML = `
+             <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium mb-1.5">
+                 <span>⚡</span> 对话摘要
+             </div>
+             <div class="summary-content markdown-body text-xs opacity-90">正在生成总结...</div>
+         `; */
+
+        // --- 结构微调：增加一个放置操作按钮的 header ---
         summaryBox.innerHTML = `
-            <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium mb-1.5">
-                <span>⚡</span> 对话摘要
+            <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
+                    <span>⚡</span> 对话摘要
+                </div>
+                <div id="summary-actions" class="flex items-center gap-2">
+                    <!-- 动态插入保存按钮 -->
+                </div>
             </div>
             <div class="summary-content markdown-body text-xs opacity-90">正在生成总结...</div>
         `;
@@ -680,6 +693,7 @@ function createNotebookBar() {
         scrollToBottomIfNear()
 
         const contentDiv = summaryBox.querySelector('.summary-content');
+        const actionsDiv = summaryBox.querySelector('#summary-actions');
         const customUrl = localStorage.getItem('custom_api_url') || '';
         const customKey = localStorage.getItem('custom_api_key') || '';
 
@@ -700,9 +714,60 @@ function createNotebookBar() {
             // 假设 Go 后端同步返回格式为 {"abstract": "摘要内容"} 或 {"DialogAbstract": "摘要内容"}
             const textResult = data.abstract || data.DialogAbstract || "暂无摘要内容";
 
-            contentDiv.innerHTML = safeMarkdownParse(textResult);
-            btn.innerHTML = `<span class="text-amber-500 font-bold">✓</span> Summary`;
 
+            // --- 2. 创建文本框 ---
+            const textarea = document.createElement('textarea');
+            textarea.className = "w-full bg-transparent border-none focus:outline-none text-xs text-gray-700 dark:text-gray-200 resize-none leading-relaxed font-sans mt-1 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors";
+            textarea.value = textResult;
+
+            const adjustHeight = (el) => {
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+            };
+
+            // --- 3. 创建显式的“保存”按钮 ---
+            const saveBtn = document.createElement('button');
+            saveBtn.className = "hidden flex items-center gap-1 px-2 py-0.5 bg-emerald-500 text-white rounded-md text-[10px] hover:bg-emerald-600 transition-all shadow-sm animate-fade-in";
+            saveBtn.innerHTML = `<span>✓</span> 确认修改`;
+
+            // 定义保存逻辑
+            const performSave = async () => {
+                saveBtn.innerHTML = `<span>⏳</span> 正在存入...`;
+                try {
+                    await fetch('/api/edit-abstract', {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ abstract: textarea.value })
+                    });
+                    // 保存成功后变回勾选状态，然后消失
+                    saveBtn.innerHTML = `<span>✓</span> 已保存`;
+                    saveBtn.classList.replace('bg-emerald-500', 'bg-blue-500');
+                    setTimeout(() => {
+                        saveBtn.classList.add('hidden');
+                        saveBtn.classList.replace('bg-blue-500', 'bg-emerald-500');
+                        saveBtn.innerHTML = `<span>✓</span> 确认修改`;
+                    }, 1500);
+                } catch (e) {
+                    saveBtn.innerHTML = `❌ 失败`;
+                }
+            };
+
+            saveBtn.onclick = performSave;
+
+            // 监听输入：只有当用户动手改了，才显示保存按钮
+            textarea.addEventListener('input', () => {
+                adjustHeight(textarea);
+                if (saveBtn.classList.contains('hidden')) {
+                    saveBtn.classList.remove('hidden');
+                }
+            });
+
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(textarea);
+            actionsDiv.appendChild(saveBtn);
+
+            setTimeout(() => adjustHeight(textarea), 20);
+            btn.innerHTML = `<span class="text-amber-500 font-bold">✓</span> Summary`;
         } catch (e) {
             console.error('Summary 失败:', e);
             contentDiv.innerHTML = `<span class="text-rose-500">生成总结时出现错误：${e.message}</span>`;

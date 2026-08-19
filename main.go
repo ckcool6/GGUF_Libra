@@ -207,6 +207,32 @@ func main() {
 		})
 	})
 
+	// 修改摘要的接口
+	http.HandleFunc("/api/edit-abstract", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Abstract string `json:"abstract"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if currentChain != nil {
+			currentChain.EditAbstract(body.Abstract)
+			// 修改完立刻落盘，防止丢失
+			rootChain.SaveChainToFile("chain_history.json")
+
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+			return
+		}
+
+		http.Error(w, "节点不存在", http.StatusNotFound)
+	})
+
 	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
 	http.ListenAndServe(":8099", nil)
 }
