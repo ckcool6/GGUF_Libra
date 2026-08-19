@@ -24,8 +24,9 @@ type chatChain struct {
 	DialogAbstract string
 
 	// structure
-	DialogMain *chatChain
-	DialogSide *chatChain
+	DialogMain      *chatChain
+	DialogSide      *chatChain
+	HistoryArchives []*chatChain `json:"history_archives,omitempty"`
 
 	BranchColor  NodeColor
 	IsForkedNode bool
@@ -320,6 +321,10 @@ func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
 	// 6. 物理执行合并（原子操作）
 	// a. 将主线末尾指向新节点
 	mainTail.DialogMain = mergedNode
+
+	if forkNode.DialogSide != nil {
+		forkNode.HistoryArchives = append(forkNode.HistoryArchives, forkNode.DialogSide)
+	}
 
 	// b. 收割侧线：断开分叉点与侧线的连接
 	// 这样整棵侧线在逻辑上就“消失”了，只有摘要留在了主线里

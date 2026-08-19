@@ -6,6 +6,8 @@ type Message struct {
 	// 用于在历史记录中存储图片的 Base64 数据
 	// omitempty 表示如果没有图片，生成的 JSON 就不包含这个字段
 	Image string `json:"image,omitempty"`
+
+	Archives [][]Message `json:"archives,omitempty"`
 }
 
 type SystemPromptConfig struct {

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
@@ -151,43 +150,69 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	data, err := os.ReadFile("chain_history.json")
-	if err != nil {
+	// 注意：直接从内存中的 rootChain 开始遍历，而不是重新读文件
+	// 因为内存里的 rootChain 才是最新的
+	if rootChain == nil {
 		json.NewEncoder(w).Encode([]Message{})
-		return
-	}
-
-	var root chatChain
-	if err := json.Unmarshal(data, &root); err != nil {
-		http.Error(w, "解析历史 JSON 失败", http.StatusInternalServerError)
 		return
 	}
 
 	history := []Message{}
 
-	// 深度遍历整棵树（主线 + 侧线），按顺序搜集所有非 system 消息
 	var collectMessages func(node *chatChain)
 	collectMessages = func(node *chatChain) {
 		if node == nil {
 			return
 		}
 
-		if node.DialogContent != nil {
+		if node.DialogContent != nil && len(node.DialogContent.ChatHistory) > 0 {
+			// 提取该节点的非系统消息
+			nodeMsgs := []Message{}
 			for _, msg := range node.DialogContent.ChatHistory {
 				if msg.Role != "system" {
-					history = append(history, msg)
+					nodeMsgs = append(nodeMsgs, msg)
 				}
 			}
+
+			// --- 【核心修改】：处理档案袋 ---
+			// 如果该节点有已合并的档案，我们将档案挂载到该节点的最后一条消息上
+			if len(node.HistoryArchives) > 0 && len(nodeMsgs) > 0 {
+				lastIdx := len(nodeMsgs) - 1
+				for _, archChain := range node.HistoryArchives {
+					// 递归提取档案链里的所有消息
+					archMsgs := extractAllMessages(archChain)
+					nodeMsgs[lastIdx].Archives = append(nodeMsgs[lastIdx].Archives, archMsgs)
+				}
+			}
+
+			history = append(history, nodeMsgs...)
 		}
 
-		// 依次搜集主线和侧线
+		// 递归主线和当前的活动侧线
 		collectMessages(node.DialogMain)
 		collectMessages(node.DialogSide)
 	}
 
-	collectMessages(&root)
-
+	collectMessages(rootChain)
 	json.NewEncoder(w).Encode(history)
+}
+
+// 辅助函数：把一个档案支线里的所有消息拍平，用于弹窗显示
+func extractAllMessages(node *chatChain) []Message {
+	if node == nil {
+		return nil
+	}
+	res := []Message{}
+	if node.DialogContent != nil {
+		for _, m := range node.DialogContent.ChatHistory {
+			if m.Role != "system" {
+				res = append(res, m)
+			}
+		}
+	}
+	res = append(res, extractAllMessages(node.DialogMain)...)
+	res = append(res, extractAllMessages(node.DialogSide)...)
+	return res
 }
 
 // 辅助方法：安全获取当前节点的 ChatHistory

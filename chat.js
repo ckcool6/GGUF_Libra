@@ -248,6 +248,24 @@ async function loadHistory() {
                             </div>
                         </div>`;
 
+                    // --- 核心修改：检查是否有档案 ---
+                    if (m.archives && m.archives.length > 0) {
+                        // 创建一个精致的档案入口按钮
+                        const archiveEntry = document.createElement('div');
+                        archiveEntry.className = "mt-2 px-2";
+                        archiveEntry.innerHTML = `
+                            <button class="flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-400/5 px-2 py-1 rounded-lg border border-emerald-200/50 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-400/10 transition-all">
+                                <span>📂</span> 
+                                <span>查看此节点下的 ${m.archives.length} 条已合并支线</span>
+                            </button>
+                        `;
+
+                        // 绑定点击事件，打开弹窗
+                        archiveEntry.querySelector('button').onclick = () => showArchiveModal(m.archives);
+
+                        wrapper.querySelector('.flex-col').appendChild(archiveEntry);
+                    }
+
                     const notebookBar = createNotebookBar();
                     wrapper.querySelector('.flex-col').appendChild(notebookBar);
                     chatBox.appendChild(wrapper);
@@ -767,6 +785,63 @@ async function extractErrorMessage(response) {
         } catch (_) { }
     }
     return errorText;
+}
+
+/**
+ * 展示档案内容弹窗
+ * @param {Array} archives - 后端传来的 [[Msg1, Msg2], [MsgA, MsgB]]
+ */
+function showArchiveModal(archives) {
+    const modal = document.getElementById('archive-modal');
+    const contentContainer = document.getElementById('archive-content');
+
+    if (!modal || !contentContainer) return;
+
+    // 1. 清空上一次的内容
+    contentContainer.innerHTML = '';
+
+    // 2. 遍历每一个支线 (branch)
+    archives.forEach((branch, index) => {
+        // 分割线
+        const divider = document.createElement('div');
+        divider.className = "relative py-6 flex items-center justify-center";
+        divider.innerHTML = `
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200 dark:border-gray-800"></div></div>
+            <span class="relative px-3 bg-gray-50 dark:bg-[#131415] text-[10px] text-gray-400 font-mono tracking-widest uppercase">Archived Branch #${index + 1}</span>
+        `;
+        contentContainer.appendChild(divider);
+
+        // 渲染该支线内的每一条消息
+        branch.forEach(msg => {
+            const isUser = msg.role === 'user';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`;
+
+            // 使用简化的气泡样式，区别于主线
+            msgDiv.innerHTML = `
+                <div class="p-3 rounded-xl max-w-[85%] text-sm shadow-sm border ${isUser
+                    ? 'bg-blue-500 text-white border-blue-400'
+                    : 'bg-white dark:bg-[#1e1f20] text-gray-800 dark:text-gray-200 border-gray-100 dark:border-gray-800'
+                }">
+                    ${isUser ? formatUserText(msg.content) : safeMarkdownParse(msg.content)}
+                </div>
+            `;
+            contentContainer.appendChild(msgDiv);
+        });
+    });
+
+    // 3. 显示弹窗并禁用背后主界面的滚动
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // 4. 处理弹窗关闭
+    const closeBtn = document.getElementById('close-archive');
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    };
+    closeBtn.onclick = closeModal;
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 }
 
 document.getElementById('send-btn').addEventListener('click', send);
