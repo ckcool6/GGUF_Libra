@@ -165,6 +165,48 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"abstract": ""})
 	})
 
+	http.HandleFunc("/api/discard-side", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if rootChain == nil || currentChain == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// 1. 寻找该侧线是从主线哪个点分出来的
+		forkNode := rootChain.BackToMainForkedNode(currentChain)
+
+		// 如果找不到分叉点，说明已经在主线上了，或者树结构异常
+		if forkNode == nil {
+			// 保险起见，直接把 currentChain 指向主线末尾
+			currentChain = rootChain
+			for currentChain.DialogMain != nil {
+				currentChain = currentChain.DialogMain
+			}
+		} else {
+			// 2. 【物理删除】直接将分叉点的侧线指针设为 nil
+			// 这样整个聊烂了的侧线子树都会被 Go 的 GC 回收，且不会存入 JSON
+			forkNode.DialogSide = nil
+
+			// 3. 【回归正史】寻找主线现在的最末尾
+			mainTail := rootChain
+			for mainTail.DialogMain != nil {
+				mainTail = mainTail.DialogMain
+			}
+			currentChain = mainTail
+		}
+
+		// 保存状态，文件里的侧线历史会瞬间消失
+		rootChain.SaveChainToFile("chain_history.json")
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": "侧线已丢弃，已回到主线末尾",
+		})
+	})
+
 	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
 	http.ListenAndServe(":8099", nil)
 }

@@ -615,6 +615,10 @@ function createNotebookBar() {
             
             <!-- 悬浮按钮组 -->
             <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
+                <button class="discard-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-rose-500 font-bold">×</span> Discard
+                </button>
+                <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-emerald-500 font-bold">+</span> Side Chat
                 </button>
@@ -711,6 +715,28 @@ function createNotebookBar() {
     mergeBtn.addEventListener('click', async () => {
         // 执行合并操作
         await handleMergeAction(mergeBtn);
+    });
+
+    // discard 事件
+    const discardBtn = notebookBar.querySelector('.discard-btn');
+    discardBtn.addEventListener('click', async () => {
+        if (!confirm("确定要丢弃当前侧线吗？所有未合并的对话将永久消失。")) return;
+
+        try {
+            discardBtn.innerHTML = `<span class="text-rose-500 animate-spin">⏳</span> Discarding...`;
+
+            const res = await fetch('/api/discard-side', { method: 'POST', headers: getHeaders() });
+
+            if (res.ok) {
+                // 重新加载历史，界面会瞬间变回分叉前的干净样子
+                loadHistory();
+            } else {
+                throw new Error("丢弃失败");
+            }
+        } catch (e) {
+            alert(e.message);
+            discardBtn.innerHTML = `<span class="text-rose-500 font-bold">×</span> Discard`;
+        }
     });
 
     return notebookBar;
