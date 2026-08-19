@@ -233,6 +233,43 @@ func main() {
 		http.Error(w, "节点不存在", http.StatusNotFound)
 	})
 
+	http.HandleFunc("/api/archive-main", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if currentChain == nil {
+			http.Error(w, "未初始化", http.StatusBadRequest)
+			return
+		}
+
+		// 1. 校验：必须是主线才能点这个“归档”
+		if currentChain.BranchColor != YellowNode {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(map[string]string{"error": "归档功能仅限主线使用"})
+			return
+		}
+
+		// 2. 校验：必须先有摘要才能归档
+		if currentChain.DialogAbstract == "" {
+			w.WriteHeader(http.StatusPreconditionFailed) // 412
+			return
+		}
+
+		// 3. 【核心操作】调用你的封装函数开启新主线节点
+		// 这会自动创建 newNode，并将摘要作为 system 消息塞进去
+		newNode := currentChain.AppendMainBranchNode()
+
+		// 4. 更新指针并保存
+		currentChain = newNode
+		rootChain.SaveChainToFile("chain_history.json")
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": "主线已翻页，开启新章节",
+		})
+	})
+
 	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
 	http.ListenAndServe(":8099", nil)
 }

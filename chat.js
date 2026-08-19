@@ -630,9 +630,47 @@ function createNotebookBar() {
                  <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-purple-500 font-bold">m</span> Merge
                 </button>
+                <span class="text-gray-300 dark:text-gray-700">|</span>
+                <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-blue-500 font-bold">📦</span> Archive
+                </button>
             </div>
         </div>
     `;
+
+    // 归档事件
+    const archiveBtn = notebookBar.querySelector('.archive-btn');
+
+    archiveBtn.addEventListener('click', async () => {
+        try {
+            archiveBtn.innerHTML = `<span class="text-blue-500 animate-spin">⏳</span> Archiving...`;
+
+            let res = await fetch('/api/archive-main', {
+                method: 'POST',
+                headers: getHeaders()
+            });
+
+            // 如果没摘要，自动先走一遍摘要流程
+            if (res.status === 412) {
+                // 这里逻辑和 Merge 类似，自动触发 summary
+                alert("归档前请先点击 Summary 生成摘要");
+                archiveBtn.innerHTML = `<span class="text-blue-500 font-bold">📦</span> Archive`;
+                return;
+            }
+
+            if (res.ok) {
+                archiveBtn.innerHTML = `<span class="text-blue-500">✓</span> Done`;
+                setTimeout(() => {
+                    loadHistory(); // 刷新界面，此时屏幕会清空，只剩一条前情提要
+                }, 500);
+            } else {
+                const err = await res.json();
+                alert(err.error || "归档失败");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    });
 
     // 绑定 Fork Side 事件
     notebookBar.querySelector('.fork-side-btn').addEventListener('click', async () => {
