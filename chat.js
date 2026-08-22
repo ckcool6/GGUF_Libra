@@ -616,23 +616,23 @@ function createNotebookBar() {
             <!-- 悬浮按钮组 -->
             <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
                 <button class="discard-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-rose-500 font-bold">×</span> Discard
+                    <span class="text-grey-400 font-bold">×</span> Discard
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-emerald-500 font-bold">+</span> Side Chat
+                    <span class="text-grey-400 font-bold">🌿</span> Side Chat
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-amber-500 font-bold">⚡</span> Summary
+                    <span class="text-grey-400 font-bold">⚡</span> Summary
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                  <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-purple-500 font-bold">m</span> Merge
+                    <span class="text-grey-400 font-bold">m</span> Merge
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-blue-500 font-bold">📦</span> Archive
+                    <span class="text-grey-400 font-bold">📑</span> Archive
                 </button>
             </div>
         </div>
@@ -654,7 +654,7 @@ function createNotebookBar() {
             if (res.status === 412) {
                 // 这里逻辑和 Merge 类似，自动触发 summary
                 alert("归档前请先点击 Summary 生成摘要");
-                archiveBtn.innerHTML = `<span class="text-blue-500 font-bold">📦</span> Archive`;
+                archiveBtn.innerHTML = `<span class="text-grey-500 font-bold">📑</span> Archive`;
                 return;
             }
 
