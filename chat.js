@@ -274,7 +274,9 @@ async function loadHistory() {
 
             // 高亮与排版处理
             chatBox.querySelectorAll('.ai-bubble pre code').forEach(el => hljs.highlightElement(el));
-            twemoji.parse(chatBox, { folder: 'svg', ext: '.svg' });
+            chatBox.querySelectorAll('.ai-bubble, .user-bubble').forEach(el => {
+                twemoji.parse(el, { folder: 'svg', ext: '.svg' });
+            });
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch (e) {
