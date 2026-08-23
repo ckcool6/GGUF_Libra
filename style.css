@@ -155,6 +155,14 @@ label[for="image-input"] {
     margin-bottom: 2px;
 }
 
+.markdown-body hr {
+    border: none;
+    border-top: 2px dashed var(--border-color);
+    background: transparent;
+    opacity: 0.3;
+    margin: 24px 0;
+}
+
 /* ==================================== Markdown 表格样式 ==================================== */
 
 /* 基础表格容器设置 */
