@@ -154,3 +154,52 @@ label[for="image-input"] {
     flex-shrink: 0;
     margin-bottom: 2px;
 }
+
+/* ==================================== Markdown 表格样式 ==================================== */
+
+/* 基础表格容器设置 */
+.markdown-body table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: collapse;
+    border-spacing: 0;
+    display: block;
+    /* 在移动端允许横向滚动 */
+    overflow-x: auto;
+    border: 1.5px solid var(--border-color);
+    /* 使用你定义的变量 */
+    border-radius: 0.75rem;
+}
+
+/* 单元格边框与内边距 */
+.markdown-body th,
+.markdown-body td {
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+/* 表头背景加深 */
+.markdown-body th {
+    background-color: rgba(0, 0, 0, 0.03);
+    font-weight: 600;
+}
+
+/* 暗色模式微调 (当 .dark-mode-active 激活时) */
+.dark-mode-active .markdown-body th {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 修正表格内段落的外边距，防止撑开单元格 */
+.markdown-body td p {
+    margin: 0 !important;
+}
+
+/* 隔行变色（可选，让表格更易读） */
+.markdown-body tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+.dark-mode-active .markdown-body tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
