@@ -994,7 +994,7 @@ async function processImage(file) {
 
                 let width = img.width;
                 let height = img.height;
-                const maxSide = 512; // 目标最大边长
+                const maxSide = 2048; // 目标最大边长
 
                 // 计算等比例缩放后的尺寸
                 if (width > height) {
@@ -1017,7 +1017,7 @@ async function processImage(file) {
 
                 // 导出为 JPEG (体积更小，且对 AI 友好)
                 // 0.8 是质量压缩比，可以根据需要调整 (0.1 ~ 1.0)
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
                 resolve(dataUrl);
             };
             img.onerror = reject;
@@ -1043,7 +1043,7 @@ imageInput.addEventListener('change', async (e) => {
         imagePreview.style.opacity = '1';
         imagePreviewWrapper.classList.remove('hidden');
 
-        console.log("图片已处理为 256x256");
+        console.log("图片已处理为 2048x2048");
     } catch (err) {
         console.error("图片处理失败:", err);
         alert("图片处理失败");
