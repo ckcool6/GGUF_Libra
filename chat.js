@@ -697,8 +697,20 @@ function createNotebookBar() {
         // 1. 如果已经存在总结框，再次点击可以切换展开/隐藏
         let summaryBox = notebookBar.parentElement?.querySelector('.summary-box');
         if (summaryBox) {
-            summaryBox.classList.toggle('hidden');
-            return;
+            const textarea = summaryBox.querySelector('textarea');
+            const hasError = summaryBox.querySelector('.text-rose-500');
+
+            // 判断条件：如果有报错红色字，或者文本框里的内容是默认的“暂无摘要...”
+            const isInvalid = hasError || (textarea && (textarea.value === "暂无摘要内容" || textarea.value.trim() === ""));
+
+            if (isInvalid) {
+                // 如果内容无效，直接删掉旧框，让程序往下走，重新去 fetch
+                summaryBox.remove();
+            } else {
+                // 如果内容是有效的，才执行正常的切换显示/隐藏
+                summaryBox.classList.toggle('hidden');
+                return;
+            }
         }
 
         // 2. 创建黄色虚线框容器
@@ -746,13 +758,18 @@ function createNotebookBar() {
             const data = await res.json();
 
             // 假设 Go 后端同步返回格式为 {"abstract": "摘要内容"} 或 {"DialogAbstract": "摘要内容"}
-            const textResult = data.abstract || data.DialogAbstract || "暂无摘要内容";
+            const textResult = data.abstract || data.DialogAbstract || "";
 
 
             // --- 2. 创建文本框 ---
             const textarea = document.createElement('textarea');
             textarea.className = "w-full bg-transparent border-none focus:outline-none text-xs text-gray-700 dark:text-gray-200 resize-none leading-relaxed font-sans mt-1 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors";
-            textarea.value = textResult;
+            if (!textResult) {
+                textarea.value = "";
+                textarea.placeholder = "暂无摘要内容，请点击 Summary 重新生成...";
+            } else {
+                textarea.value = textResult;
+            }
 
             const adjustHeight = (el) => {
                 el.style.height = 'auto';
