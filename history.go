@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkoukk/tiktoken-go"
 )
@@ -95,42 +96,57 @@ func getMessageTokens(msg Message) int {
 
 func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	var result []Message
+	var systemBackdrops []Message // 专门存放归档背景
 	totalTokens := 0
 
-	// 计算系统提示词
+	// 1. 计算全局系统提示词 (人设)
 	if systemPrompt.Content != "" {
-		// 这里的 systemPrompt 也是 Message 类型
 		totalTokens += getMessageTokens(systemPrompt)
 	}
 
-	if totalTokens > maxTokens {
-		return []Message{systemPrompt}
+	// 2. 预处理：先从历史中找出所有的“归档背景” (system 角色且包含关键字)
+	// 这些是灵魂，必须优先保送
+	for _, msg := range history {
+		if msg.Role == "system" && (strings.Contains(msg.Content, "前情提要") || strings.Contains(msg.Content, "上下文")) {
+			tokens := getMessageTokens(msg)
+			if totalTokens+tokens <= maxTokens {
+				totalTokens += tokens
+				systemBackdrops = append(systemBackdrops, msg)
+			}
+		}
 	}
 
+	// 3. 倒序处理常规对话 (user / assistant)
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
 
+		// 如果是系统消息，我们已经在上面处理过了，这里跳过
 		if msg.Role == "system" {
 			continue
 		}
 
-		// 传入整个 msg 结构体
 		msgTokens := getMessageTokens(msg)
 
 		if totalTokens+msgTokens > maxTokens {
-			break
+			break // 达到 Token 上限，停止拉取更旧的消息
 		}
 
 		totalTokens += msgTokens
 		result = append(result, msg)
 	}
 
+	// 4. 反转对话顺序（因为上面是倒序拉取的）
 	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
 		result[i], result[j] = result[j], result[i]
 	}
 
+	// 5. 最终组装：[全局人设] + [历史背景摘要] + [近期对话记录]
+	finalMessages := []Message{}
 	if systemPrompt.Content != "" {
-		return append([]Message{systemPrompt}, result...)
+		finalMessages = append(finalMessages, systemPrompt)
 	}
-	return result
+	finalMessages = append(finalMessages, systemBackdrops...)
+	finalMessages = append(finalMessages, result...)
+
+	return finalMessages
 }

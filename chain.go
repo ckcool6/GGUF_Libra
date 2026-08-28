@@ -73,13 +73,20 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	})
 
 	for _, m := range chain.DialogContent.ChatHistory {
-		if m.Role == "system" {
-			continue
-		}
 		content := m.Content
-		if m.Image != "" {
-			content = "[图片消息] " + content // 仅保留占位符
+
+		if m.Role == "system" {
+			// 修改点：允许带有背景标识的系统消息进入“总结素材”
+			// 这样 AI 在总结这一页时，会把上一页的摘要也考虑进去
+			if !strings.Contains(content, "前情提要") && !strings.Contains(content, "上下文总结") {
+				continue
+			}
 		}
+
+		if m.Image != "" {
+			content = "[图片消息] " + content
+		}
+
 		promptMessages = append(promptMessages, LlamaMessage{
 			Role:    m.Role,
 			Content: content,
