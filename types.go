@@ -8,6 +8,7 @@ type Message struct {
 	Image string `json:"image,omitempty"`
 
 	Archives [][]Message `json:"archives,omitempty"`
+	Abstract string      `json:"abstract,omitempty"`
 }
 
 type SystemPromptConfig struct {

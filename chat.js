@@ -266,6 +266,21 @@ async function loadHistory() {
                         wrapper.querySelector('.flex-col').appendChild(archiveEntry);
                     }
 
+                    if (m.abstract) {
+                        const summaryBox = document.createElement('div');
+                        summaryBox.className = 'summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all';
+                        summaryBox.innerHTML = `
+                            <div class="flex items-center justify-between mb-1.5">
+                                <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
+                                    <span>⚡</span> 对话摘要
+                                </div>
+                            </div>
+                            <div class="summary-content markdown-body text-xs opacity-90">${m.abstract}</div>
+                        `;
+                        // 把摘要框插在 AI 气泡下面，控制条上面
+                        wrapper.querySelector('.flex-col').appendChild(summaryBox);
+                    }
+
                     const notebookBar = createNotebookBar();
                     wrapper.querySelector('.flex-col').appendChild(notebookBar);
                     chatBox.appendChild(wrapper);

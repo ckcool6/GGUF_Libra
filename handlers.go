@@ -174,14 +174,18 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// --- 【核心修改】：处理档案袋 ---
-			// 如果该节点有已合并的档案，我们将档案挂载到该节点的最后一条消息上
-			if len(node.HistoryArchives) > 0 && len(nodeMsgs) > 0 {
+			// --- 核心修改：挂载摘要 ---
+			if len(nodeMsgs) > 0 {
 				lastIdx := len(nodeMsgs) - 1
-				for _, archChain := range node.HistoryArchives {
-					// 递归提取档案链里的所有消息
-					archMsgs := extractAllMessages(archChain)
-					nodeMsgs[lastIdx].Archives = append(nodeMsgs[lastIdx].Archives, archMsgs)
+				// 将该节点的摘要赋值给该节点的最后一条可见消息
+				nodeMsgs[lastIdx].Abstract = node.DialogAbstract
+
+				// 处理档案袋
+				if len(node.HistoryArchives) > 0 {
+					for _, archChain := range node.HistoryArchives {
+						archMsgs := extractAllMessages(archChain)
+						nodeMsgs[lastIdx].Archives = append(nodeMsgs[lastIdx].Archives, archMsgs)
+					}
 				}
 			}
 
