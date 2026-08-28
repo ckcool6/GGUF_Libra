@@ -28,7 +28,7 @@ var (
 
 	// 用于常规超时请求（如生成摘要、获取 props）
 	httpTimeoutClient = &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 300 * time.Second,
 		Transport: &http.Transport{
 			MaxIdleConns:        20,
 			MaxIdleConnsPerHost: 5,
