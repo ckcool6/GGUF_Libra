@@ -292,7 +292,7 @@ async function loadHistory() {
             chatBox.querySelectorAll('.ai-bubble, .user-bubble').forEach(el => {
                 twemoji.parse(el, { folder: 'svg', ext: '.svg' });
             });
-            chatBox.scrollTop = chatBox.scrollHeight;
+            //chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch (e) {
         console.error("加载历史记录失败:", e);
@@ -677,9 +677,16 @@ function createNotebookBar() {
 
             if (res.ok) {
                 archiveBtn.innerHTML = `<span class="text-blue-500">✓</span> Done`;
+
                 setTimeout(() => {
-                    loadHistory(); // 刷新界面，此时屏幕会清空，只剩一条前情提要
-                }, 500);
+                    loadHistory().then(() => {
+                        // 在 loadHistory 彻底跑完后再补一次滚动
+                        // 如果有图片，甚至可以延迟更久一点
+                        setTimeout(() => {
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                        }, 30);
+                    });
+                }, 50);
             } else {
                 const err = await res.json();
                 alert(err.error || "归档失败");
@@ -832,7 +839,11 @@ function createNotebookBar() {
             contentDiv.appendChild(textarea);
             actionsDiv.appendChild(saveBtn);
 
-            setTimeout(() => adjustHeight(textarea), 20);
+            setTimeout(() => {
+                adjustHeight(textarea);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 50);
+
             btn.innerHTML = `<span class="text-amber-500 font-bold">✓</span> Summary`;
         } catch (e) {
             console.error('Summary 失败:', e);
@@ -859,8 +870,10 @@ function createNotebookBar() {
             const res = await fetch('/api/discard-side', { method: 'POST', headers: getHeaders() });
 
             if (res.ok) {
-                // 重新加载历史，界面会瞬间变回分叉前的干净样子
-                loadHistory();
+                await loadHistory();
+                setTimeout(() => {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }, 50);
             } else {
                 throw new Error("丢弃失败");
             }
@@ -919,6 +932,9 @@ async function handleMergeAction(btn) {
         // 延迟一小下让用户看清“Done”，然后刷新
         setTimeout(() => {
             loadHistory(); // 重新加载历史，这时 currentChain 已经在主线末尾了
+            setTimeout(() => {
+                chatBox.scrollTop = chatBox.scrollHeight; //scroll bottom
+            }, 100);
         }, 500);
 
     } catch (e) {
