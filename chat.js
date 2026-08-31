@@ -389,7 +389,7 @@ async function send() {
             headers: getHeaders(),
             signal: chatAbortController.signal,
             body: JSON.stringify({
-                message: text,
+                message: text || "\u200B",
                 // 修改：如果存在图片，去掉 "data:image/jpeg;base64," 的前缀只发内容
                 image: imageToSend ? imageToSend.split(',')[1] : null,
                 custom_url: localStorage.getItem('custom_api_url') || ''

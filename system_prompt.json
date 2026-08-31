@@ -20,6 +20,11 @@
             "id": "test",
             "name": "test",
             "content": ""
+        },
+        {
+            "id": "ocr",
+            "name": "OCR提取",
+            "content": "提取图中文字，禁止脑补，无需解读。"
         }
     ]
 }

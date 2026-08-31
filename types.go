@@ -38,7 +38,7 @@ type chatlist struct {
 
 type LlamaContent struct {
 	Type     string            `json:"type"`
-	Text     string            `json:"text,omitempty"`
+	Text     string            `json:"text"`
 	ImageURL *LlamaImageDetail `json:"image_url,omitempty"`
 }
 
