@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gguf-player-v1';
+const CACHE_NAME = 'gguf-player-v3';
 
 // 安装阶段：只预缓存必有的根入口和图标
 const PRECACHE_ASSETS = [
