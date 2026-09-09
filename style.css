@@ -87,7 +87,7 @@ footer {
 }
 
 .markdown-body pre {
-    background: #282c34 !important;
+    background: #fafafa;
     padding: 1rem;
     border-radius: 0.75rem;
     margin: 0.5rem 0;
@@ -210,4 +210,18 @@ label[for="image-input"] {
 
 .dark-mode-active .markdown-body tr:nth-child(even) {
     background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* 当 html 有 .dark 或者 .dark-mode-active 时，代码块强制变黑 */
+.dark pre,
+.dark pre code,
+.dark .hljs,
+.dark-mode-active pre,
+.dark-mode-active pre code,
+.dark-mode-active .hljs {
+    background-color: #1e1f22 !important;
+    /* 纯正的高级代码暗黑底色 */
+    color: #abb2bf !important;
+    /* 文字变成柔和的浅白 */
+    border-color: #333 !important;
 }

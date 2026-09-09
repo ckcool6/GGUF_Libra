@@ -4,7 +4,7 @@ import twemoji from 'twemoji';
 import hljs from 'highlight.js';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/atom-one-dark.min.css';
+import 'highlight.js/styles/atom-one-light.min.css';
 
 // ==================================== 工具函数 =============================================
 // 用户纯文本转义与换行处理
