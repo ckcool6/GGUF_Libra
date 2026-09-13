@@ -7,3 +7,4 @@ node_modules/
 dist/
 todo
 gguf-player.exe
+parser_py/.venv
