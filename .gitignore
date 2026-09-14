@@ -2,9 +2,8 @@
 .env
 
 # 忽略编译后的二进制文件
-my-gemini-ui
 node_modules/
 dist/
-todo
 gguf-player.exe
 parser_py/.venv
+parser_py/__pycache__
