@@ -7,6 +7,8 @@ import msgspec
 from bottle import response, route, run
 from parser import parse_json  
 
+data_lock = threading.Lock()
+
 # ==========================================
 # Configure logging: Silence the server output and write to a log file
 # ==========================================
@@ -33,7 +35,8 @@ def api_test():
 @route('/api/save', method=['POST'])
 def api_save():
     try:
-        result = parse_json()
+        with data_lock: 
+            result = parse_json()
         return {"status": "success", "message": "Parsed and saved successfully", "data": result}
     except FileNotFoundError as e:
         response.status = 404

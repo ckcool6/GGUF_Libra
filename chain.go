@@ -317,6 +317,7 @@ func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
 	mergedNode := NewChatChain()
 	mergedNode.BranchColor = YellowNode // 回归主线
 	mergedNode.IsForkedNode = false     // 它是汇聚点
+	mergedNode.DialogAbstract = summary // 把侧线的总结拿到dialogmain里
 
 	// 5. 组装合并消息
 	mergeMsg := Message{
