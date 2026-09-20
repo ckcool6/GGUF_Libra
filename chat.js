@@ -558,8 +558,8 @@ async function handleStreamResponse(response) {
                         ctx.charBuffer.length > 30
                             ? 4
                             : ctx.charBuffer.length > 10
-                              ? 2
-                              : 1;
+                                ? 2
+                                : 1;
                     const chunk = ctx.charBuffer.splice(0, step).join("");
                     ctx.displayedText += chunk;
 
@@ -1034,7 +1034,7 @@ async function extractErrorMessage(response) {
         try {
             const text = await response.text();
             if (text) return `${errorText} - ${text}`;
-        } catch (_) {}
+        } catch (_) { }
     }
     return errorText;
 }
@@ -1071,10 +1071,9 @@ function showArchiveModal(archives) {
 
             // 使用简化的气泡样式，区别于主线
             msgDiv.innerHTML = `
-                <div class="p-3 rounded-xl max-w-[85%] text-sm shadow-sm border ${
-                    isUser
-                        ? "bg-blue-500 text-white border-blue-400"
-                        : "bg-white dark:bg-[#1e1f20] text-gray-800 dark:text-gray-200 border-gray-100 dark:border-gray-800"
+                <div class="p-3 rounded-xl max-w-[85%] text-sm shadow-sm border ${isUser
+                    ? "bg-blue-500 text-white border-blue-400"
+                    : "bg-white dark:bg-[#1e1f20] text-gray-800 dark:text-gray-200 border-gray-100 dark:border-gray-800"
                 }">
                     ${isUser ? formatUserText(msg.content) : safeMarkdownParse(msg.content)}
                 </div>
@@ -1386,3 +1385,108 @@ async function get_ctx_usage() {
         tokenDisplay.classList.remove("text-rose-500");
     }
 }
+
+// ========================= 页面内搜索功能 =========================================
+const searchToggleBtn = document.getElementById("search-toggle-btn");
+const pageSearchPanel = document.getElementById("page-search-panel");
+const pageSearchInput = document.getElementById("page-search-input");
+const pageSearchList = document.getElementById("page-search-list");
+const closePageSearchBtn = document.getElementById("close-page-search");
+
+// 切换搜索面板显示状态
+searchToggleBtn.addEventListener("click", () => {
+    pageSearchPanel.classList.toggle("hidden");
+    if (!pageSearchPanel.classList.contains("hidden")) {
+        pageSearchInput.focus();
+    }
+});
+
+// 关闭搜索面板
+closePageSearchBtn.addEventListener("click", () => {
+    pageSearchPanel.classList.add("hidden");
+    pageSearchInput.value = '';
+    pageSearchList.innerHTML = '';
+});
+
+// 监听输入框内容变化
+pageSearchInput.addEventListener("input", function () {
+    const keyword = this.value.trim();
+    pageSearchList.innerHTML = ''; // 清空结果
+
+    if (!keyword) return;
+
+    let hasResult = false;
+    // 获取当前聊天框内的所有用户气泡和 AI 气泡
+    const chatBubbles = document.querySelectorAll("#chat-box .user-bubble, #chat-box .ai-bubble, #chat-box .summary-box");
+
+    const lowerKeyword = keyword.toLowerCase();
+
+    chatBubbles.forEach((bubble) => {
+        // 使用 textContent 只获取纯文本，避免搜到 HTML 标签 (如 class, div 等)
+        const text = bubble.textContent;
+        const lowerText = text.toLowerCase();
+
+        let startIndex = 0;
+        let index;
+
+        // 一个气泡里可能多次出现关键字，用循环把它都找出来
+        while ((index = lowerText.indexOf(lowerKeyword, startIndex)) > -1) {
+            hasResult = true;
+
+            // 截取摘要上下文 (前后各 15 个字符)
+            const start = Math.max(0, index - 15);
+            const end = Math.min(text.length, index + keyword.length + 15);
+            let snippet = text.substring(start, end);
+
+            if (start > 0) snippet = '...' + snippet;
+            if (end < text.length) snippet = snippet + '...';
+
+            // 高亮关键字 (忽略大小写)
+            const regex = new RegExp(`(${keyword})`, 'gi');
+            // 将片段放入 HTML 前先进行简单的安全处理，防止 XSS
+            snippet = snippet.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            snippet = snippet.replace(regex, '<span class="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-0.5 rounded">$1</span>');
+
+            // 创建列表项
+            const li = document.createElement("li");
+            li.className = "px-4 py-2 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-gray-300";
+
+            // 标识是用户的发言还是AI的发言 (可选小图标)
+            let icon = "🤖";
+            let label = "AI";
+            if (bubble.classList.contains("user-bubble")) {
+                icon = "👤";
+                label = "User";
+            } else if (bubble.classList.contains("summary-box")) {
+                icon = "⚡";
+                label = "摘要";
+            }
+
+            li.innerHTML = `<div class="text-[10px] text-gray-400 mb-0.5">${icon} ${label}</div><div>${snippet}</div>`;
+
+            // 点击跳转
+            li.addEventListener("click", () => {
+                // 平滑滚动到目标气泡
+                bubble.scrollIntoView({ behavior: "smooth", block: "center" });
+
+                // 添加闪烁动画
+                bubble.classList.remove("target-flash");
+                void bubble.offsetWidth; // 触发重绘
+                bubble.classList.add("target-flash");
+
+                // 在移动端点击后可选是否自动收起搜索面板
+                if (window.innerWidth < 768) {
+                    pageSearchPanel.classList.add("hidden");
+                }
+            });
+
+            pageSearchList.appendChild(li);
+
+            startIndex = index + keyword.length; // 继续往后找
+        }
+    });
+
+    if (!hasResult) {
+        pageSearchList.innerHTML = '<li class="p-4 text-center text-gray-400 dark:text-gray-500">未找到相关内容</li>';
+    }
+});

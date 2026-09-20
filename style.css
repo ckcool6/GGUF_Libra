@@ -225,3 +225,47 @@ label[for="image-input"] {
     /* 文字变成柔和的浅白 */
     border-color: #333 !important;
 }
+
+/* ==================================== 搜索跳转高亮动画 ==================================== */
+.target-flash {
+    animation: flash-bubble 1.5s ease-out;
+}
+
+@keyframes flash-bubble {
+    0% {
+        background-color: rgba(250, 204, 21, 0.4);
+        /* 黄色半透明 */
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.dark-mode-active .target-flash {
+    animation: flash-bubble-dark 1.5s ease-out;
+}
+
+@keyframes flash-bubble-dark {
+    0% {
+        background-color: rgba(250, 204, 21, 0.2);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* 搜索结果列表滚动条美化 */
+#page-search-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+#page-search-list::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.dark-mode-active #page-search-list::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+}
