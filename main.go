@@ -165,7 +165,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"abstract": ""})
 	})
 
-	http.HandleFunc("/api/discard-side", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/switch-side-to-main", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -187,7 +187,7 @@ func main() {
 		} else {
 			// 2. 【物理删除】直接将分叉点的侧线指针设为 nil
 			// 这样整个聊烂了的侧线子树都会被 Go 的 GC 回收，且不会存入 JSON
-			forkNode.DialogSide = nil
+			// forkNode.DialogSide = nil
 
 			// 3. 【回归正史】寻找主线现在的最末尾
 			mainTail := rootChain

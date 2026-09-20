@@ -177,6 +177,7 @@ func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	newNode := NewChatChain()
 	chain.DialogMain = newNode
 	newNode.BranchColor = chain.BranchColor
+	newNode.DialogAbstract = chain.DialogAbstract
 
 	if chain.DialogAbstract != "" {
 		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
