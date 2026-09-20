@@ -632,8 +632,8 @@ function createNotebookBar() {
             
             <!-- 悬浮按钮组 -->
             <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
-                <button class="discard-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">×</span> Discard
+                <button class="switch-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="text-grey-400 font-bold">s</span> switch to main 
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
@@ -649,7 +649,7 @@ function createNotebookBar() {
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">|</span>
                 <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">📑</span> Archive
+                    <span class="text-grey-400 font-bold">📑</span> Archive main
                 </button>
             </div>
         </div>
@@ -859,15 +859,15 @@ function createNotebookBar() {
         await handleMergeAction(mergeBtn);
     });
 
-    // discard 事件
-    const discardBtn = notebookBar.querySelector('.discard-btn');
-    discardBtn.addEventListener('click', async () => {
-        if (!confirm("确定要丢弃当前侧线吗？所有未合并的对话将永久消失。")) return;
+    // switch-side-to-main 事件
+    const switchBtn = notebookBar.querySelector('.switch-btn');
+    switchBtn.addEventListener('click', async () => {
+        if (!confirm("确定要丢弃当前侧线吗？")) return;
 
         try {
-            discardBtn.innerHTML = `<span class="text-rose-500 animate-spin">⏳</span> Discarding...`;
+            switchBtn.innerHTML = `<span class="text-rose-500 animate-spin">⏳</span> switching...`;
 
-            const res = await fetch('/api/discard-side', { method: 'POST', headers: getHeaders() });
+            const res = await fetch('/api/switch-side-to-main', { method: 'POST', headers: getHeaders() });
 
             if (res.ok) {
                 await loadHistory();
@@ -879,7 +879,7 @@ function createNotebookBar() {
             }
         } catch (e) {
             alert(e.message);
-            discardBtn.innerHTML = `<span class="text-rose-500 font-bold">×</span> Discard`;
+            switchBtn.innerHTML = `<span class="text-rose-500 font-bold">×</span> switch`;
         }
     });
 
