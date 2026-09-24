@@ -84,7 +84,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("==============================================")
 	// 👆👆👆 新增调试打印日志 👆👆👆
 	if err == nil && len(matchedDocs) > 0 {
-		contextSnippet := "【参考关联代码/文档】：\n" + strings.Join(matchedDocs, "\n---\n") + "\n\n请结合以上上下文回答："
+		contextSnippet := "【参考代码/文档】：\n" + strings.Join(matchedDocs, "\n---\n") + "\n\n若用户提问与【参考代码/文档】意思接近，请回答，否则忽略【参考代码/文档】的内容："
 		body.Message = contextSnippet + body.Message
 	}
 
