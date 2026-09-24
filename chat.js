@@ -128,6 +128,28 @@ function getHeaders() {
     };
 }
 
+function updateBranchIndicator(text) {
+    const indicator = document.getElementById("branch-indicator");
+    if (indicator) {
+        indicator.innerText = `current：${text}`;
+
+        // 剥离所有可能存在的文字颜色
+        indicator.classList.remove(
+            "text-gray-600", "dark:text-gray-300",
+            "text-emerald-600", "dark:text-emerald-400",
+            "text-amber-600", "dark:text-amber-400"
+        );
+
+        if (text === "side") {
+            // 支线：文字变绿
+            indicator.classList.add("text-emerald-600", "dark:text-emerald-400");
+        } else {
+            // 主线：文字变黄
+            indicator.classList.add("text-amber-600", "dark:text-amber-400");
+        }
+    }
+}
+
 // ==================================== init & extensions load =============================
 // 自定义 marked 扩展，用来精确拦截 $$ 和 $
 const latexExtension = {
@@ -754,6 +776,7 @@ function createNotebookBar() {
             try {
                 const res = await fetch("/api/fork-side", { method: "POST" });
                 if (res.ok) {
+                    updateBranchIndicator("side");
                     const notice = document.createElement("div");
                     notice.className =
                         "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
@@ -946,6 +969,7 @@ function createNotebookBar() {
             });
 
             if (res.ok) {
+                updateBranchIndicator("main");
                 await loadHistory();
                 setTimeout(() => {
                     chatBox.scrollTop = chatBox.scrollHeight;
@@ -1008,6 +1032,7 @@ async function handleMergeAction(btn) {
 
         // 3. 合并成功，刷新整个界面
         btn.innerHTML = `<span class="text-purple-500">✓</span> Done`;
+        updateBranchIndicator("main");
 
         // 延迟一小下让用户看清“Done”，然后刷新
         setTimeout(() => {
