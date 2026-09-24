@@ -231,27 +231,6 @@ func addChunksToVectorDB(ctx context.Context, chunks []string, filename string) 
 	return col.AddDocuments(ctx, docs, 4)
 }
 
-/* func queryVectorDB(ctx context.Context, query string, topK int) ([]string, error) {
-	ragMu.Lock()
-	col := ragCollection
-	ragMu.Unlock()
-
-	if col == nil {
-		return nil, nil
-	}
-
-	results, err := col.Query(ctx, query, topK, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var matchedTexts []string
-	for _, res := range results {
-		matchedTexts = append(matchedTexts, res.Content)
-	}
-	return matchedTexts, nil
-} */
-
 func queryVectorDB(ctx context.Context, query string, topK int) ([]string, error) {
 	ragMu.Lock()
 	col := ragCollection
