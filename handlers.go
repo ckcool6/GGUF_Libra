@@ -223,9 +223,9 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 			history = append(history, nodeMsgs...)
 		}
 
-		// 递归主线和当前的活动侧线
-		collectMessages(node.DialogMain)
+		// 逆向DFS
 		collectMessages(node.DialogSide)
+		collectMessages(node.DialogMain)
 	}
 
 	collectMessages(rootChain)
