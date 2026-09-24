@@ -80,6 +80,8 @@ footer {
     border: 1.5px solid var(--border-color);
     color: var(--text-main);
     line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 #chat-box .user-bubble {
@@ -136,8 +138,9 @@ header button:hover {
 /* 限制输入框最大高度，超过则内部滚动 */
 #user-input {
     max-height: 200px;
-    /* 根据需要调整这个值，比如 160px 或 200px */
     overflow-y: hidden;
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
     /* 默认隐藏滚动条，由 JS 控制显示 */
     scrollbar-width: thin;
 }
