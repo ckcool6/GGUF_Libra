@@ -28,7 +28,7 @@ var (
 
 	// 用于常规超时请求（如生成摘要、获取 props）
 	httpTimeoutClient = &http.Client{
-		Timeout: 300 * time.Second,
+		Timeout: 600 * time.Second,
 		Transport: &http.Transport{
 			MaxIdleConns:        20,
 			MaxIdleConnsPerHost: 5,
@@ -122,7 +122,6 @@ func main() {
 		})
 	})
 
-	//  手动触发生成当前节点的上下文摘要
 	http.HandleFunc("/api/generate-abstract", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			CustomUrl string `json:"custom_url"`
@@ -134,35 +133,56 @@ func main() {
 			authHeader := r.Header.Get("Authorization")
 			body.CustomKey = strings.TrimPrefix(authHeader, "Bearer ")
 		}
-		// 1. 快速读取当前节点指针后立即释放全局锁，不阻塞其他请求
+
 		mu.Lock()
 		targetChain := currentChain
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		if targetChain != nil {
-			// 2. 耗时的 AI 摘要生成过程在锁外并发执行，内部使用 chainMu 保证节点安全
-			// 改为用两个变量接收返回值
-			abstract, err := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
 
-			// 如果发生了鉴权错误，直接返回 401 状态码给前端
-			if err != nil && err.Error() == "AUTH_ERROR" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// 3. 摘要生成完毕后再快速持锁落盘
-			mu.Lock()
-			rootChain.SaveChainToFile("chain_history.json")
-			mu.Unlock()
-
+		// 如果节点根本不存在，直接抛出 400 错误，不返回空对象
+		if targetChain == nil {
+			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{
-				"abstract": abstract,
+				"error": "当前节点不存在，无法生成摘要",
 			})
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]string{"abstract": ""})
+		// 调用 AI 生成摘要
+		abstract, err := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
+
+		// 拦截任何报错（包括超时、401、网络异常、没对话记录等）
+		if err != nil {
+			if err.Error() == "AUTH_ERROR" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "生成摘要失败: " + err.Error(),
+			})
+			return
+		}
+
+		// 剥离前后空格后如果还是空的，直接拒绝落盘并报错
+		if strings.TrimSpace(abstract) == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "大模型返回了空的摘要，已被系统拦截",
+			})
+			return
+		}
+
+		// 只有确保内容不为空，才落盘并返回成功响应
+		mu.Lock()
+		rootChain.SaveChainToFile("chain_history.json")
+		mu.Unlock()
+
+		json.NewEncoder(w).Encode(map[string]string{
+			"abstract": abstract,
+		})
 	})
 
 	http.HandleFunc("/api/switch-side-to-main", func(w http.ResponseWriter, r *http.Request) {

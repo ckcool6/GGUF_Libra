@@ -160,9 +160,14 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	}
 
 	if len(result.Choices) > 0 {
-		abstract := result.Choices[0].Message.Content
+		// 去除换行和首尾无用空格
+		abstract := strings.TrimSpace(result.Choices[0].Message.Content)
+		if abstract == "" {
+			return "", fmt.Errorf("AI 返回的文本内容为空")
+		}
+
 		chain.DialogAbstract = abstract
-		return abstract, nil // 成功返回摘要和 nil 错误
+		return abstract, nil
 	}
 
 	return "", fmt.Errorf("API 返回了空的选择列表")
