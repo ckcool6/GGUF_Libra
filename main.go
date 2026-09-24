@@ -40,6 +40,7 @@ var (
 func main() {
 
 	config_init()
+	initRAG()
 
 	// 托管整个 dist 目录
 	http.Handle("/", http.FileServer(http.Dir("dist")))
@@ -289,6 +290,8 @@ func main() {
 			"message": "主线已翻页，开启新章节",
 		})
 	})
+
+	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 
 	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
 	http.ListenAndServe(":8099", nil)

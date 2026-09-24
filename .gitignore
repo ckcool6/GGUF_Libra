@@ -9,3 +9,4 @@ parser_py/.venv
 parser_py/__pycache__
 parser_py/server.log
 data.bin
+chromem_db

@@ -439,6 +439,8 @@ async function send() {
                 // 修改：如果存在图片，去掉 "data:image/jpeg;base64," 的前缀只发内容
                 image: imageToSend ? imageToSend.split(",")[1] : null,
                 custom_url: localStorage.getItem("custom_api_url") || "",
+                custom_embedding_url: localStorage.getItem("custom_embedding_url") || "",
+
             }),
         });
 
@@ -1297,10 +1299,16 @@ document.getElementById("new-chat-btn").addEventListener("click", newChat);
 // ========================= settings page =========================================
 const modal = document.getElementById("settings-modal");
 const customUrlInput = document.getElementById("custom-url");
+// 新增获取 embedding 文本框 DOM
+const customEmbeddingUrlInput = document.getElementById("custom-embedding-url");
 const customKeyInput = document.getElementById("custom-key");
 
 document.getElementById("settings-btn").addEventListener("click", () => {
     customUrlInput.value = localStorage.getItem("custom_api_url") || "";
+    // 新增：读取本地存储的 embedding url
+    if (customEmbeddingUrlInput) {
+        customEmbeddingUrlInput.value = localStorage.getItem("custom_embedding_url") || "";
+    }
     customKeyInput.value = localStorage.getItem("custom_api_key") || "";
     modal.classList.remove("hidden");
 });
@@ -1315,6 +1323,10 @@ modal.addEventListener("click", (e) => {
 
 document.getElementById("save-settings").addEventListener("click", () => {
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
+    // 新增：将 embedding url 保存到本地
+    if (customEmbeddingUrlInput) {
+        localStorage.setItem("custom_embedding_url", customEmbeddingUrlInput.value.trim());
+    }
     localStorage.setItem("custom_api_key", customKeyInput.value.trim());
     modal.classList.add("hidden");
 });
@@ -1515,3 +1527,64 @@ pageSearchInput.addEventListener("input", function () {
         pageSearchList.innerHTML = '<li class="p-4 text-center text-gray-400 dark:text-gray-500">未找到相关内容</li>';
     }
 });
+
+//===========================upload file===========================================
+const docInput = document.getElementById("doc-input");
+const uploadDocBtn = document.getElementById("upload-doc-btn");
+
+if (docInput) {
+    docInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // 读取前端设置的 API 地址并一同发送
+        const customUrl = localStorage.getItem("custom_api_url") || "";
+        const customEmbeddingUrl = localStorage.getItem("custom_embedding_url") || ""; // 新增读取
+
+        formData.append("custom_url", customUrl);
+        formData.append("custom_embedding_url", customEmbeddingUrl); // 新增传给后端
+
+        if (uploadDocBtn) uploadDocBtn.style.pointerEvents = "none";
+
+        try {
+            const key = localStorage.getItem("custom_api_key") || "";
+            const res = await fetch("/api/upload-doc", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${key}`
+                },
+                body: formData,
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "文档解析或入库失败");
+            }
+
+            // 在聊天框提示入库成功
+            const chatBox = document.getElementById("chat-box");
+            if (chatBox) {
+                const noticeHtml = `
+                    <div class="flex justify-center mb-4">
+                        <div class="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-xs font-mono">
+                            📚 已成功将文档《${file.name}》索引至知识库
+                        </div>
+                    </div>`;
+                chatBox.insertAdjacentHTML("beforeend", noticeHtml);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+        } catch (err) {
+            console.error("上传文档失败:", err);
+            alert("文档入库失败: " + err.message);
+        } finally {
+            // 恢复按钮状态并清空 input，允许上传同名文件
+            if (uploadDocBtn) uploadDocBtn.style.pointerEvents = "auto";
+            docInput.value = "";
+        }
+    });
+}
+

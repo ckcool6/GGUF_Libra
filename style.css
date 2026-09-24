@@ -152,8 +152,9 @@ header button:hover {
     /* 微调对齐 */
 }
 
-/* 上传图标也要防止缩放 */
-label[for="image-input"] {
+/* 确保文档与图片上传图标完美对齐并防止缩放 */
+label[for="image-input"],
+label[for="doc-input"] {
     flex-shrink: 0;
     margin-bottom: 2px;
 }

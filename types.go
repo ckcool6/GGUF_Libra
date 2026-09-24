@@ -25,9 +25,10 @@ type PromptItem struct {
 type reqBody struct {
 	Message string `json:"message"`
 	// 接收前端 JS 发来的图片 Base64
-	Image     string `json:"image"`
-	CustomUrl string `json:"custom_url"`
-	CustomKey string `json:"custom_key"`
+	Image              string `json:"image"`
+	CustomUrl          string `json:"custom_url"`
+	CustomKey          string `json:"custom_key"`
+	CustomEmbeddingUrl string `json:"custom_embedding_url"`
 }
 
 type chatlist struct {

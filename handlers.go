@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -55,6 +56,36 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	if localChain == nil {
 		http.Error(w, "No active chain", http.StatusBadRequest)
 		return
+	}
+
+	// 先进行向量数据库检索并组装 Prompt
+	embURL := getEmbeddingsURL(body.CustomEmbeddingUrl)
+	ctx := context.WithValue(r.Context(), embeddingURLKey, embURL)
+
+	// 补充透传鉴权 Header，确保聊天时的 RAG 向量检索也能正常通过鉴权
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		ctx = context.WithValue(ctx, "auth_header", auth)
+	} else if body.CustomKey != "" {
+		ctx = context.WithValue(ctx, "auth_header", "Bearer "+body.CustomKey)
+	}
+
+	matchedDocs, err := queryVectorDB(ctx, body.Message, 3)
+	// 👇👇👇 新增调试打印日志 👇👇👇
+	fmt.Println("================ RAG 调试信息 ================")
+	fmt.Printf("1. 用户提问: %s\n", body.Message)
+	if err != nil {
+		fmt.Printf("2. [warnning] 检索未命中: %v\n", err)
+	} else {
+		fmt.Printf("2. [OK] 检索成功，共命中 %d 条片段\n", len(matchedDocs))
+		if len(matchedDocs) > 0 {
+			fmt.Printf("3. 📌 命中的第一条内容预览: \n%s\n", matchedDocs[0])
+		}
+	}
+	fmt.Println("==============================================")
+	// 👆👆👆 新增调试打印日志 👆👆👆
+	if err == nil && len(matchedDocs) > 0 {
+		contextSnippet := "【参考关联代码/文档】：\n" + strings.Join(matchedDocs, "\n---\n") + "\n\n请结合以上上下文回答："
+		body.Message = contextSnippet + body.Message
 	}
 
 	// 2. 载入历史记录
@@ -268,6 +299,13 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	// 3. 动态清理 llama.cpp 的 slot 0 缓存
 	customURL := r.URL.Query().Get("custom_url")
 	eraseLlamaSlot(customURL, 0)
+
+	// 4. 清理 chromem-go 产生的内存对象与磁盘 .gob 文件
+	if err := ClearVectorDB(); err != nil {
+		fmt.Printf("⚠️ 清理向量数据库/gob 文件失败: %v\n", err)
+	} else {
+		fmt.Println("🧹 已成功重置 chromem-go 向量数据库，并清理相关 .gob 持久化文件！")
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -485,4 +523,51 @@ func apiSwitchPromptHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.ParseMultipartForm(32 << 20)
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "上传文件解析失败"})
+		return
+	}
+	defer file.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(file)
+	fileBytes := buf.Bytes()
+
+	// 1. 语法树切块：将 header.Filename 作为第二个参数传入
+	chunks := splitCodeWithTreeSitter(fileBytes, header.Filename)
+
+	// 获取前端传上来的 custom_url 并注入 context
+	authHeader := r.Header.Get("Authorization")
+	customEmbURL := r.FormValue("custom_embedding_url")
+	embURL := getEmbeddingsURL(customEmbURL)
+
+	ctx := context.WithValue(r.Context(), embeddingURLKey, embURL)
+	ctx = context.WithValue(ctx, "auth_header", authHeader)
+
+	// 入库
+	err = addChunksToVectorDB(ctx, chunks, header.Filename)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "向量数据库写入失败: " + err.Error()})
+		return
+	}
+
+	fmt.Printf("成功提取《%s》的 %d 个语法块并存入内嵌向量库\n", header.Filename, len(chunks))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": fmt.Sprintf("成功切分并索引了 %d 个代码/文本块", len(chunks)),
+	})
 }
