@@ -77,6 +77,7 @@ func main() {
 
 	// 生成侧线分支（Fork）
 	http.HandleFunc("/api/fork-side", func(w http.ResponseWriter, r *http.Request) {
+		ClearVectorDB() //让side branch不受知识库污染
 		mu.Lock()
 		if currentChain != nil {
 			// 生成侧线子节点，并将 currentChain 指向新侧线
@@ -184,6 +185,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{
 			"abstract": abstract,
 		})
+		ClearVectorDB() //让模型忘记知识库,只记总结
 	})
 
 	http.HandleFunc("/api/switch-side-to-main", func(w http.ResponseWriter, r *http.Request) {
