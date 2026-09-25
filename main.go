@@ -197,7 +197,7 @@ func main() {
 			return
 		}
 
-		// 1. 寻找该侧线是从主线哪个点分出来的
+		// 寻找该侧线是从主线哪个点分出来的
 		forkNode := rootChain.BackToMainForkedNode(currentChain)
 
 		// 如果找不到分叉点，说明已经在主线上了，或者树结构异常
@@ -208,11 +208,8 @@ func main() {
 				currentChain = currentChain.DialogMain
 			}
 		} else {
-			// 2. 【物理删除】直接将分叉点的侧线指针设为 nil
-			// 这样整个聊烂了的侧线子树都会被 Go 的 GC 回收，且不会存入 JSON
-			// forkNode.DialogSide = nil
 
-			// 3. 【回归正史】寻找主线现在的最末尾
+			// 【回归正史】寻找主线现在的最末尾
 			mainTail := rootChain
 			for mainTail.DialogMain != nil {
 				mainTail = mainTail.DialogMain
