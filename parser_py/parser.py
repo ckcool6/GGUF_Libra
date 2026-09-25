@@ -3,6 +3,9 @@ from pathlib import Path
 import time
 from typing import List, Optional, Tuple
 import msgspec
+import numpy as np
+from scipy.sparse import csr_matrix, diags
+from scipy.sparse.linalg import eigsh
 
 # 获取上一级目录
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -89,7 +92,8 @@ def parse_json():
     elapsed = time.time() - start_time
     
     return {
-        "tree_count": len(rawdata), # 这里现在是 1
+        "tree_count": len(rawdata), 
+        "logic_t": logic_t,  # 新增此项
         "entry_count": len(entries), 
         "source_size_mb": round(source_json.stat().st_size / (1024 * 1024), 2),
         "packed_size_mb": round(target_msgpack.stat().st_size / (1024 * 1024), 2),
@@ -176,10 +180,39 @@ def extract_by_stack(root_node: ChatChain, start_global_id: int = 0) -> Tuple[Li
 
     return entries, nodes_processed
 
-def compute_logic_t(matrix: TreeMatrix) -> float:
-    # 你的计算逻辑
-    return 0.99
 
+def compute_logic_t(matrix_struct: TreeMatrix) -> float:
+    """计算拉普拉斯第二特征值的倒数 (logic_T)"""
+    if matrix_struct.node_count <= 2: return 0.0
+    num_nodes = matrix_struct.node_count
+    start_ids = [entry.start_id for entry in matrix_struct.entries]
+    end_ids = [entry.end_id for entry in matrix_struct.entries]
+    
+    # 构造无向图
+    row = np.array(start_ids + end_ids)
+    col = np.array(end_ids + start_ids)
+    data = np.ones(len(row))
+    
+    A = csr_matrix((data, (row, col)), shape=(num_nodes, num_nodes))
+    degrees = np.array(A.sum(axis=1)).flatten()
+    D = diags(degrees)
+    L = D - A
+    
+    try:
+        # 节点小于 5 时使用稠密矩阵求解器
+        if num_nodes < 5:
+            dense_L = L.toarray()
+            eigenvalues = np.linalg.eigvalsh(dense_L)
+            lambda_2 = eigenvalues[1]
+        else:
+            eigenvalues, _ = eigsh(L.astype(float), k=2, which='SA')
+            lambda_2 = eigenvalues[1]
+        
+        if lambda_2 < 1e-10: return 0.0 
+        return float(round(1.0 / lambda_2, 4))
+    except Exception as e:
+        print(f"计算特征值出错: {e}")
+        return 0.0
 
 # test
 if __name__ == "__main__":
@@ -191,6 +224,7 @@ if __name__ == "__main__":
         print("-" * 30)
         print(f"🌲 树的数量       : {result['tree_count']} 棵")
         print(f"🔗 提取的父子连线 : {result['entry_count']} 对")
+        print(f"🧠 Logic T 值     : {result['logic_t']}")  
         print(f"📁 原始 JSON 大小 : {result['source_size_mb']} MB")
         print(f"📦 压缩 Msgpack 大小: {result['packed_size_mb']} MB")
         print(f"⏱️  耗时           : {result['elapsed_seconds']} 秒")
