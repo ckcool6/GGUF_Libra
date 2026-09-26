@@ -86,7 +86,7 @@ def parse_json():
     # 编码为 Msgpack
     packed_bytes = msgspec.msgpack.encode(final_record)
 
-    with open(target_msgpack, "wb") as f:
+    with open(target_msgpack, "ab") as f: # append 进去
         f.write(packed_bytes)
 
     elapsed = time.time() - start_time
@@ -183,7 +183,7 @@ def extract_by_stack(root_node: ChatChain, start_global_id: int = 0) -> Tuple[Li
 
 def compute_logic_t(matrix_struct: TreeMatrix) -> float:
     """计算拉普拉斯第二特征值的倒数 (logic_T)"""
-    if matrix_struct.node_count <= 2: return 0.0
+    if matrix_struct.node_count <= 2: return float('inf')
     num_nodes = matrix_struct.node_count
     start_ids = [entry.start_id for entry in matrix_struct.entries]
     end_ids = [entry.end_id for entry in matrix_struct.entries]
@@ -207,8 +207,9 @@ def compute_logic_t(matrix_struct: TreeMatrix) -> float:
         else:
             eigenvalues, _ = eigsh(L.astype(float), k=2, which='SA')
             lambda_2 = eigenvalues[1]
+
         
-        if lambda_2 < 1e-10: return 0.0 
+        if lambda_2 < 1e-10: return float('inf')
         return float(round(1.0 / lambda_2, 4))
     except Exception as e:
         print(f"计算特征值出错: {e}")
