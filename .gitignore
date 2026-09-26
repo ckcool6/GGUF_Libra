@@ -7,6 +7,6 @@ dist/
 gguf-player.exe
 parser_py/.venv
 parser_py/__pycache__
-parser_py/server.log
+parser_py/app.log
 data.bin
 chromem_db
