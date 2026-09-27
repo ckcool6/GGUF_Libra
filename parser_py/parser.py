@@ -6,6 +6,7 @@ import msgspec
 import numpy as np
 from scipy.sparse import csr_matrix, diags
 from scipy.sparse.linalg import eigsh
+import random
 
 # 获取上一级目录
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -35,8 +36,10 @@ class Record(msgspec.Struct):
     keyword: str
     matrix: TreeMatrix    
     
+import msgpack  # 确保文件顶部有 import msgpack，或者在函数内部使用
+
 def parse_json():
-    """解析上一级目录下的 json 文件"""
+    """解析上一级目录下的 json 文件，并按 logic_t 降序保存到 data.bin"""
     source_json = PARENT_DIR / "chain_history.json"
     target_msgpack = PARENT_DIR / "data.bin"
 
@@ -49,10 +52,10 @@ def parse_json():
     with open(source_json, "rb") as f:
         json_bytes = f.read()
 
-    # 关键修改：最外层是 {}，所以 type 设为单体 ChatChain
+    # 最外层是 {}，type 设为单体 ChatChain
     single_tree: ChatChain = msgspec.json.decode(json_bytes, type=ChatChain)
     
-    # 包装成列表，因为我们后面的 build_entry 需要 List
+    # 包装成列表，因为 build_entry 需要 List
     rawdata: List[ChatChain] = [single_tree]
 
     # 执行转换
@@ -64,15 +67,14 @@ def parse_json():
         entries=entries
     )
 
-    # 假定这些函数的实现
     logic_t = compute_logic_t(matrix)
     
-    # 构建最终 Record
+    # 构建当前新 Record
     final_record = Record(
         logic_t=logic_t,
-        uuid=123456789, # 需要你的生成逻辑
+        uuid=generate_int_uuid(), 
         date=datetime.datetime.now(),
-        keyword="example_keyword", # 需要你的提取逻辑
+        keyword=extract_keyword(entries, single_tree), 
         matrix=matrix
     )
 
@@ -83,18 +85,40 @@ def parse_json():
         print(f"  儿子文本前20字: {entry.raw_data[1][:20].replace('\n', '')}...\n")
     print("=======================================\n")
     
-    # 编码为 Msgpack
-    packed_bytes = msgspec.msgpack.encode(final_record)
+    # ========================================================
+    # 核心改动：先读旧记录 -> 放入新记录 -> 按 logic_t 降序重排 -> 整体覆写
+    # ========================================================
+    all_records: List[Record] = []
 
-    with open(target_msgpack, "ab") as f: # append 进去
-        f.write(packed_bytes)
+    # 1. 如果旧文件存在，把历史的 Record 全读出来
+    if target_msgpack.exists() and target_msgpack.stat().st_size > 0:
+        with open(target_msgpack, "rb") as f:
+            unpacker = msgpack.Unpacker(raw=False)
+            unpacker.feed(f.read())
+            for item in unpacker:
+                try:
+                    all_records.append(msgspec.convert(item, type=Record))
+                except Exception:
+                    pass
+
+    # 2. 加入当前这次的新记录
+    all_records.append(final_record)
+
+    # 3. 按 logic_t 从大到小排序 (reverse=True)
+    all_records.sort(key=lambda r: r.logic_t, reverse=True)
+
+    # 4. 用 "wb" 模式把排好序的全部记录重新写入文件
+    with open(target_msgpack, "wb") as f:
+        for rec in all_records:
+            f.write(msgspec.msgpack.encode(rec))
 
     elapsed = time.time() - start_time
     
     return {
         "tree_count": len(rawdata), 
-        "logic_t": logic_t,  # 新增此项
+        "logic_t": logic_t,
         "entry_count": len(entries), 
+        "total_records_in_db": len(all_records), # 新增：告诉你现在库里排了多少条
         "source_size_mb": round(source_json.stat().st_size / (1024 * 1024), 2),
         "packed_size_mb": round(target_msgpack.stat().st_size / (1024 * 1024), 2),
         "elapsed_seconds": round(elapsed, 3)
@@ -215,6 +239,26 @@ def compute_logic_t(matrix_struct: TreeMatrix) -> float:
         print(f"计算特征值出错: {e}")
         return 0.0
 
+
+def generate_int_uuid() -> int:
+    """生成一个保证在 int64 范围内的有序唯一 ID (毫秒时间戳 + 随机尾缀)"""
+    # 41位时间戳(毫秒) + 22位随机数 = 63位整数 (最高位为0，保证为正数)
+    timestamp_ms = int(time.time() * 1000)
+    rand_suffix = random.getrandbits(22)
+    return (timestamp_ms << 22) | rand_suffix
+
+def extract_keyword(entries: List[Entry], root_tree: ChatChain) -> str:
+    # 1. 优先拿整棵树最后遍历到的父子总结（不管是主线还是支线的终点）
+    if entries and len(entries[-1].raw_data) > 1:
+        return entries[-1].raw_data[1].strip()
+    
+    # 2. 兜底保护：如果树只有根节点一个点，没有连线 (entries 为空)
+    if root_tree and root_tree.DialogAbstract:
+        return root_tree.DialogAbstract.strip()
+        
+    return "Untitled Chat"
+
+
 # test
 if __name__ == "__main__":
     try:
@@ -225,7 +269,7 @@ if __name__ == "__main__":
         print("-" * 30)
         print(f"🌲 树的数量       : {result['tree_count']} 棵")
         print(f"🔗 提取的父子连线 : {result['entry_count']} 对")
-        print(f"🧠 Logic T 值     : {result['logic_t']}")  
+        print(f"✨ Logic T 值     : {result['logic_t']}")  
         print(f"📁 原始 JSON 大小 : {result['source_size_mb']} MB")
         print(f"📦 压缩 Msgpack 大小: {result['packed_size_mb']} MB")
         print(f"⏱️  耗时           : {result['elapsed_seconds']} 秒")

@@ -1,8 +1,9 @@
 import logging
 import cmd
 import json
+from typing import List
 import msgspec
-from parser import parse_json  
+import parser
 
 # ==========================================
 # Configure logging: Write to a log file
@@ -39,7 +40,7 @@ class AppTUI(cmd.Cmd):
         print("Executing save logic...")
         try:
             # 直接调用本地解析函数
-            result = parse_json()
+            result = parser.parse_json()
             print(f"📦 Parsed and saved successfully:\n{json.dumps(result, indent=2, ensure_ascii=False)}")
         except FileNotFoundError as e:
             print(f"❌ File not found error: {e}")
@@ -47,6 +48,73 @@ class AppTUI(cmd.Cmd):
             print(f"❌ Invalid JSON format or structure: {e}")
         except Exception as e:
             print(f"❌ Execution failed: {e}")
+
+    def do_data(self, arg):
+        """查看 data.bin 内部存储状态: data_status"""
+        bin_path = parser.PARENT_DIR / "data.bin"
+
+        if not bin_path.exists():
+            print(f"❌ 未找到二进制文件: {bin_path}")
+            return
+
+        file_size = bin_path.stat().st_size
+        print(f"\n{self.BOLD}========== 📄 data.bin 存储概况 =========={self.RESET}")
+        print(f"📁 文件路径 : {bin_path.resolve()}")
+        print(f"📊 文件大小 : {file_size} 字节 ({round(file_size / 1024, 2)} KB)")
+
+        if file_size == 0:
+            print("⚠️ 文件为空！")
+            return
+        # 1. 使用 msgpack.Unpacker 流式解包所有历史 Record
+        # ----------------------------------------------------
+        records: List[parser.Record] = []
+        with open(bin_path, "rb") as f:
+            raw_bytes = f.read()
+
+        import msgpack
+        unpacker = msgpack.Unpacker(raw=False)
+        unpacker.feed(raw_bytes)
+        for item in unpacker:
+            try:
+                rec = msgspec.convert(item, type=parser.Record)
+                records.append(rec)
+            except Exception as e:
+                pass
+
+        print(f"📦 记录总数 : {self.GREEN}{len(records)}{self.RESET} 条对话树 (Record)")
+        print(f"{self.BOLD}=========================================={self.RESET}\n")
+
+        # ----------------------------------------------------
+        # 2. 列出各条 Record 的结构化详情
+        # ----------------------------------------------------
+        for idx, rec in enumerate(records):
+            print(f"{self.CYAN}【Record #{idx + 1}】{self.RESET}")
+            print(f"  🔑 UUID     : {rec.uuid}")
+            print(f"  🕒 时间     : {rec.date.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"  ✨ Logic T  : {self.BOLD}{rec.logic_t}{self.RESET}")
+            print(f"  🏷️  Keyword  : {self.GREEN}{rec.keyword}{self.RESET}")
+            print(f"  🌲 对话拓扑 : {rec.matrix.node_count} 个节点, {rec.matrix.entry_count} 条父子连线")
+            
+            # 如果存在连线，展示最后一条连线（最后收敛的总结）
+            if rec.matrix.entries:
+                last_entry = rec.matrix.entries[-1]
+                p_text = last_entry.raw_data[0][:20].replace('\n', '')
+                c_text = last_entry.raw_data[1][:20].replace('\n', '')
+                print(f"  🔗 末端收敛 : [{last_entry.start_id}] {p_text}... ➔ [{last_entry.end_id}] {c_text}...")
+            print("-" * 42)
+
+        # ----------------------------------------------------
+        # 3. 真实十六进制切片预览 (前 64 字节)
+        # ----------------------------------------------------
+        print(f"\n{self.BLUE}🔍 二进制底层切片预览 (前 64 字节 Hex & ASCII):{self.RESET}")
+        preview_bytes = raw_bytes[:64]
+        for i in range(0, len(preview_bytes), 16):
+            chunk = preview_bytes[i:i+16]
+            hex_str = " ".join(f"{b:02X}" for b in chunk).ljust(48)
+            # 可见 ASCII 字符正常显示，不可见显示为 '.'
+            ascii_str = "".join(chr(b) if 32 <= b <= 126 else "." for b in chunk)
+            print(f"  {i:04X} | {hex_str} | {ascii_str}")
+        print()
 
     def do_exit(self, arg):
         """Exit the program: exit"""
