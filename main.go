@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"gguf-player/query"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,6 +15,8 @@ var (
 	OpenRouterKey string
 	rootChain     *chatChain
 	currentChain  *chatChain
+	queryEngine   *query.Engine // 👈 新增这一行：全局查询引擎
+
 )
 
 var (
@@ -38,6 +41,16 @@ var (
 )
 
 func main() {
+
+	var err error
+
+	// 初始化并加载 data.bin（赋值给全局变量 queryEngine）
+	queryEngine, err = query.NewEngine("data.bin")
+	if err != nil {
+		fmt.Printf("❌ 加载 data.bin 失败: %v\n", err)
+	} else {
+		fmt.Printf("✅ data.bin 加载成功！共包含 %d 棵对话树\n", len(queryEngine.Records))
+	}
 
 	config_init()
 	initRAG()

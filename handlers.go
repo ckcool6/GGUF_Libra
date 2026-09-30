@@ -58,40 +58,114 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 先进行向量数据库检索并组装 Prompt
+	// =========================================================================
+	// 2. 向量数据库检索（微观文档事实）
+	// =========================================================================
 	embURL := getEmbeddingsURL(body.CustomEmbeddingUrl)
 	ctx := context.WithValue(r.Context(), embeddingURLKey, embURL)
 
-	// 补充透传鉴权 Header，确保聊天时的 RAG 向量检索也能正常通过鉴权
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		ctx = context.WithValue(ctx, "auth_header", auth)
 	} else if body.CustomKey != "" {
 		ctx = context.WithValue(ctx, "auth_header", "Bearer "+body.CustomKey)
 	}
 
-	matchedDocs, err := queryVectorDB(ctx, body.Message, 3)
-	// 👇👇👇 新增调试打印日志 👇👇👇
-	fmt.Println("================ RAG 调试信息 ================")
+	matchedDocs, vErr := queryVectorDB(ctx, body.Message, 3)
+
+	fmt.Println("================ RAG 向量调试信息 ================")
 	fmt.Printf("1. 用户提问: %s\n", body.Message)
-	if err != nil {
-		fmt.Printf("2. [warnning] 检索未命中: %v\n", err)
+	if vErr != nil {
+		fmt.Printf("2. [warnning] 检索未命中: %v\n", vErr)
 	} else {
 		fmt.Printf("2. [OK] 检索成功，共命中 %d 条片段\n", len(matchedDocs))
 		if len(matchedDocs) > 0 {
 			fmt.Printf("3. 📌 命中的第一条内容预览: \n%s\n", matchedDocs[0])
 		}
 	}
-	fmt.Println("==============================================")
-	// 👆👆👆 新增调试打印日志 👆👆👆
-	if err == nil && len(matchedDocs) > 0 {
-		contextSnippet := "【参考代码/文档】：\n" + strings.Join(matchedDocs, "\n---\n") + "\n\n若用户提问与【参考代码/文档】意思接近，请回答，否则忽略【参考代码/文档】的内容："
-		body.Message = contextSnippet + body.Message
+	fmt.Println("==================================================")
+
+	// =========================================================================
+	// 3. 核心新增：拓扑思维链检索 (data.bin) + 详细日志
+	// =========================================================================
+	var thoughtChainSnippet string
+
+	if queryEngine != nil {
+		// 检索 top 5 棵树
+		qRes, qErr := queryEngine.Query(r.Context(), 5, body.Message)
+
+		if qErr != nil {
+			// 没命中时：极其自然温和，不让人觉得是出 Bug
+			fmt.Println("ℹ️  [思维链] 当前提问未触发外部树，沿用现有上下文")
+		} else {
+			// 命中时：华丽展开所有详情
+			fmt.Println("================== 🎯 命中历史思维树 (data.bin) ==================")
+			fmt.Printf("  - 命中树 UUID : %d\n", qRes.Record.UUID)
+			fmt.Printf("  - 树 Logic T  : %.4f\n", qRes.Record.LogicT)
+			fmt.Printf("  - 匹配关键词  : 【%s】\n", qRes.Record.Keyword)
+			fmt.Printf("  - 思考溯源链  : %v (共 %d 步推理)\n", qRes.NodePath, len(qRes.EdgePath))
+
+			// 组装思维链 Prompt 片段
+			var sb strings.Builder
+			sb.WriteString("【相关历史思考推导脉络（仅供参考其演化逻辑）】：\n")
+			for i, step := range qRes.EdgePath {
+				sb.WriteString(fmt.Sprintf("  - 第 %d 步: 依据【%s】➔ 得出【%s】\n", i+1, step.ParentText, step.ChildText))
+			}
+			sb.WriteString("\n")
+			thoughtChainSnippet = sb.String()
+
+			// 打印第一步与最后一步作为日志预览
+			if len(qRes.EdgePath) > 0 {
+				firstStep := qRes.EdgePath[0]
+				lastStep := qRes.EdgePath[len(qRes.EdgePath)-1]
+				fmt.Printf("  - 起始推导   : [%d] %s... ➔ [%d] %s...\n",
+					firstStep.ParentID, firstStep.ParentText[:min(20, len(firstStep.ParentText))],
+					firstStep.ChildID, firstStep.ChildText[:min(20, len(firstStep.ChildText))])
+				fmt.Printf("  - 末端收敛   : [%d] ➔ [%d] %s...\n",
+					lastStep.ParentID, lastStep.ChildID, lastStep.ChildText[:min(30, len(lastStep.ChildText))])
+			}
+			fmt.Println("================================================================")
+		}
+	}
+	fmt.Println("==================================================")
+
+	// =========================================================================
+	// 4. 混合上下文注水（思维链 + 参考文档 + 原提问）
+	// =========================================================================
+	var promptPrefix strings.Builder
+
+	// 先放因果思维链
+	if thoughtChainSnippet != "" {
+		promptPrefix.WriteString(thoughtChainSnippet)
 	}
 
-	// 2. 载入历史记录
+	// 再放向量库参考文档
+	if vErr == nil && len(matchedDocs) > 0 {
+		promptPrefix.WriteString("【参考代码/文档】：\n")
+		promptPrefix.WriteString(strings.Join(matchedDocs, "\n---\n"))
+		promptPrefix.WriteString("\n\n")
+	}
+
+	if promptPrefix.Len() > 0 {
+		promptPrefix.WriteString("若上述参考内容与用户提问相关，请结合其背景回答；若无关则忽略：\n\n")
+	}
+
+	// =========================================================================
+	// 5. 载入历史记录并请求本地模型（隔离前端展示与模型输入）
+	// =========================================================================
+	// 1. 先用原始提问载入历史（这样 ChatHistory 里保存的是干干净净的用户原话！）
+	originalUserMsg := body.Message
 	load_history(localChain, &body)
 
-	// 3. 网络请求完全无锁运行
+	// 2. 如果有注入前缀，只偷偷修改 SendHistory 里最后一条准备发给模型的消息
+	if promptPrefix.Len() > 0 && len(localChain.DialogContent.SendHistory) > 0 {
+		lastIdx := len(localChain.DialogContent.SendHistory) - 1
+		enhancedPrompt := promptPrefix.String() + originalUserMsg
+
+		// 只给发往模型的报文注水
+		localChain.DialogContent.SendHistory[lastIdx].Content = enhancedPrompt
+		body.Message = enhancedPrompt // 兼容 sendRequestToLlama
+	}
+
 	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
 		fmt.Println("❌ 无法连接到 llama.cpp 服务:", err)
@@ -103,24 +177,21 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// 如果下游（Nginx/llamacpp）返回 401，立刻回滚历史并传给前端
 	if resp.StatusCode == http.StatusUnauthorized {
 		rollbackHistory(localChain)
-		w.WriteHeader(http.StatusUnauthorized) // 发送 401，让前端触发“鉴权失败”提示
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// 4. 流式传输与后续更新
+	// 6. 流式传输与后续更新
 	aiFullContent, streamSuccess := forwardStreamData(w, r, resp.Body)
 
 	if streamSuccess || aiFullContent != "" {
-		// 追加 AI 回复文本到历史记录
 		localChain.DialogContent.ChatHistory = append(localChain.DialogContent.ChatHistory, Message{
 			Role:    "assistant",
 			Content: aiFullContent,
 		})
 
-		// 写文件时用全局锁守护整棵树的序列化
 		mu.Lock()
 		rootChain.SaveChainToFile("chain_history.json")
 		mu.Unlock()
