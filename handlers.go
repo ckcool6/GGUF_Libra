@@ -94,11 +94,21 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		qRes, qErr := queryEngine.Query(r.Context(), 5, body.Message)
 
 		if qErr != nil {
-			// 没命中时：极其自然温和，不让人觉得是出 Bug
-			fmt.Println("ℹ️  [思维链] 当前提问未触发外部树，沿用现有上下文")
+			// ==========================================
+			// 情况 1：未命中新树，检查当前分支是否已有锚定的记忆
+			// ==========================================
+			if localChain.ActiveThoughtChain != "" {
+				// 成功沿用之前的思维地图！
+				thoughtChainSnippet = localChain.ActiveThoughtChain
+				fmt.Println("ℹ️  [思维链] 当前提问未触发新树，成功沿用本会话已锚定的历史思维地图！")
+			} else {
+				fmt.Println("ℹ️  [思维链] 当前提问未触发外部树，沿用现有上下文")
+			}
 		} else {
-			// 命中时：华丽展开所有详情
-			fmt.Println("================== 🎯 命中历史思维树 (data.bin) ==================")
+			// ==========================================
+			// 情况 2：命中新树！打印详情并锚定到当前分支
+			// ==========================================
+			fmt.Println("================== 🎯 命中并锚定新思维树 (data.bin) ==================")
 			fmt.Printf("  - 命中树 UUID : %d\n", qRes.Record.UUID)
 			fmt.Printf("  - 树 Logic T  : %.4f\n", qRes.Record.LogicT)
 			fmt.Printf("  - 匹配关键词  : 【%s】\n", qRes.Record.Keyword)
@@ -112,6 +122,9 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			sb.WriteString("\n")
 			thoughtChainSnippet = sb.String()
+
+			// 📌 核心动作：把组装好的思维链保存给当前分支，后续多轮对话都能用！
+			localChain.ActiveThoughtChain = thoughtChainSnippet
 
 			// 打印第一步与最后一步作为日志预览
 			if len(qRes.EdgePath) > 0 {
