@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// 动态获取当前模型的 n_ctx 上限
+// Dynamically retrieve the current model's maximum n_ctx context limit
 func getLlamaMaxCtx(customURL string) int {
 	apiURL := "http://127.0.0.1:8021/props"
 	if customURL != "" {
@@ -21,10 +21,10 @@ func getLlamaMaxCtx(customURL string) int {
 		}
 	}
 
-	// 使用全局复用的 httpTimeoutClient 发起请求
+	// Initiate request using globally shared httpTimeoutClient
 	resp, err := httpTimeoutClient.Get(apiURL)
 	if err != nil || resp.StatusCode != http.StatusOK {
-		return 512 // 拿不到时，使用 llama.cpp 的默认最小值 512 保底
+		return 512 // Fallback to llama.cpp's default minimum of 512 if unavailable
 	}
 	defer resp.Body.Close()
 
@@ -34,7 +34,7 @@ func getLlamaMaxCtx(customURL string) int {
 		} `json:"default_generation_settings"`
 	}
 
-	// 解析响应 JSON
+	// Parse response JSON
 	if err := json.NewDecoder(resp.Body).Decode(&propsData); err == nil && propsData.DefaultGenerationSettings.NCtx > 0 {
 		return propsData.DefaultGenerationSettings.NCtx
 	}
@@ -48,7 +48,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. 获取本地局部引用，立刻释放全局锁
+	// Acquire local reference and immediately release global mutex
 	mu.Lock()
 	localChain := currentChain
 	mu.Unlock()
@@ -59,7 +59,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// =========================================================================
-	// 2. 向量数据库检索（微观文档事实）
+	// Vector database retrieval (fine-grained document facts)
 	// =========================================================================
 	embURL := getEmbeddingsURL(body.CustomEmbeddingUrl)
 	ctx := context.WithValue(r.Context(), embeddingURLKey, embURL)
@@ -72,68 +72,68 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	matchedDocs, vErr := queryVectorDB(ctx, body.Message, 3)
 
-	fmt.Println("================ RAG 向量调试信息 ================")
-	fmt.Printf("1. 用户提问: %s\n", body.Message)
+	fmt.Println("================ RAG Vector Debug Info ================")
+	fmt.Printf("1. User query: %s\n", body.Message)
 	if vErr != nil {
-		fmt.Printf("2. [warnning] 检索未命中: %v\n", vErr)
+		fmt.Printf("2. [warning] Retrieval missed: %v\n", vErr)
 	} else {
-		fmt.Printf("2. [OK] 检索成功，共命中 %d 条片段\n", len(matchedDocs))
+		fmt.Printf("2. [OK] Retrieval successful, matched %d snippet(s)\n", len(matchedDocs))
 		if len(matchedDocs) > 0 {
-			fmt.Printf("3. 📌 命中的第一条内容预览: \n%s\n", matchedDocs[0])
+			fmt.Printf("3. 📌 Preview of first matched snippet:\n%s\n", matchedDocs[0])
 		}
 	}
-	fmt.Println("==================================================")
+	fmt.Println("=======================================================")
 
 	// =========================================================================
-	// 3. 核心新增：拓扑思维链检索 (data.bin) + 详细日志
+	// Core addition: Topological chain-of-thought retrieval (data.bin) + detailed logs
 	// =========================================================================
 	var thoughtChainSnippet string
 
 	if queryEngine != nil {
-		// 检索 top 5 棵树
+		// Query top 5 dialogue trees
 		qRes, qErr := queryEngine.Query(r.Context(), 5, body.Message)
 
 		if qErr != nil {
 			// ==========================================
-			// 情况 1：未命中新树，检查当前分支是否已有锚定的记忆
+			// Case 1: No new tree matched, check if current branch has anchored memory
 			// ==========================================
 			if localChain.ActiveThoughtChain != "" {
-				// 成功沿用之前的思维地图！
+				// Reusing previous thought map
 				thoughtChainSnippet = localChain.ActiveThoughtChain
-				fmt.Println("ℹ️  [思维链] 当前提问未触发新树，成功沿用本会话已锚定的历史思维地图！")
+				fmt.Println("ℹ️  [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!")
 			} else {
-				fmt.Println("ℹ️  [思维链] 当前提问未触发外部树，沿用现有上下文")
+				fmt.Println("ℹ️  [Chain of Thought] No external tree triggered; retaining existing context")
 			}
 		} else {
 			// ==========================================
-			// 情况 2：命中新树！打印详情并锚定到当前分支
+			// Case 2: New tree matched! Log details and anchor to current branch
 			// ==========================================
-			fmt.Println("================== 🎯 命中并锚定新思维树 (data.bin) ==================")
-			fmt.Printf("  - 命中树 UUID : %d\n", qRes.Record.UUID)
-			fmt.Printf("  - 树 Logic T  : %.4f\n", qRes.Record.LogicT)
-			fmt.Printf("  - 匹配关键词  : 【%s】\n", qRes.Record.Keyword)
-			fmt.Printf("  - 思考溯源链  : %v (共 %d 步推理)\n", qRes.NodePath, len(qRes.EdgePath))
+			fmt.Println("================== 🎯 Matched & Anchored New Thought Tree (data.bin) ==================")
+			fmt.Printf("  - Matched Tree UUID : %d\n", qRes.Record.UUID)
+			fmt.Printf("  - Tree Logic T      : %.4f\n", qRes.Record.LogicT)
+			fmt.Printf("  - Matched Keyword   : [%s]\n", qRes.Record.Keyword)
+			fmt.Printf("  - Derivation Chain  : %v (%d reasoning steps)\n", qRes.NodePath, len(qRes.EdgePath))
 
-			// 组装思维链 Prompt 片段
+			// Assemble chain-of-thought prompt snippet
 			var sb strings.Builder
-			sb.WriteString("【相关历史思考推导脉络（仅供参考其演化逻辑）】：\n")
+			sb.WriteString("[Relevant historical reasoning context (for evolutionary logic reference only)]:\n")
 			for i, step := range qRes.EdgePath {
-				sb.WriteString(fmt.Sprintf("  - 第 %d 步: 依据【%s】➔ 得出【%s】\n", i+1, step.ParentText, step.ChildText))
+				sb.WriteString(fmt.Sprintf("  - Step %d: Based on [%s] -> Derived [%s]\n", i+1, step.ParentText, step.ChildText))
 			}
 			sb.WriteString("\n")
 			thoughtChainSnippet = sb.String()
 
-			// 📌 核心动作：把组装好的思维链保存给当前分支，后续多轮对话都能用！
+			// Core action: persist assembled thought chain to current branch for multi-turn conversations
 			localChain.ActiveThoughtChain = thoughtChainSnippet
 
-			// 打印第一步与最后一步作为日志预览
+			// Log the first and last steps as a preview
 			if len(qRes.EdgePath) > 0 {
 				firstStep := qRes.EdgePath[0]
 				lastStep := qRes.EdgePath[len(qRes.EdgePath)-1]
-				fmt.Printf("  - 起始推导   : [%d] %s... ➔ [%d] %s...\n",
+				fmt.Printf("  - Initial Step : [%d] %s... -> [%d] %s...\n",
 					firstStep.ParentID, firstStep.ParentText[:min(20, len(firstStep.ParentText))],
 					firstStep.ChildID, firstStep.ChildText[:min(20, len(firstStep.ChildText))])
-				fmt.Printf("  - 末端收敛   : [%d] ➔ [%d] %s...\n",
+				fmt.Printf("  - Terminal Step: [%d] -> [%d] %s...\n",
 					lastStep.ParentID, lastStep.ChildID, lastStep.ChildText[:min(30, len(lastStep.ChildText))])
 			}
 			fmt.Println("================================================================")
@@ -142,50 +142,50 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("==================================================")
 
 	// =========================================================================
-	// 4. 混合上下文注水（思维链 + 参考文档 + 原提问）
+	// Hybrid context augmentation (chain-of-thought + reference docs + user query)
 	// =========================================================================
 	var promptPrefix strings.Builder
 
-	// 先放因果思维链
+	// Causal chain-of-thought
 	if thoughtChainSnippet != "" {
 		promptPrefix.WriteString(thoughtChainSnippet)
 	}
 
-	// 再放向量库参考文档
+	// Vector DB reference documents
 	if vErr == nil && len(matchedDocs) > 0 {
-		promptPrefix.WriteString("【参考代码/文档】：\n")
+		promptPrefix.WriteString("[Reference Code / Documents]:\n")
 		promptPrefix.WriteString(strings.Join(matchedDocs, "\n---\n"))
 		promptPrefix.WriteString("\n\n")
 	}
 
 	if promptPrefix.Len() > 0 {
-		promptPrefix.WriteString("若上述参考内容与用户提问相关，请结合其背景回答；若无关则忽略：\n\n")
+		promptPrefix.WriteString("If the reference content above is relevant to the user's question, incorporate it into your answer; otherwise, ignore it:\n\n")
 	}
 
 	// =========================================================================
-	// 5. 载入历史记录并请求本地模型（隔离前端展示与模型输入）
+	// Load history and dispatch request to local model (isolate UI display from model input)
 	// =========================================================================
-	// 1. 先用原始提问载入历史（这样 ChatHistory 里保存的是干干净净的用户原话！）
+	// Load history with original message first (ensuring ChatHistory preserves clean user input)
 	originalUserMsg := body.Message
 	load_history(localChain, &body)
 
-	// 2. 如果有注入前缀，只偷偷修改 SendHistory 里最后一条准备发给模型的消息
+	// If prompt prefix exists, only augment the last message in SendHistory destined for the model
 	if promptPrefix.Len() > 0 && len(localChain.DialogContent.SendHistory) > 0 {
 		lastIdx := len(localChain.DialogContent.SendHistory) - 1
 		enhancedPrompt := promptPrefix.String() + originalUserMsg
 
-		// 只给发往模型的报文注水
+		// Augment only the payload dispatched to the model
 		localChain.DialogContent.SendHistory[lastIdx].Content = enhancedPrompt
-		body.Message = enhancedPrompt // 兼容 sendRequestToLlama
+		body.Message = enhancedPrompt // Maintain compatibility with sendRequestToLlama
 	}
 
 	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
-		fmt.Println("❌ 无法连接到 llama.cpp 服务:", err)
+		fmt.Println("❌ Failed to connect to llama.cpp service:", err)
 		rollbackHistory(localChain)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "本地 API 请求失败"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Local API request failed"})
 		return
 	}
 	defer resp.Body.Close()
@@ -196,7 +196,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. 流式传输与后续更新
+	// Streaming transfer and post-processing
 	aiFullContent, streamSuccess := forwardStreamData(w, r, resp.Body)
 
 	if streamSuccess || aiFullContent != "" {
@@ -221,15 +221,15 @@ func load_history(chain *chatChain, body *reqBody) {
 		return
 	}
 
-	// 存入消息时必须包含 Image
+	// Message entry must include Image
 	chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory, Message{
 		Role:    "user",
 		Content: body.Message,
-		Image:   body.Image, // 必须把图片 Base64 存入历史
+		Image:   body.Image, // Base64 image must be preserved in history
 	})
 	chain.DialogContent.UserMsgIndex = len(chain.DialogContent.ChatHistory) - 1
 
-	// 计算当前节点发送给模型时的 safeMaxTokens
+	// Calculate safeMaxTokens for the current node when sending to model
 	maxCtx := getLlamaMaxCtx(body.CustomUrl)
 
 	reserveTokens := 2048
@@ -242,7 +242,7 @@ func load_history(chain *chatChain, body *reqBody) {
 		safeMaxTokens = 100
 	}
 
-	// 过滤消息填入 SendHistory
+	// Filter messages and populate SendHistory
 	chain.DialogContent.SendHistory = filterMessagesByToken(chain.DialogContent.ChatHistory, safeMaxTokens)
 }
 
@@ -265,8 +265,8 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// 注意：直接从内存中的 rootChain 开始遍历，而不是重新读文件
-	// 因为内存里的 rootChain 才是最新的
+	// Traverse rootChain directly from memory rather than re-reading the file
+	// In-memory rootChain contains the most up-to-date state
 	if rootChain == nil {
 		json.NewEncoder(w).Encode([]Message{})
 		return
@@ -281,7 +281,7 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if node.DialogContent != nil && len(node.DialogContent.ChatHistory) > 0 {
-			// 提取该节点的非系统消息
+			// Extract non-system messages for this node
 			nodeMsgs := []Message{}
 			for _, msg := range node.DialogContent.ChatHistory {
 				if msg.Role != "system" {
@@ -289,13 +289,13 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// --- 核心修改：挂载摘要 ---
+			// Mount summary to node
 			if len(nodeMsgs) > 0 {
 				lastIdx := len(nodeMsgs) - 1
-				// 将该节点的摘要赋值给该节点的最后一条可见消息
+				// Assign node summary to the last visible message of this node
 				nodeMsgs[lastIdx].Abstract = node.DialogAbstract
 
-				// 处理档案袋
+				// Process history archives
 				if len(node.HistoryArchives) > 0 {
 					for _, archChain := range node.HistoryArchives {
 						archMsgs := extractAllMessages(archChain)
@@ -307,7 +307,7 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 			history = append(history, nodeMsgs...)
 		}
 
-		// 逆向DFS
+		// Reverse DFS traversal
 		collectMessages(node.DialogSide)
 		collectMessages(node.DialogMain)
 	}
@@ -316,7 +316,7 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(history)
 }
 
-// 辅助函数：把一个档案支线里的所有消息拍平，用于弹窗显示
+// Helper: Flatten all messages from an archived branch for modal display
 func extractAllMessages(node *chatChain) []Message {
 	if node == nil {
 		return nil
@@ -334,7 +334,7 @@ func extractAllMessages(node *chatChain) []Message {
 	return res
 }
 
-// 辅助方法：安全获取当前节点的 ChatHistory
+// Helper: Safely retrieve ChatHistory of the current node
 func (chain *chatChain) dialogChainContentOrDefault() []Message {
 	if chain == nil || chain.DialogContent == nil {
 		return []Message{}
@@ -342,7 +342,7 @@ func (chain *chatChain) dialogChainContentOrDefault() []Message {
 	return chain.DialogContent.ChatHistory
 }
 
-// 动态清除 llama.cpp 指定 slot 的 KV 缓存
+// Dynamically erase llama.cpp KV cache for a specified slot
 func eraseLlamaSlot(customURL string, slotID int) {
 	apiURL := fmt.Sprintf("http://127.0.0.1:8021/slots/%d?action=erase", slotID)
 
@@ -358,13 +358,13 @@ func eraseLlamaSlot(customURL string, slotID int) {
 			return
 		}
 
-		// 使用全局复用的 httpTimeoutClient 发起异步清理请求
+		// Dispatch asynchronous cleanup request using globally shared httpTimeoutClient
 		resp, err := httpTimeoutClient.Do(req)
 		if err != nil {
 			return
 		}
 
-		// 确保把 Body 读完并关闭，TCP 连接才能被 client 正确回收重用
+		// Ensure response body is drained and closed so the client can reuse TCP connections
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
@@ -372,40 +372,40 @@ func eraseLlamaSlot(customURL string, slotID int) {
 
 func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
-	// 1. 在内存中彻底创建一个全新的干净树节点
+	// Initialize a clean tree root node in memory
 	rootChain = NewChatChain()
 	currentChain = rootChain
 
-	// 2. 将这棵空树覆盖写入 chain_history.json 文件
+	// Overwrite chain_history.json with this new empty tree
 	rootChain.SaveChainToFile("chain_history.json")
 	mu.Unlock()
 
-	// 3. 动态清理 llama.cpp 的 slot 0 缓存
+	// Dynamically erase llama.cpp slot 0 cache
 	customURL := r.URL.Query().Get("custom_url")
 	eraseLlamaSlot(customURL, 0)
 
-	// 4. 清理 chromem-go 产生的内存对象与磁盘 .gob 文件
+	// Clean up chromem-go in-memory collections and disk .gob files
 	if err := ClearVectorDB(); err != nil {
-		fmt.Printf("⚠️ 清理向量数据库/gob 文件失败: %v\n", err)
+		fmt.Printf("⚠️ Failed to clean up vector database/gob files: %v\n", err)
 	} else {
-		fmt.Println("🧹 已成功重置 chromem-go 向量数据库，并清理相关 .gob 持久化文件！")
+		fmt.Println("🧹 Successfully reset chromem-go vector database and cleared persisted .gob files!")
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// 请求 llama.cpp 的 /props 接口获取真实的 context 占用
+// Query llama.cpp /props endpoint to obtain actual context utilization
 func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	customURL := r.URL.Query().Get("custom_url")
 	maxCtx := getLlamaMaxCtx(customURL)
 
-	// 计算 currentChain 当前实际聊天历史在使用的 Token 开销
+	// Calculate token consumption of the active chat history in currentChain
 	mu.Lock()
 	currentTokens := 0
 	if currentChain != nil && currentChain.DialogContent != nil {
-		// 扣掉预留给 AI 输出的空间
+		// Reserve headroom for model output tokens
 		reserveTokens := 2048
 		if maxCtx/5 < reserveTokens {
 			reserveTokens = maxCtx / 5
@@ -415,7 +415,7 @@ func apiLlamaPropsHandler(w http.ResponseWriter, r *http.Request) {
 			safeMaxTokens = 100
 		}
 
-		// 用 safeMaxTokens 来裁剪计算，这样算出来的就是“真正会发给 AI 的有效上下文 Token”
+		// Prune messages using safeMaxTokens to compute effective context tokens dispatched to model
 		filteredMsgs := filterMessagesByToken(currentChain.DialogContent.ChatHistory, safeMaxTokens)
 		for _, msg := range filteredMsgs {
 			currentTokens += getMessageTokens(msg)
@@ -453,7 +453,7 @@ Loop:
 	for {
 		select {
 		case <-r.Context().Done():
-			fmt.Println("\n🛑 检测到前端主动断开连接，停止接收流数据。")
+			fmt.Println("\n🛑 Client disconnected; stopped receiving stream.")
 			respBody.Close()
 			break Loop
 		default:
@@ -462,7 +462,7 @@ Loop:
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				fmt.Println("⚠️ 读取流时遭遇非 EOF 异常中断:", err)
+				fmt.Println("⚠️ Non-EOF error encountered while reading stream:", err)
 			}
 			break
 		}
@@ -512,7 +512,7 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 	for _, m := range history {
 		if m.Image != "" {
-			// 有图片，组装为 []LlamaContent 数组
+			// Image present: construct []LlamaContent slice
 			contentArray := []LlamaContent{
 				{Type: "text", Text: m.Content},
 				{
@@ -524,13 +524,13 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 			}
 			formattedMessages = append(formattedMessages, LlamaMessage{
 				Role:    m.Role,
-				Content: contentArray, // interface{} 可以接收 slice
+				Content: contentArray, // interface{} accepts slice
 			})
 		} else {
-			// 没图片，直接用字符串
+			// Text only: direct string assignment
 			formattedMessages = append(formattedMessages, LlamaMessage{
 				Role:    m.Role,
-				Content: m.Content, // interface{} 可以接收 string
+				Content: m.Content, // interface{} accepts string
 			})
 		}
 	}
@@ -553,12 +553,12 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// 优先尝试从 JSON Body 获取
+	// Prioritize custom API key from JSON body
 	if body.CustomKey != "" {
 		req.Header.Set("Authorization", "Bearer "+body.CustomKey)
 	} else {
-		// 如果 Body 里没传，则直接转发前端发给 Go 的 Authorization Header
-		// 这就是你前端 getHeaders() 函数发送的内容： "Bearer your_key"
+		// If absent in body, forward the Authorization header received from the client
+		// Sent via client getHeaders(): "Bearer your_key"
 		if auth := r.Header.Get("Authorization"); auth != "" {
 			req.Header.Set("Authorization", auth)
 		}
@@ -569,11 +569,11 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		fmt.Println("❌ 解析前端请求失败:", err)
+		fmt.Println("❌ Failed to parse client request:", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return err
 	}
-	fmt.Println("> 用户输入:", body.Message)
+	fmt.Println("> User Input:", body.Message)
 	return nil
 }
 
@@ -619,7 +619,7 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "上传文件解析失败"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse uploaded file"})
 		return
 	}
 	defer file.Close()
@@ -628,10 +628,10 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 	buf.ReadFrom(file)
 	fileBytes := buf.Bytes()
 
-	// 1. 语法树切块：将 header.Filename 作为第二个参数传入
+	// AST code chunking: pass header.Filename as secondary parameter
 	chunks := splitCodeWithTreeSitter(fileBytes, header.Filename)
 
-	// 获取前端传上来的 custom_url 并注入 context
+	// Retrieve custom_url from request and inject into context
 	authHeader := r.Header.Get("Authorization")
 	customEmbURL := r.FormValue("custom_embedding_url")
 	embURL := getEmbeddingsURL(customEmbURL)
@@ -639,19 +639,19 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.WithValue(r.Context(), embeddingURLKey, embURL)
 	ctx = context.WithValue(ctx, "auth_header", authHeader)
 
-	// 入库
+	// Ingest into vector DB
 	err = addChunksToVectorDB(ctx, chunks, header.Filename)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "向量数据库写入失败: " + err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Vector database insertion failed: " + err.Error()})
 		return
 	}
 
-	fmt.Printf("成功提取《%s》的 %d 个语法块并存入内嵌向量库\n", header.Filename, len(chunks))
+	fmt.Printf("Successfully extracted %d syntax chunks from \"%s\" and indexed into vector DB\n", len(chunks), header.Filename)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
-		"message": fmt.Sprintf("成功切分并索引了 %d 个代码/文本块", len(chunks)),
+		"message": fmt.Sprintf("Successfully chunked and indexed %d code/text snippet(s)", len(chunks)),
 	})
 }

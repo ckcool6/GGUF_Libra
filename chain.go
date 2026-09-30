@@ -14,8 +14,8 @@ import (
 type NodeColor int
 
 const (
-	YellowNode NodeColor = iota // 0: 主线
-	GreenNode                   // 1: 侧线
+	YellowNode NodeColor = iota // 0: Main branch
+	GreenNode                   // 1: Side branch
 )
 
 type chatChain struct {
@@ -40,7 +40,7 @@ func (chain *chatChain) initChatChain() {
 		return
 	}
 
-	// 初始化当前节点的对话列表容器
+	// Initialize chat list container for current node
 	chain.DialogContent = &chatlist{
 		ChatHistory:  make([]Message, 0),
 		SendHistory:  make([]Message, 0),
@@ -54,39 +54,39 @@ func (chain *chatChain) initChatChain() {
 	chain.IsForkedNode = false
 }
 
-// NewChatChain 创建并返回一个初始化好的 chatChain 节点指针
+// NewChatChain creates and returns an initialized chatChain node pointer
 func NewChatChain() *chatChain {
 	chain := &chatChain{}
 	chain.initChatChain()
 	return chain
 }
 
-// GenerateAbstract 提取摘要
+// GenerateAbstract extracts summary
 func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, error) {
 	if chain == nil || chain.DialogContent == nil || len(chain.DialogContent.ChatHistory) == 0 {
-		return "", fmt.Errorf("没有对话记录")
+		return "", fmt.Errorf("no chat history available")
 	}
 
-	// 构造专门用于总结的 Prompt
+	// Construct prompt specifically for summarization
 	var promptMessages []LlamaMessage
 	promptMessages = append(promptMessages, LlamaMessage{
 		Role:    "system",
-		Content: "你是一个精炼的文本总结助手。请总结对话核心要点，字数控制在100-200字以内。",
+		Content: "You are a concise text summarization assistant. Summarize the key points of the dialogue within 100-200 words. You must generate the summary in the same primary language used in the conversation history (do not default to English).",
 	})
 
 	for _, m := range chain.DialogContent.ChatHistory {
 		content := m.Content
 
 		if m.Role == "system" {
-			// 修改点：允许带有背景标识的系统消息进入“总结素材”
-			// 这样 AI 在总结这一页时，会把上一页的摘要也考虑进去
-			if !strings.Contains(content, "前情提要") && !strings.Contains(content, "上下文总结") {
+			// Allow system messages containing context markers to enter summarization source material
+			// This ensures the AI takes previous chapter summaries into account when summarizing current chapter
+			if !strings.Contains(content, "Previous Context") && !strings.Contains(content, "Context Summary") {
 				continue
 			}
 		}
 
 		if m.Image != "" {
-			content = "[图片消息] " + content
+			content = "[Image Message] " + content
 		}
 
 		promptMessages = append(promptMessages, LlamaMessage{
@@ -97,7 +97,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	promptMessages = append(promptMessages, LlamaMessage{
 		Role:    "user",
-		Content: "请为以上的对话生成一份简短的上下文摘要总结。",
+		Content: "Please generate a brief context summary for the conversation above.Summarize the key points of the dialogue within 100-200 words. You must generate the summary in the same primary language used in the conversation history (do not default to English).",
 	})
 
 	payload := map[string]interface{}{
@@ -116,12 +116,12 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("❌ 创建总结请求失败:", err)
+		fmt.Println("❌ Failed to create summary request:", err)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// 处理 Key 的转发
+	// Handle API key forwarding
 	if customKey != "" {
 		if strings.HasPrefix(customKey, "Bearer ") {
 			req.Header.Set("Authorization", customKey)
@@ -132,20 +132,20 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	resp, err := httpTimeoutClient.Do(req)
 	if err != nil {
-		fmt.Println("❌ 请求总结 API 失败:", err)
+		fmt.Println("❌ Summary API request failed:", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	// --- 处理 401 错误 ---
+	// Handle 401 Unauthorized
 	if resp.StatusCode == http.StatusUnauthorized {
-		return "", fmt.Errorf("AUTH_ERROR") // 返回特定错误，让 Handler 能够识别
+		return "", fmt.Errorf("AUTH_ERROR") // Return specific error sentinel for handler identification
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		fmt.Printf("❌ 生成总结失败，响应码 %d: %s\n", resp.StatusCode, string(bodyBytes))
-		return "", fmt.Errorf("API 响应错误: %d", resp.StatusCode)
+		fmt.Printf("❌ Failed to generate summary, status code %d: %s\n", resp.StatusCode, string(bodyBytes))
+		return "", fmt.Errorf("API response error: %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -157,25 +157,25 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		fmt.Println("❌ 解析总结响应失败:", err)
+		fmt.Println("❌ Failed to parse summary response:", err)
 		return "", err
 	}
 
 	if len(result.Choices) > 0 {
-		// 去除换行和首尾无用空格
+		// Trim leading and trailing whitespace
 		abstract := strings.TrimSpace(result.Choices[0].Message.Content)
 		if abstract == "" {
-			return "", fmt.Errorf("AI 返回的文本内容为空")
+			return "", fmt.Errorf("AI returned empty content")
 		}
 
 		chain.DialogAbstract = abstract
 		return abstract, nil
 	}
 
-	return "", fmt.Errorf("API 返回了空的选择列表")
+	return "", fmt.Errorf("API returned empty choices list")
 }
 
-// AppendMainBranchNode 为当前节点追加一个新的主线子节点
+// AppendMainBranchNode appends a new main branch child node to the current node
 func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	if chain == nil {
 		return nil
@@ -189,14 +189,14 @@ func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	if chain.DialogAbstract != "" {
 		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
 			Role:    "system",
-			Content: "【前情提要/历史上下文总结】：\n" + chain.DialogAbstract,
+			Content: "[Previous Context / Context Summary]:\n" + chain.DialogAbstract,
 		})
 	}
 
 	return newNode
 }
 
-// AppendSideBranchNode 为当前节点追加一个新的侧线分支节点
+// AppendSideBranchNode appends a new side branch child node to the current node
 func (chain *chatChain) AppendSideBranchNode() *chatChain {
 	if chain == nil {
 		return nil
@@ -210,14 +210,14 @@ func (chain *chatChain) AppendSideBranchNode() *chatChain {
 	if chain.DialogAbstract != "" {
 		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
 			Role:    "system",
-			Content: "【前情提要/历史上下文总结】：\n" + chain.DialogAbstract,
+			Content: "[Previous Context / Context Summary]:\n" + chain.DialogAbstract,
 		})
 	}
 
 	return newNode
 }
 
-// BackToLastForkedNode 查找并返回离当前节点最近的上一个分叉节点指针
+// BackToLastForkedNode finds and returns a pointer to the nearest preceding fork node from the current node
 func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 	if root == nil || currentNode == nil || root == currentNode {
 		return nil
@@ -256,7 +256,7 @@ func (root *chatChain) BackToLastForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
-// BackToMainForkedNode 忽略侧线内部的所有微型分叉，直接回退到主线上最近的那个分叉点
+// BackToMainForkedNode ignores all micro-forks within side branches and traces directly back to the nearest fork point on the main branch
 func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 	if root == nil || currentNode == nil || root == currentNode {
 		return nil
@@ -284,7 +284,7 @@ func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 		return nil
 	}
 
-	// 从父节点开始倒序查找，必须同时满足：是 YellowNode（主线）且拥有分叉特征
+	// Search in reverse from parent nodes; must satisfy both: is YellowNode (main branch) and possesses fork characteristics
 	for i := len(path) - 2; i >= 0; i-- {
 		n := path[i]
 		if n.BranchColor == YellowNode && (n.IsForkedNode || n.DialogSide != nil) {
@@ -295,62 +295,62 @@ func (root *chatChain) BackToMainForkedNode(currentNode *chatChain) *chatChain {
 	return nil
 }
 
-// Merge 执行合并逻辑：找到分叉点 -> 找到主线末尾 -> 嫁接摘要节点
+// Merge executes merge logic: find fork point -> locate main branch tail -> graft summary node
 func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
 	if root == nil || currentNode == nil {
-		return nil, fmt.Errorf("节点不能为空")
+		return nil, fmt.Errorf("node cannot be nil")
 	}
 
-	// 1. 获取侧线摘要 (前提是已经在前端触发了 generate-abstract)
+	// Retrieve side branch summary (requires generate-abstract to be triggered beforehand)
 	summary := currentNode.DialogAbstract
 	if summary == "" {
-		return nil, fmt.Errorf("侧线尚未生成摘要，请先生成摘要再合并")
+		return nil, fmt.Errorf("side branch summary has not been generated yet, please generate summary before merging")
 	}
 
-	// 2. 回溯寻找该侧线是从哪个主线分叉点出来的
+	// Trace back to identify which main branch fork point this side branch originated from
 	forkNode := root.BackToMainForkedNode(currentNode)
 	if forkNode == nil {
-		return nil, fmt.Errorf("无法定位该侧线的分叉源头")
+		return nil, fmt.Errorf("failed to locate fork origin of this side branch")
 	}
 
-	// 3. 寻找当前主线（正史）的最深末尾
-	// 我们要保证合并成果是接在主线最下方的
+	// Locate the deepest tail of the current main canonical branch
+	// Ensure the merged result is grafted onto the bottom of the main branch
 	mainTail := root
 	for mainTail.DialogMain != nil {
 		mainTail = mainTail.DialogMain
 	}
 
-	// 4. 创建全新的合并节点
-	// 这个节点将承载侧线的成果，并作为主线的延伸
+	// Create brand new merge node
+	// This node encapsulates the achievements of the side branch and extends the main branch
 	mergedNode := NewChatChain()
-	mergedNode.BranchColor = YellowNode // 回归主线
-	mergedNode.IsForkedNode = false     // 它是汇聚点
-	mergedNode.DialogAbstract = summary // 把侧线的总结拿到dialogmain里
+	mergedNode.BranchColor = YellowNode // Return to main branch
+	mergedNode.IsForkedNode = false     // Convergence node
+	mergedNode.DialogAbstract = summary // Transfer side branch summary to main dialog
 
-	// 5. 组装合并消息
+	// Assemble merge message
 	mergeMsg := Message{
 		Role:    "assistant",
-		Content: "【背景】刚才我们深入探讨了以下内容,以此为基础继续对话:\n\n" + summary,
+		Content: "[Context] We previously explored the following topic in depth; continuing conversation on this basis:\n\n" + summary,
 	}
 	mergedNode.DialogContent.ChatHistory = append(mergedNode.DialogContent.ChatHistory, mergeMsg)
 
-	// 6. 物理执行合并（原子操作）
-	// a. 将主线末尾指向新节点
+	// Execute merge physically (atomic operation)
+	// a. Point main branch tail to the new node
 	mainTail.DialogMain = mergedNode
 
 	if forkNode.DialogSide != nil {
 		forkNode.HistoryArchives = append(forkNode.HistoryArchives, forkNode.DialogSide)
 	}
 
-	// b. 收割侧线：断开分叉点与侧线的连接
-	// 这样整棵侧线在逻辑上就“消失”了，只有摘要留在了主线里
+	// b. Prune side branch: disconnect side branch from fork point
+	// The side branch is logically detached, leaving only the summary within the main branch
 	forkNode.DialogSide = nil
 
-	// 返回这个新产生的主线节点，以便 main.go 更新 currentChain
+	// Return newly created main branch node to allow main.go to update currentChain
 	return mergedNode, nil
 }
 
-// EditAbstract 手动覆盖修改摘要
+// EditAbstract manually overwrites and modifies summary
 func (chain *chatChain) EditAbstract(newAbstract string) {
 	if chain == nil {
 		return
@@ -358,7 +358,7 @@ func (chain *chatChain) EditAbstract(newAbstract string) {
 	chain.DialogAbstract = newAbstract
 }
 
-// SaveChainToFile 序列化保存到 JSON 文件
+// SaveChainToFile serializes and persists chain to JSON file
 func (chain *chatChain) SaveChainToFile(filePath string) error {
 	if chain == nil {
 		return nil
@@ -366,14 +366,14 @@ func (chain *chatChain) SaveChainToFile(filePath string) error {
 
 	data, err := json.MarshalIndent(chain, "", "  ")
 	if err != nil {
-		fmt.Println("❌ 序列化 chatChain 失败:", err)
+		fmt.Println("❌ Failed to serialize chatChain:", err)
 		return err
 	}
 
 	return os.WriteFile(filePath, data, 0644)
 }
 
-// LoadChainFromFile 从 JSON 文件还原
+// LoadChainFromFile restores chain from JSON file
 func LoadChainFromFile(filePath string) (*chatChain, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -382,7 +382,7 @@ func LoadChainFromFile(filePath string) (*chatChain, error) {
 
 	var root chatChain
 	if err := json.Unmarshal(data, &root); err != nil {
-		fmt.Println("❌ 反序列化 chatChain 失败:", err)
+		fmt.Println("❌ Failed to deserialize chatChain:", err)
 		return nil, err
 	}
 

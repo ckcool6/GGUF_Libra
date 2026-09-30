@@ -31,7 +31,7 @@ type Record struct {
 	Matrix  TreeMatrix `msgpack:"matrix"`
 }
 
-// PathStep 表示思考链路上的单步推理
+// PathStep represents a single step in the reasoning chain
 type PathStep struct {
 	ParentID   int    `json:"parent_id"`
 	ChildID    int    `json:"child_id"`
@@ -39,23 +39,23 @@ type PathStep struct {
 	ChildText  string `json:"child_text"`
 }
 
-// QueryResult 查询到的最终结果
+// QueryResult represents the final query result
 type QueryResult struct {
-	Record   Record     `json:"record"`    // 命中的那棵树基本信息
-	RootID   int        `json:"root_id"`   // 根节点 ID
-	LeafID   int        `json:"leaf_id"`   // 命中叶子节点 ID
-	NodePath []int      `json:"node_path"` // 节点 ID 路径：例如 [1, 3, 5]
-	EdgePath []PathStep `json:"edge_path"` // 正序排列的完整推理链条
+	Record   Record     `json:"record"`    // Matched tree metadata
+	RootID   int        `json:"root_id"`   // Root node ID
+	LeafID   int        `json:"leaf_id"`   // Matched leaf node ID
+	NodePath []int      `json:"node_path"` // Node ID path: e.g., [1, 3, 5]
+	EdgePath []PathStep `json:"edge_path"` // Full forward-ordered reasoning chain
 }
 
-// 查询引擎（带内存缓存，避免每次查都重新读磁盘）
+// Engine is an in-memory cached query engine to avoid redundant disk reads
 type Engine struct {
 	mu      sync.RWMutex
-	Records []Record         // 👈 改为大写 Records（公开给外部访问）
-	UUIDMap map[int64]Record // 👈 改为大写 UUIDMap（公开给外部访问）
+	Records []Record         // Exported Records for external access
+	UUIDMap map[int64]Record // Exported UUIDMap for external access
 }
 
-// NewEngine 初始化并从 bin 文件加载数据
+// NewEngine initializes and loads data from a binary file
 func NewEngine(binPath string) (*Engine, error) {
 	file, err := os.Open(binPath)
 	if err != nil {
@@ -81,26 +81,26 @@ func NewEngine(binPath string) (*Engine, error) {
 	}
 
 	return &Engine{
-		Records: records, // 👈 对应大写的 Records
-		UUIDMap: uuidMap, // 👈 对应大写的 UUIDMap
+		Records: records,
+		UUIDMap: uuidMap,
 	}, nil
 }
 
-// Query 在前 topK 棵逻辑树中，通过 keyword 检索并反向回溯完整的思考链路
+// Query searches within the topK logical trees by keyword and backtracks the full reasoning path
 func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// 1. 边界保护：限制 topK 范围
+	// Boundary check: constrain topK range
 	limit := topK
 	if limit <= 0 || limit > len(e.Records) {
 		limit = len(e.Records)
 	}
 
-	// 2. 遍历前 topK 棵树进行 Keyword 匹配
+	// Iterate through topK trees to match keyword
 	var matchedRecord *Record
 	for i := 0; i < limit; i++ {
-		// 优先响应外部 ctx 超时或取消
+		// Prioritize responding to context cancellation or timeout
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -108,8 +108,8 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		}
 
 		rec := &e.Records[i]
-		// 👇👇👇 替换为这一段智能清洗与双向匹配 👇👇👇
-		// 1. 过滤掉前后的空格、中英文引号
+		// Sanitize input and perform bidirectional substring matching
+		// Strip leading and trailing whitespaces and quote marks
 		cleanInput := strings.Trim(strings.ToLower(keyword), " \t\r\n\"'“”‘’")
 		cleanRecKey := strings.Trim(strings.ToLower(rec.Keyword), " \t\r\n\"'“”‘’")
 
@@ -117,38 +117,37 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 			continue
 		}
 
-		// 2. 双向包含：只要用户提问包含了关键词，或者关键词包含用户提问
+		// Bidirectional match: query contains keyword or keyword contains query
 		if strings.Contains(cleanInput, cleanRecKey) || strings.Contains(cleanRecKey, cleanInput) {
 			matchedRecord = rec
 			break
 		}
-		// 👆👆👆 替换结束 👆👆👆
 	}
 
 	if matchedRecord == nil {
-		return nil, errors.New("在前 topK 棵树中未找到匹配关键词的对话记录")
+		return nil, errors.New("no matching conversation record found within the topK trees")
 	}
 
 	entries := matchedRecord.Matrix.Entries
 	if len(entries) == 0 {
-		return nil, errors.New("该记录中没有连线拓扑信息")
+		return nil, errors.New("record contains no edge topology information")
 	}
 
-	// 3. 构建 end_id -> Entry 的反向映射表（为了 O(1) 逆向寻根）
+	// Build reverse map of end_id -> Entry for O(1) backtracking towards the root
 	parentLookup := make(map[int]Entry, len(entries))
 	for _, entry := range entries {
 		parentLookup[entry.EndID] = entry
 	}
 
-	// 4. 定位目标起点：按你的逻辑，keyword 是最后一条边的 end_id
+	// Locate target starting point: target keyword corresponds to the end_id of the last edge
 	targetLeafID := entries[len(entries)-1].EndID
 
-	// 5. 逆向回溯寻根（不断往左找 parent，直到找不到了为止）
+	// Backtrack to find the root node (traverse upwards along parent pointers)
 	var reversedSteps []PathStep
 	currID := targetLeafID
 
 	for {
-		// 每次回溯也做一次 ctx 响应
+		// Check context status during each backtracking step
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -157,11 +156,11 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 
 		edge, hasParent := parentLookup[currID]
 		if !hasParent {
-			// 当前节点不在任何边集的 end_id 里，说明它就是最顶层的根节点（Root）！
+			// If node is not an end_id in any edge, it is the root node
 			break
 		}
 
-		// 提取该步的对话内容
+		// Extract conversation text for this step
 		pText, cText := "", ""
 		if len(edge.RawData) > 0 {
 			pText = edge.RawData[0]
@@ -177,13 +176,13 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 			ChildText:  cText,
 		})
 
-		// 往左跳一步
+		// Move one step up to parent
 		currID = edge.StartID
 	}
 
-	rootID := currID // 最终定格在 root
+	rootID := currID // Backtracking terminated at root
 
-	// 6. 将逆序链路反转成正向演变链：[Root -> ... -> Leaf]
+	// Reverse the path to get forward progression: [Root -> ... -> Leaf]
 	stepCount := len(reversedSteps)
 	orderedSteps := make([]PathStep, stepCount)
 	nodePath := make([]int, 0, stepCount+1)

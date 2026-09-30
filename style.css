@@ -73,7 +73,7 @@ footer {
     padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 
-/* 透明边框气泡 */
+/* Transparent bordered message bubbles */
 #chat-box .ai-bubble,
 #chat-box .user-bubble {
     background-color: transparent;
@@ -127,32 +127,32 @@ header button:hover {
     transform: scale(1.05);
 }
 
-/* 每一条消息的容器 */
+/* Message row container */
 .message-row {
     content-visibility: auto;
-    /* 赋予一个预估高度，防止消息没渲染时滚动条乱跳 */
-    /* 100px 是消息的平均高度 */
+    /* Provide estimated height to prevent scrollbar jumping before rendering */
+    /* 100px represents average message height */
     contain-intrinsic-size: auto 100px;
 }
 
-/* 限制输入框最大高度，超过则内部滚动 */
+/* Limit max input height; enable internal scrolling beyond this limit */
 #user-input {
     max-height: 200px;
     overflow-y: hidden;
     overflow-x: hidden;
     overflow-wrap: anywhere;
-    /* 默认隐藏滚动条，由 JS 控制显示 */
+    /* Scrollbar hidden by default; visibility controlled via JS */
     scrollbar-width: thin;
 }
 
-/* 确保发送按钮在输入框变高时不会变形 */
+/* Prevent send button deformation when input area expands */
 #send-btn {
     flex-shrink: 0;
     margin-bottom: 2px;
-    /* 微调对齐 */
+    /* Fine-tune alignment */
 }
 
-/* 确保文档与图片上传图标完美对齐并防止缩放 */
+/* Ensure document and image upload icons align properly and prevent scaling */
 label[for="image-input"],
 label[for="doc-input"] {
     flex-shrink: 0;
@@ -167,23 +167,23 @@ label[for="doc-input"] {
     margin: 24px 0;
 }
 
-/* ==================================== Markdown 表格样式 ==================================== */
+/* ==================================== Markdown Table Styles ==================================== */
 
-/* 基础表格容器设置 */
+/* Base table container styles */
 .markdown-body table {
     width: 100%;
     margin: 1rem 0;
     border-collapse: collapse;
     border-spacing: 0;
     display: block;
-    /* 在移动端允许横向滚动 */
+    /* Allow horizontal scrolling on mobile viewports */
     overflow-x: auto;
     border: 1.5px solid var(--border-color);
-    /* 使用你定义的变量 */
+    /* Use defined theme variable */
     border-radius: 0.75rem;
 }
 
-/* 单元格边框与内边距 */
+/* Cell borders and padding */
 .markdown-body th,
 .markdown-body td {
     padding: 10px 16px;
@@ -191,23 +191,23 @@ label[for="doc-input"] {
     text-align: left;
 }
 
-/* 表头背景加深 */
+/* Darkened header background */
 .markdown-body th {
     background-color: rgba(0, 0, 0, 0.03);
     font-weight: 600;
 }
 
-/* 暗色模式微调 (当 .dark-mode-active 激活时) */
+/* Dark mode adjustments (when .dark-mode-active is active) */
 .dark-mode-active .markdown-body th {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* 修正表格内段落的外边距，防止撑开单元格 */
+/* Normalize paragraph margin inside table cells to prevent expansion */
 .markdown-body td p {
     margin: 0 !important;
 }
 
-/* 隔行变色（可选，让表格更易读） */
+/* Alternating row colors for readability */
 .markdown-body tr:nth-child(even) {
     background-color: rgba(0, 0, 0, 0.01);
 }
@@ -216,7 +216,7 @@ label[for="doc-input"] {
     background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* 当 html 有 .dark 或者 .dark-mode-active 时，代码块强制变黑 */
+/* Force dark theme for code blocks when .dark or .dark-mode-active is present */
 .dark pre,
 .dark pre code,
 .dark .hljs,
@@ -224,13 +224,13 @@ label[for="doc-input"] {
 .dark-mode-active pre code,
 .dark-mode-active .hljs {
     background-color: #1e1f22 !important;
-    /* 纯正的高级代码暗黑底色 */
+    /* Premium dark background for code blocks */
     color: #abb2bf !important;
-    /* 文字变成柔和的浅白 */
+    /* Soft off-white text color */
     border-color: #333 !important;
 }
 
-/* ==================================== 搜索跳转高亮动画 ==================================== */
+/* ==================================== Search Target Flash Animation ==================================== */
 .target-flash {
     animation: flash-bubble 1.5s ease-out;
 }
@@ -238,7 +238,7 @@ label[for="doc-input"] {
 @keyframes flash-bubble {
     0% {
         background-color: rgba(250, 204, 21, 0.4);
-        /* 黄色半透明 */
+        /* Semi-transparent yellow */
     }
 
     100% {
@@ -260,7 +260,7 @@ label[for="doc-input"] {
     }
 }
 
-/* 搜索结果列表滚动条美化 */
+/* Search results scrollbar styling */
 #page-search-list::-webkit-scrollbar {
     width: 4px;
 }

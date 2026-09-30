@@ -18,37 +18,37 @@ var (
 func config_init() {
 	var err error
 
-	// 尝试从本地加载已保存的树状历史
+	// Attempt to load saved tree-structured dialogue history from local file
 	rootChain, err = LoadChainFromFile("chain_history.json")
 	if err != nil || rootChain == nil {
-		fmt.Println("未找到历史链文件，初始化新链...")
+		fmt.Println("No history chain file found, initializing a new chain...")
 		rootChain = NewChatChain()
 	} else {
-		fmt.Println("成功加载历史链结构")
+		fmt.Println("Successfully loaded history chain structure")
 	}
 
-	// 默认将 currentChain 指向主线最深处的末尾节点
+	// Default currentChain to the deepest leaf node of the main branch
 	currentChain = rootChain
 	for currentChain.DialogMain != nil {
 		currentChain = currentChain.DialogMain
 	}
 
-	stopLoading := StartLoading("正在初始化 Token 编码器（如果是首次运行，可能需要下载词表文件，请稍候）...")
+	stopLoading := StartLoading("Initializing token encoder (first run may require downloading vocabulary files, please wait)...")
 
 	tkm, err = tiktoken.GetEncoding("cl100k_base")
 
 	close(stopLoading)
 
 	if err != nil {
-		panic(fmt.Sprintf("初始化 Token 编码器失败: %v", err))
+		panic(fmt.Sprintf("Failed to initialize token encoder: %v", err))
 	}
 
 	err = loadSystemPrompt("system_prompt.json")
 	if err != nil {
-		panic(fmt.Sprintf("加载 System Prompt 失败: %v", err))
+		panic(fmt.Sprintf("Failed to load system prompt: %v", err))
 	}
 	fmt.Println()
-	fmt.Printf("【系统】成功加载提示词配置文件\n")
+	fmt.Printf("[SYSTEM] Prompt configuration file loaded successfully\n")
 }
 
 func loadSystemPrompt(filePath string) error {
@@ -80,15 +80,15 @@ func setActivePrompt(id string) bool {
 }
 
 func getMessageTokens(msg Message) int {
-	// 基础 Token (Role + Content)
+	// Base tokens (Role + Content)
 	tokens := 4
 	tokens += len(tkm.Encode(msg.Role, nil, nil))
 	tokens += len(tkm.Encode(msg.Content, nil, nil))
 
-	//  图片 Token
+	// Image tokens
 	if msg.Image != "" {
-		// 图片经过 mmproj 处理后会占用固定的视觉 Token 槽位。
-		// 1024 是一个比较通用的保守估算值。
+		// Images processed via mmproj occupy fixed visual token slots.
+		// 1024 is a conservative and standard estimation.
 		tokens += 1024
 	}
 	return tokens
@@ -96,18 +96,18 @@ func getMessageTokens(msg Message) int {
 
 func filterMessagesByToken(history []Message, maxTokens int) []Message {
 	var result []Message
-	var systemBackdrops []Message // 专门存放归档背景
+	var systemBackdrops []Message // Stores archived background summaries
 	totalTokens := 0
 
-	// 1. 计算全局系统提示词 (人设)
+	// Calculate tokens for the global system prompt (persona)
 	if systemPrompt.Content != "" {
 		totalTokens += getMessageTokens(systemPrompt)
 	}
 
-	// 2. 预处理：先从历史中找出所有的“归档背景” (system 角色且包含关键字)
-	// 这些是灵魂，必须优先保送
+	// Preprocess: extract all archived background summaries from history (system role matching keywords)
+	// These are critical context and must be retained with highest priority
 	for _, msg := range history {
-		if msg.Role == "system" && (strings.Contains(msg.Content, "前情提要") || strings.Contains(msg.Content, "上下文")) {
+		if msg.Role == "system" && (strings.Contains(msg.Content, "Previous Context") || strings.Contains(msg.Content, "Context Summary")) {
 			tokens := getMessageTokens(msg)
 			if totalTokens+tokens <= maxTokens {
 				totalTokens += tokens
@@ -116,11 +116,11 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 		}
 	}
 
-	// 3. 倒序处理常规对话 (user / assistant)
+	// Process regular chat turns (user / assistant) in reverse chronological order
 	for i := len(history) - 1; i >= 0; i-- {
 		msg := history[i]
 
-		// 如果是系统消息，我们已经在上面处理过了，这里跳过
+		// Skip system messages as they have already been processed above
 		if msg.Role == "system" {
 			continue
 		}
@@ -128,19 +128,19 @@ func filterMessagesByToken(history []Message, maxTokens int) []Message {
 		msgTokens := getMessageTokens(msg)
 
 		if totalTokens+msgTokens > maxTokens {
-			break // 达到 Token 上限，停止拉取更旧的消息
+			break // Stop including older messages once token limit is reached
 		}
 
 		totalTokens += msgTokens
 		result = append(result, msg)
 	}
 
-	// 4. 反转对话顺序（因为上面是倒序拉取的）
+	// Restore original chronological order (reversed from the loop above)
 	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
 		result[i], result[j] = result[j], result[i]
 	}
 
-	// 5. 最终组装：[全局人设] + [历史背景摘要] + [近期对话记录]
+	// Final assembly: [Global persona] + [Archived background summaries] + [Recent dialogue turns]
 	finalMessages := []Message{}
 	if systemPrompt.Content != "" {
 		finalMessages = append(finalMessages, systemPrompt)

@@ -6,28 +6,28 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/atom-one-light.min.css";
 
-// ==================================== 工具函数 =============================================
-// 用户纯文本转义与换行处理
+// ==================================== UTILITY FUNCTIONS =====================================
+// Escape user plain text and handle line breaks
 function formatUserText(str) {
-    // 创建一个临时的 div，利用浏览器的 innerText/textContent 特性进行转义
+    // Create a temporary div to escape text using the browser's textContent property
     const temp = document.createElement("div");
     temp.textContent = str;
-    const escapedStr = temp.innerHTML; // 这会将 < 变成 &lt; 等
+    const escapedStr = temp.innerHTML; // Converts < to &lt;, etc.
 
-    // 然后再把换行符替换为 <br>
+    // Replace newlines with <br> tags
     return escapedStr.replace(/\n/g, "<br>");
 }
 
-// AI Markdown 渲染与 XSS 边界防护
+// AI Markdown rendering with XSS sanitization
 function safeMarkdownParse(content) {
     const rawHtml = marked.parse(content);
     return DOMPurify.sanitize(rawHtml, {
-        ADD_TAGS: ["use", "path", "svg"], // 容许 KaTeX / Math 相关的 SVG 标签
+        ADD_TAGS: ["use", "path", "svg"], // Allow KaTeX / Math SVG tags
         ADD_ATTR: ["target", "allow"],
     });
 }
 
-// 智能滚动：只有当用户处于底部附近时才自动滚动
+// Smart scroll: Auto-scroll only when user is near the bottom
 function scrollToBottomIfNear() {
     const isAtBottom =
         chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 120;
@@ -36,7 +36,7 @@ function scrollToBottomIfNear() {
     }
 }
 
-// 初始化提示词下拉框
+// Initialize prompt selector dropdown
 async function initPromptSelect() {
     const select = document.getElementById("prompt-select");
     if (!select) return;
@@ -44,7 +44,7 @@ async function initPromptSelect() {
     try {
         const res = await fetch("/api/prompts", { headers: getHeaders() });
 
-        if (!res.ok) throw new Error(`HTTP 状态异常: ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP status error: ${res.status}`);
 
         const data = await res.json();
 
@@ -57,74 +57,74 @@ async function initPromptSelect() {
                 if (p.id === data.active) opt.selected = true;
                 select.appendChild(opt);
             });
-            select.disabled = false; // 正常启用下拉框
+            select.disabled = false; // Enable select dropdown
         } else {
-            showPromptError(select, "无可用提示词");
+            showPromptError(select, "No prompts available");
         }
 
-        // 监听切换事件（使用 addEventListener 确保只绑定一次，或者直接覆盖 onchange）
+        // Listen for prompt change
         select.onchange = async (e) => {
             const newId = e.target.value;
 
-            // 1. 如果当前正在生成回复，强行中断请求
+            // If currently generating a response, abort the request
             if (chatAbortController) {
                 chatAbortController.abort();
                 chatAbortController = null;
             }
 
-            // 2. 还原按钮与加载状态
+            // Reset button and loading states
             loading.classList.add("hidden");
             sendBtn.classList.remove("is-loading");
-            sendBtn.innerHTML = "发送";
+            sendBtn.innerHTML = "Send";
 
             try {
-                // 3. 通知后端切换提示词
+                // Notify backend to switch prompt
                 const switchRes = await fetch("/api/switch-prompt", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ id: newId }),
                 });
 
-                if (!switchRes.ok) throw new Error("切换提示词失败");
+                if (!switchRes.ok) throw new Error("Failed to switch prompt");
 
-                // 4. 读取本地 custom_url，带上参数去调用清空后端对话历史
+                // Retrieve local custom_url and clear backend chat history
                 const customUrl = localStorage.getItem("custom_api_url") || "";
                 await fetch(
                     `/api/new-chat?custom_url=${encodeURIComponent(customUrl)}`,
                 );
 
-                // 5. 重置前端 UI
+                // Reset frontend UI
                 chatBox.innerHTML = `
                     <div class="flex justify-start mb-8">
                         <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
-                            你好！
+                            Hello!
                         </div>
                     </div>`;
 
-                // 6. 重新刷新 Context 内存计算
+                // Refresh context memory calculation
                 get_ctx_usage();
             } catch (err) {
-                console.error("切换提示词或清空对话失败:", err);
+                console.error("Failed to switch prompt or clear chat:", err);
             }
         };
     } catch (e) {
-        console.error("加载提示词列表失败:", e);
-        showPromptError(select, "未连接服务");
+        console.error("Failed to load prompt list:", e);
+        showPromptError(select, "Service disconnected");
     }
 }
 
-// 未连接或无数据时的显示提示词辅助函数
+// Helper function to display error/empty state in prompt select
 function showPromptError(select, message) {
     select.innerHTML = `<option value="" disabled selected>⚠️ ${message}</option>`;
     select.disabled = true;
 }
 
-// 获取统一的请求头
+// Get unified request headers
 function getHeaders() {
     const key = localStorage.getItem("custom_api_key") || "";
     return {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`, // 很多后端（包括 OpenAI 格式）都检查这个
+        Authorization: `Bearer ${key}`, // Standard authorization header checked by backends
     };
 }
 
@@ -133,7 +133,7 @@ function updateBranchIndicator(text) {
     if (indicator) {
         indicator.innerText = `current：${text}`;
 
-        // 剥离所有可能存在的文字颜色
+        // Strip any existing color classes
         indicator.classList.remove(
             "text-gray-600", "dark:text-gray-300",
             "text-emerald-600", "dark:text-emerald-400",
@@ -141,17 +141,17 @@ function updateBranchIndicator(text) {
         );
 
         if (text === "side") {
-            // 支线：文字变绿
+            // Side branch: text turns green
             indicator.classList.add("text-emerald-600", "dark:text-emerald-400");
         } else {
-            // 主线：文字变黄
+            // Main branch: text turns amber
             indicator.classList.add("text-amber-600", "dark:text-amber-400");
         }
     }
 }
 
-// ==================================== init & extensions load =============================
-// 自定义 marked 扩展，用来精确拦截 $$ 和 $
+// ==================================== INIT & EXTENSIONS LOAD =============================
+// Custom marked extension to accurately intercept $$ and $
 const latexExtension = {
     name: "inlineLatex",
     level: "inline",
@@ -159,7 +159,7 @@ const latexExtension = {
         return src.indexOf("$");
     },
     tokenizer(src) {
-        // 优先匹配块级公式 $$...$$
+        // Match block LaTeX $$...$$ first
         const blockMatch = /^\$\$\s*([\s\S]*?)\s*\$\$/.exec(src);
         if (blockMatch) {
             return {
@@ -169,7 +169,7 @@ const latexExtension = {
                 displayMode: true,
             };
         }
-        // 匹配行内公式 $...$
+        // Match inline LaTeX $...$
         const inlineMatch = /^\$([^\$\n]+?)\$/.exec(src);
         if (inlineMatch) {
             return {
@@ -282,19 +282,19 @@ async function loadHistory() {
                             </div>
                         </div>`;
 
-                    // --- 核心修改：检查是否有档案 ---
+                    // Check if archived branches exist
                     if (m.archives && m.archives.length > 0) {
-                        // 创建一个精致的档案入口按钮
+                        // Create archive entry button
                         const archiveEntry = document.createElement("div");
                         archiveEntry.className = "mt-2 px-2";
                         archiveEntry.innerHTML = `
                             <button class="flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-400/5 px-2 py-1 rounded-lg border border-emerald-200/50 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-400/10 transition-all">
                                 <span>📂</span> 
-                                <span>查看此节点下的 ${m.archives.length} 条已合并支线</span>
+                                <span>View ${m.archives.length} merged branch(es) under this node</span>
                             </button>
                         `;
 
-                        // 绑定点击事件，打开弹窗
+                        // Bind click event to open modal
                         archiveEntry.querySelector("button").onclick = () =>
                             showArchiveModal(m.archives);
 
@@ -310,12 +310,12 @@ async function loadHistory() {
                         summaryBox.innerHTML = `
                             <div class="flex items-center justify-between mb-1.5">
                                 <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
-                                    <span>⚡</span> 对话摘要
+                                    <span>⚡</span> Conversation Summary
                                 </div>
                             </div>
                             <div class="summary-content markdown-body text-xs opacity-90">${m.abstract}</div>
                         `;
-                        // 把摘要框插在 AI 气泡下面，控制条上面
+                        // Insert summary box below AI bubble and above notebook bar
                         wrapper
                             .querySelector(".flex-col")
                             .appendChild(summaryBox);
@@ -329,7 +329,7 @@ async function loadHistory() {
                 const notebookBar = createNotebookBar();
                 lastAiWrapperCol.appendChild(notebookBar);
             }
-            // 高亮与排版处理
+            // Code highlighting and emoji parsing
             chatBox
                 .querySelectorAll(".ai-bubble pre code")
                 .forEach((el) => hljs.highlightElement(el));
@@ -338,13 +338,13 @@ async function loadHistory() {
                 .forEach((el) => {
                     twemoji.parse(el, { folder: "svg", ext: ".svg" });
                 });
-            //chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch (e) {
-        console.error("加载历史记录失败:", e);
+        console.error("Failed to load chat history:", e);
     }
 }
-// ==================================== send messages ==============================================
+
+// ==================================== SEND MESSAGES ==============================================
 let chatAbortController = null;
 
 const chatBox = document.getElementById("chat-box");
@@ -354,19 +354,19 @@ const sendBtn = document.getElementById("send-btn");
 
 if (input) {
     input.addEventListener("input", () => {
-        // 先重置高度，让 scrollHeight 重新计算
+        // Reset height to recalculate scrollHeight
         input.style.height = "auto";
 
-        // 设定最大高度（需与 CSS 一致）
+        // Set maximum height (keep consistent with CSS)
         const maxHeight = 200;
         const currentScrollHeight = input.scrollHeight;
 
         if (currentScrollHeight > maxHeight) {
-            // 达到上限，固定高度并显示滚动条
+            // Reached upper limit, lock height and enable scrolling
             input.style.height = maxHeight + "px";
             input.style.overflowY = "auto";
         } else {
-            // 未达上限，自适应高度并隐藏滚动条
+            // Below upper limit, adjust height dynamically and hide scrollbar
             input.style.height = currentScrollHeight + "px";
             input.style.overflowY = "hidden";
         }
@@ -382,29 +382,29 @@ async function send() {
     }
 
     const text = input.value.trim();
-    // 修改：如果没有文字 且 没有图片，则不发送
+    // Do not send if both text and image are empty
     if (!text && !currentImageBase64) return;
 
     sendBtn.classList.add("is-loading");
-    // 修改按钮 UI 为停止图标
+    // Change button UI to stop icon
     sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
 
-    // 暂存图片并清空输入
+    // Stash image and reset input
     const imageToSend = currentImageBase64;
     input.value = "";
     input.style.height = "auto";
-    clearImage(); // 调用你之前写的清理图片预览的函数
+    clearImage(); // Clear image preview
 
-    // --- 构建用户 UI 气泡 ---
+    // Build user UI bubble
     const safeUserText = formatUserText(text);
     let userBubbleHtml = `<div class="message-row flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">`;
 
-    // 如果有图片，先插入图片节点
+    // Insert image node if present
     if (imageToSend) {
         userBubbleHtml += `<img src="${imageToSend}" class="max-w-full rounded-lg mb-2 shadow-sm border border-black/5 dark:border-white/5">`;
     }
 
-    // 插入文字（如果有）
+    // Insert text content if present
     if (safeUserText) {
         userBubbleHtml += `<div>${safeUserText}</div>`;
     }
@@ -414,16 +414,16 @@ async function send() {
     chatBox.insertAdjacentHTML("beforeend", userBubbleHtml);
     loading.classList.remove("hidden");
 
-    // 滚动
+    // Scroll handling
     const lastMessageImg = chatBox.querySelector(".message-row:last-child img");
 
     if (lastMessageImg) {
-        // 如果有图片，等图片加载完再滚
+        // Wait for image to load before scrolling
         lastMessageImg.onload = () => {
             chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
         };
     } else {
-        // 没图片（纯文字），直接滚
+        // Plain text: scroll immediately
         chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
     }
 
@@ -436,11 +436,10 @@ async function send() {
             signal: chatAbortController.signal,
             body: JSON.stringify({
                 message: text || "\u200B",
-                // 修改：如果存在图片，去掉 "data:image/jpeg;base64," 的前缀只发内容
+                // Strip "data:image/jpeg;base64," prefix and send base64 data only
                 image: imageToSend ? imageToSend.split(",")[1] : null,
                 custom_url: localStorage.getItem("custom_api_url") || "",
                 custom_embedding_url: localStorage.getItem("custom_embedding_url") || "",
-
             }),
         });
 
@@ -456,18 +455,18 @@ async function send() {
         await handleStreamResponse(response);
     } catch (err) {
         if (err.name === "AbortError") {
-            console.log("用户中止了 AI 的回复");
+            console.log("User aborted the AI response");
         } else {
             loading.classList.add("hidden");
-            let displayTitle = "⚠️ 遇到系统错误";
+            let displayTitle = "⚠️ System Error Encountered";
             let displayMsg = formatUserText(
-                err.message || "连接错误，请检查后端。",
+                err.message || "Connection error. Please check backend server.",
             );
 
             if (err.message === "401_UNAUTHORIZED") {
-                displayTitle = "🔑 鉴权失败";
+                displayTitle = "🔑 Authentication Failed";
                 displayMsg =
-                    "后端需要有效的 API Key 才能继续，请在设置中检查。";
+                    "A valid API Key is required to continue. Please verify it in settings.";
             }
 
             const errorHtml = `
@@ -485,13 +484,13 @@ async function send() {
     } finally {
         loading.classList.add("hidden");
         sendBtn.classList.remove("is-loading");
-        sendBtn.innerHTML = "发送";
+        sendBtn.innerHTML = "Send";
         chatAbortController = null;
         get_ctx_usage();
     }
 }
 
-// 核心处理器对象
+// Core stream chunk handlers
 const streamChunkHandlers = {
     model: (json, ctx) => {
         ctx.modelName = json.model.split("/").pop().split("\\").pop();
@@ -511,10 +510,10 @@ const streamChunkHandlers = {
 
         ctx.fullText += content;
 
-        // 1. 将新收到的字符压入 Buffer 缓冲队列
+        // Push incoming characters into buffer queue
         ctx.charBuffer.push(...content.split(""));
 
-        // 2. 首次收到消息：创建 AI 气泡 DOM
+        // On first chunk received: create AI bubble DOM
         if (ctx.isFirstChunk) {
             loading.classList.add("hidden");
             ctx.currentBubbleId = "ai-" + Date.now();
@@ -525,7 +524,7 @@ const streamChunkHandlers = {
                                 </div>
                                 <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
                                     <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
-                                    <span id="speed-${ctx.currentBubbleId}">⏱️ 正在计算...</span>
+                                    <span id="speed-${ctx.currentBubbleId}">⏱️ Calculating...</span>
                                 </div>
                             </div>
                         </div>`;
@@ -543,8 +542,8 @@ async function handleStreamResponse(response) {
 
     const ctx = {
         fullText: "",
-        displayedText: "", // 已经渲染出来的字符
-        charBuffer: [], // Buffer 字符队列
+        displayedText: "", // Rendered characters
+        charBuffer: [], // Buffer queue
         isFirstChunk: true,
         aiBubbleDiv: null,
         tokenCount: 0,
@@ -555,18 +554,17 @@ async function handleStreamResponse(response) {
         isRenderPending: false,
     };
 
-    // 检查并自动补全 Markdown 中未闭合的代码块 (```)
+    // Check and auto-close unclosed Markdown code blocks (```)
     function fixUnclosedCodeBlocks(markdownText) {
-        // 匹配所有的 ```
         const matches = markdownText.match(/```/g);
-        // 如果匹配到了奇数个 ```，说明当前有一个代码块处于开启且未闭合状态
+        // If an odd count of ``` is matched, an open code block exists
         if (matches && matches.length % 2 !== 0) {
-            return markdownText + "\n```"; // 临时补齐结尾的 ```
+            return markdownText + "\n```"; // Temporarily append closing code block
         }
         return markdownText;
     }
 
-    // 启动 Buffer 平滑渲染定时器（按 16ms 频率消费队列，结合 rAF 渲染）
+    // Start smooth buffer rendering timer (consume queue at ~16ms with rAF)
     const bufferTimer = setInterval(() => {
         if (
             ctx.charBuffer.length > 0 &&
@@ -577,7 +575,7 @@ async function handleStreamResponse(response) {
 
             requestAnimationFrame(() => {
                 if (ctx.aiBubbleDiv) {
-                    // 动态步长：根据堆积量决定消费速度，积压多就一次多吐几个字，避免延迟过大
+                    // Dynamic step: adjust consumption rate based on queue backlog
                     const step =
                         ctx.charBuffer.length > 30
                             ? 4
@@ -587,14 +585,14 @@ async function handleStreamResponse(response) {
                     const chunk = ctx.charBuffer.splice(0, step).join("");
                     ctx.displayedText += chunk;
 
-                    // 在解析前先补齐可能存在的未闭合代码块，让 marked 能正确识别出 <pre><code>
+                    // Close any unclosed code blocks before parsing for marked compatibility
                     const streamMarkdown = fixUnclosedCodeBlocks(
                         ctx.displayedText,
                     );
                     ctx.aiBubbleDiv.innerHTML =
                         safeMarkdownParse(streamMarkdown);
 
-                    // 每一帧解析完成后，立刻为当前气泡内的代码块添加高亮
+                    // Re-highlight code blocks inside the current bubble after each frame
                     ctx.aiBubbleDiv
                         .querySelectorAll("pre code")
                         .forEach((el) => hljs.highlightElement(el));
@@ -609,7 +607,7 @@ async function handleStreamResponse(response) {
                 ctx.isRenderPending = false;
             });
         }
-    }, 16); //
+    }, 16);
 
     try {
         while (true) {
@@ -635,15 +633,15 @@ async function handleStreamResponse(response) {
             }
         }
 
-        // 等待队列里的剩余字符全部消费完毕
+        // Flush remaining characters in buffer queue
         while (ctx.charBuffer.length > 0) {
             await new Promise((r) => setTimeout(r, 16));
         }
     } catch (streamError) {
-        console.error("流式读取过程中发生错误:", streamError);
+        console.error("Error during stream reading:", streamError);
         throw streamError;
     } finally {
-        clearInterval(bufferTimer); // 消费完成，销毁定时器
+        clearInterval(bufferTimer); // Clear timer when consumed
         finalizeAiBubble(ctx);
         scrollToBottomIfNear();
     }
@@ -664,16 +662,16 @@ function updateStreamingSpeed(currentBubbleId, startTime, tokenCount) {
 function finalizeAiBubble(ctx) {
     if (!ctx.aiBubbleDiv) return;
 
-    // 1. 进行最终无死角的安全 Markdown 解析，补齐最后一帧
+    // Final complete safe Markdown parsing for the last frame
     ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
 
-    // 2. 补齐代码高亮与表情包解析
+    // Highlight code blocks and parse emojis
     ctx.aiBubbleDiv
         .querySelectorAll("pre code")
         .forEach((el) => hljs.highlightElement(el));
     twemoji.parse(ctx.aiBubbleDiv, { folder: "svg", ext: ".svg" });
 
-    // 3. 统计展示
+    // Update speed and token usage statistics
     if (ctx.startTime && ctx.currentBubbleId) {
         const elapsed = (Date.now() - ctx.startTime) / 1000;
         const speed = (ctx.tokenCount / (elapsed || 1)).toFixed(1);
@@ -687,9 +685,8 @@ function finalizeAiBubble(ctx) {
 
     document.querySelectorAll(".notebook-bar").forEach((bar) => bar.remove());
 
-    // 4. 追加 Notebook 悬浮控制条
+    // Append Notebook floating control bar at the bottom
     const notebookBar = createNotebookBar();
-    // 插入到消息容器的最下方
     ctx.aiBubbleDiv.parentElement.appendChild(notebookBar);
 }
 
@@ -700,12 +697,12 @@ function createNotebookBar() {
 
     notebookBar.innerHTML = `
         <div class="w-full relative flex items-center justify-center">
-            <!-- 背景横线 -->
+            <!-- Background horizontal line -->
             <div class="absolute inset-0 flex items-center">
                 <div class="w-full border-t border-gray-200 dark:border-gray-800"></div>
             </div>
             
-            <!-- 悬浮按钮组 -->
+            <!-- Floating action button group -->
             <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
                 <button class="switch-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-grey-400 font-bold">s</span> switch to main 
@@ -730,7 +727,7 @@ function createNotebookBar() {
         </div>
     `;
 
-    // 归档事件
+    // Archive event
     const archiveBtn = notebookBar.querySelector(".archive-btn");
 
     archiveBtn.addEventListener("click", async () => {
@@ -742,10 +739,9 @@ function createNotebookBar() {
                 headers: getHeaders(),
             });
 
-            // 如果没摘要，自动先走一遍摘要流程
+            // If no summary exists, prompt to generate summary first
             if (res.status === 412) {
-                // 这里逻辑和 Merge 类似，自动触发 summary
-                alert("归档前请先点击 Summary 生成摘要");
+                alert("Please click Summary to generate a summary before archiving.");
                 archiveBtn.innerHTML = `<span class="text-grey-500 font-bold">📑</span> Archive`;
                 return;
             }
@@ -755,8 +751,7 @@ function createNotebookBar() {
 
                 setTimeout(() => {
                     loadHistory().then(() => {
-                        // 在 loadHistory 彻底跑完后再补一次滚动
-                        // 如果有图片，甚至可以延迟更久一点
+                        // Scroll to bottom after history reload is complete
                         setTimeout(() => {
                             chatBox.scrollTop = chatBox.scrollHeight;
                         }, 30);
@@ -764,14 +759,14 @@ function createNotebookBar() {
                 }, 50);
             } else {
                 const err = await res.json();
-                alert(err.error || "归档失败");
+                alert(err.error || "Archive failed");
             }
         } catch (e) {
             console.error(e);
         }
     });
 
-    // 绑定 Fork Side 事件
+    // Bind Fork Side event
     notebookBar
         .querySelector(".fork-side-btn")
         .addEventListener("click", async () => {
@@ -782,61 +777,61 @@ function createNotebookBar() {
                     const notice = document.createElement("div");
                     notice.className =
                         "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
-                    notice.innerText = "🌿 已切换至侧线分支 (Side Chat)";
+                    notice.innerText = "🌿 Switched to side branch (Side Chat)";
                     chatBox.appendChild(notice);
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
             } catch (e) {
-                console.error("Fork Side 失败:", e);
+                console.error("Fork Side failed:", e);
             }
         });
 
-    // 绑定 Summary 事件
+    // Bind Summary event
     notebookBar
         .querySelector(".summary-btn")
         .addEventListener("click", async () => {
             const btn = notebookBar.querySelector(".summary-btn");
 
-            // 1. 如果已经存在总结框，再次点击可以切换展开/隐藏
+            // If summary box already exists, toggle visibility
             let summaryBox =
                 notebookBar.parentElement?.querySelector(".summary-box");
             if (summaryBox) {
                 const textarea = summaryBox.querySelector("textarea");
                 const hasError = summaryBox.querySelector(".text-rose-500");
 
-                // 判断条件：如果有报错红色字，或者文本框里的内容是默认的“暂无摘要...”
+                // Check condition: error exists or text content is empty/default
                 const isInvalid =
                     hasError ||
                     (textarea &&
-                        (textarea.value === "暂无摘要内容" ||
+                        (textarea.value === "No summary content available." ||
                             textarea.value.trim() === ""));
 
                 if (isInvalid) {
-                    // 如果内容无效，直接删掉旧框，让程序往下走，重新去 fetch
+                    // Remove invalid box and re-fetch
                     summaryBox.remove();
                 } else {
-                    // 如果内容是有效的，才执行正常的切换显示/隐藏
+                    // Toggle visibility if valid
                     summaryBox.classList.toggle("hidden");
                     return;
                 }
             }
 
-            // 2. 创建黄色虚线框容器
+            // Create yellow dashed summary container
             summaryBox = document.createElement("div");
             summaryBox.className =
                 "summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all";
 
-            // --- 结构微调：增加一个放置操作按钮的 header ---
+            // Add action button header
             summaryBox.innerHTML = `
             <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
-                    <span>⚡</span> 对话摘要
+                    <span>⚡</span> Conversation Summary
                 </div>
                 <div id="summary-actions" class="flex items-center gap-2">
-                    <!-- 动态插入保存按钮 -->
+                    <!-- Save button injected here -->
                 </div>
             </div>
-            <div class="summary-content markdown-body text-xs opacity-90">正在生成总结...</div>
+            <div class="summary-content markdown-body text-xs opacity-90">Generating summary...</div>
         `;
 
             if (notebookBar.parentElement) {
@@ -864,22 +859,19 @@ function createNotebookBar() {
                     }),
                 });
 
-                if (!res.ok) throw new Error("生成总结失败");
+                if (!res.ok) throw new Error("Failed to generate summary");
 
-                // 同步直接解析 JSON
                 const data = await res.json();
-
-                // 假设 Go 后端同步返回格式为 {"abstract": "摘要内容"} 或 {"DialogAbstract": "摘要内容"}
                 const textResult = data.abstract || data.DialogAbstract || "";
 
-                // --- 2. 创建文本框 ---
+                // Create textarea
                 const textarea = document.createElement("textarea");
                 textarea.className =
                     "w-full bg-transparent border-none focus:outline-none text-xs text-gray-700 dark:text-gray-200 resize-none leading-relaxed font-sans mt-1 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors";
                 if (!textResult) {
                     textarea.value = "";
                     textarea.placeholder =
-                        "暂无摘要内容，请点击 Summary 重新生成...";
+                        "No summary content available. Click Summary to regenerate...";
                 } else {
                     textarea.value = textResult;
                 }
@@ -889,23 +881,23 @@ function createNotebookBar() {
                     el.style.height = el.scrollHeight + "px";
                 };
 
-                // --- 3. 创建显式的“保存”按钮 ---
+                // Create save button
                 const saveBtn = document.createElement("button");
                 saveBtn.className =
                     "hidden flex items-center gap-1 px-2 py-0.5 bg-emerald-500 text-white rounded-md text-[10px] hover:bg-emerald-600 transition-all shadow-sm animate-fade-in";
-                saveBtn.innerHTML = `<span>✓</span> 确认修改`;
+                saveBtn.innerHTML = `<span>✓</span> Save Changes`;
 
-                // 定义保存逻辑
+                // Define save action logic
                 const performSave = async () => {
-                    saveBtn.innerHTML = `<span>⏳</span> 正在存入...`;
+                    saveBtn.innerHTML = `<span>⏳</span> Saving...`;
                     try {
                         await fetch("/api/edit-abstract", {
                             method: "POST",
                             headers: getHeaders(),
                             body: JSON.stringify({ abstract: textarea.value }),
                         });
-                        // 保存成功后变回勾选状态，然后消失
-                        saveBtn.innerHTML = `<span>✓</span> 已保存`;
+                        // Show saved state, then hide
+                        saveBtn.innerHTML = `<span>✓</span> Saved`;
                         saveBtn.classList.replace(
                             "bg-emerald-500",
                             "bg-blue-500",
@@ -916,16 +908,16 @@ function createNotebookBar() {
                                 "bg-blue-500",
                                 "bg-emerald-500",
                             );
-                            saveBtn.innerHTML = `<span>✓</span> 确认修改`;
+                            saveBtn.innerHTML = `<span>✓</span> Save Changes`;
                         }, 1500);
                     } catch (e) {
-                        saveBtn.innerHTML = `❌ 失败`;
+                        saveBtn.innerHTML = `❌ Failed`;
                     }
                 };
 
                 saveBtn.onclick = performSave;
 
-                // 监听输入：只有当用户动手改了，才显示保存按钮
+                // Listen to textarea input: show save button on modification
                 textarea.addEventListener("input", () => {
                     adjustHeight(textarea);
                     if (saveBtn.classList.contains("hidden")) {
@@ -944,23 +936,22 @@ function createNotebookBar() {
 
                 btn.innerHTML = `<span class="text-amber-500 font-bold">✓</span> Summary`;
             } catch (e) {
-                console.error("Summary 失败:", e);
-                contentDiv.innerHTML = `<span class="text-rose-500">生成总结时出现错误：${e.message}</span>`;
+                console.error("Summary failed:", e);
+                contentDiv.innerHTML = `<span class="text-rose-500">Error generating summary: ${e.message}</span>`;
                 btn.innerHTML = `<span class="text-amber-500 font-bold">⚡</span> Summary`;
             }
         });
 
-    // 绑定 Merge 事件
+    // Bind Merge event
     const mergeBtn = notebookBar.querySelector(".merge-btn");
     mergeBtn.addEventListener("click", async () => {
-        // 执行合并操作
         await handleMergeAction(mergeBtn);
     });
 
-    // switch-side-to-main 事件
+    // switch-side-to-main event
     const switchBtn = notebookBar.querySelector(".switch-btn");
     switchBtn.addEventListener("click", async () => {
-        if (!confirm("确定要丢弃当前侧线吗？")) return;
+        if (!confirm("Are you sure you want to discard the current side branch?")) return;
 
         try {
             switchBtn.innerHTML = `<span class="text-rose-500 animate-spin">⏳</span> switching...`;
@@ -977,7 +968,7 @@ function createNotebookBar() {
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }, 50);
             } else {
-                throw new Error("丢弃失败");
+                throw new Error("Failed to discard branch");
             }
         } catch (e) {
             alert(e.message);
@@ -998,13 +989,13 @@ async function handleMergeAction(btn) {
         const customUrl = localStorage.getItem("custom_api_url") || "";
         const customKey = localStorage.getItem("custom_api_key") || "";
 
-        // 1. 尝试执行合并
+        // Attempt merge
         let res = await fetch("/api/merge", {
             method: "POST",
             headers: getHeaders(),
         });
 
-        // 2. 如果后端返回 412 (Precondition Failed)，说明还没摘要，我们自动触发一次摘要生成
+        // If 412 (Precondition Failed), summary is missing; trigger summary first
         if (res.status === 412) {
             btn.innerHTML = `<span class="text-amber-500 animate-pulse">📝</span> Summarizing first...`;
 
@@ -1018,9 +1009,9 @@ async function handleMergeAction(btn) {
             });
 
             if (!sumRes.ok)
-                throw new Error("自动生成摘要失败，请手动点击 Summary");
+                throw new Error("Automatic summary generation failed. Please click Summary manually.");
 
-            // 摘要生成成功后，再次尝试合并
+            // Retry merge after summary succeeds
             res = await fetch("/api/merge", {
                 method: "POST",
                 headers: getHeaders(),
@@ -1029,30 +1020,30 @@ async function handleMergeAction(btn) {
 
         if (!res.ok) {
             const errData = await res.json();
-            throw new Error(errData.error || "合并失败");
+            throw new Error(errData.error || "Merge failed");
         }
 
-        // 3. 合并成功，刷新整个界面
+        // Merge succeeded, refresh view
         btn.innerHTML = `<span class="text-purple-500">✓</span> Done`;
         updateBranchIndicator("main");
 
-        // 延迟一小下让用户看清“Done”，然后刷新
+        // Small delay to allow user to see "Done" before reload
         setTimeout(() => {
-            loadHistory(); // 重新加载历史，这时 currentChain 已经在主线末尾了
+            loadHistory(); // Reload history (currentChain is now positioned at main line end)
             setTimeout(() => {
-                chatBox.scrollTop = chatBox.scrollHeight; //scroll bottom
+                chatBox.scrollTop = chatBox.scrollHeight;
             }, 100);
         }, 500);
     } catch (e) {
-        console.error("Merge 失败:", e);
-        alert("合并失败: " + e.message);
+        console.error("Merge failed:", e);
+        alert("Merge failed: " + e.message);
         btn.innerHTML = originalContent;
         btn.disabled = false;
     }
 }
 
 async function extractErrorMessage(response) {
-    let errorText = `请求失败，状态码：${response.status}`;
+    let errorText = `Request failed with status: ${response.status}`;
     try {
         const errJson = await response.json();
         if (errJson.error) return `${errorText} (${errJson.error})`;
@@ -1067,8 +1058,8 @@ async function extractErrorMessage(response) {
 }
 
 /**
- * 展示档案内容弹窗
- * @param {Array} archives - 后端传来的 [[Msg1, Msg2], [MsgA, MsgB]]
+ * Display archived branch content modal
+ * @param {Array} archives - Backend payload format: [[Msg1, Msg2], [MsgA, MsgB]]
  */
 function showArchiveModal(archives) {
     const modal = document.getElementById("archive-modal");
@@ -1076,12 +1067,12 @@ function showArchiveModal(archives) {
 
     if (!modal || !contentContainer) return;
 
-    // 1. 清空上一次的内容
+    // Clear previous content
     contentContainer.innerHTML = "";
 
-    // 2. 遍历每一个支线 (branch)
+    // Iterate through each branch
     archives.forEach((branch, index) => {
-        // 分割线
+        // Divider
         const divider = document.createElement("div");
         divider.className = "relative py-6 flex items-center justify-center";
         divider.innerHTML = `
@@ -1090,13 +1081,13 @@ function showArchiveModal(archives) {
         `;
         contentContainer.appendChild(divider);
 
-        // 渲染该支线内的每一条消息
+        // Render each message in the branch
         branch.forEach((msg) => {
             const isUser = msg.role === "user";
             const msgDiv = document.createElement("div");
             msgDiv.className = `flex ${isUser ? "justify-end" : "justify-start"} mb-4`;
 
-            // 使用简化的气泡样式，区别于主线
+            // Simplified bubble style distinct from main thread
             msgDiv.innerHTML = `
                 <div class="p-3 rounded-xl max-w-[85%] text-sm shadow-sm border ${isUser
                     ? "bg-blue-500 text-white border-blue-400"
@@ -1109,11 +1100,11 @@ function showArchiveModal(archives) {
         });
     });
 
-    // 3. 显示弹窗并禁用背后主界面的滚动
+    // Show modal and disable background page scrolling
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
 
-    // 4. 处理弹窗关闭
+    // Handle modal close
     const closeBtn = document.getElementById("close-archive");
     const closeModal = () => {
         modal.classList.add("hidden");
@@ -1126,17 +1117,17 @@ function showArchiveModal(archives) {
 }
 
 document.getElementById("send-btn").addEventListener("click", send);
-// ============================= buttons ============================================
+// ============================= BUTTONS ============================================
 
-// 图片处理相关 DOM
+// Image handling DOM elements
 const imageInput = document.getElementById("image-input");
 const imagePreviewWrapper = document.getElementById("image-preview-wrapper");
 const imagePreview = document.getElementById("image-preview");
 const removeImageBtn = document.getElementById("remove-image");
 
-let currentImageBase64 = null; // 用于存储待发送的图片数据
+let currentImageBase64 = null; // Store image data to be sent
 
-// 处理并缩放图片
+// Process and resize image
 async function processImage(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1150,9 +1141,9 @@ async function processImage(file) {
 
                 let width = img.width;
                 let height = img.height;
-                const maxSide = 2048; // 目标最大边长
+                const maxSide = 2048; // Target max dimension
 
-                // 计算等比例缩放后的尺寸
+                // Compute aspect-ratio preserved dimensions
                 if (width > height) {
                     if (width > maxSide) {
                         height = Math.round(height * (maxSide / width));
@@ -1168,11 +1159,10 @@ async function processImage(file) {
                 canvas.width = width;
                 canvas.height = height;
 
-                // 在画布上绘制缩放后的图像
+                // Draw scaled image on canvas
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // 导出为 JPEG (体积更小，且对 AI 友好)
-                // 0.8 是质量压缩比，可以根据需要调整 (0.1 ~ 1.0)
+                // Export as JPEG
                 const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
                 resolve(dataUrl);
             };
@@ -1182,16 +1172,15 @@ async function processImage(file) {
     });
 }
 
-// 监听图片选择
+// Listen for file selection
 imageInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     try {
-        // 显示加载状态（可选）
         imagePreview.style.opacity = "0.5";
 
-        // 自动转换尺寸
+        // Resize image
         const resizedBase64 = await processImage(file);
 
         currentImageBase64 = resizedBase64;
@@ -1199,14 +1188,14 @@ imageInput.addEventListener("change", async (e) => {
         imagePreview.style.opacity = "1";
         imagePreviewWrapper.classList.remove("hidden");
 
-        console.log("图片已处理为 2048x2048");
+        console.log("Image processed to fit within 2048x2048");
     } catch (err) {
-        console.error("图片处理失败:", err);
-        alert("图片处理失败");
+        console.error("Failed to process image:", err);
+        alert("Failed to process image");
     }
 });
 
-// 移除图片
+// Remove image
 removeImageBtn.addEventListener("click", () => {
     clearImage();
 });
@@ -1218,23 +1207,23 @@ function clearImage() {
     imageInput.value = "";
 }
 
-// 下载导出
+// Download/Export chat
 async function downloadChat() {
     try {
-        // 从后端获取真实的原始 Markdown 对话历史
+        // Fetch raw Markdown chat history from backend
         const res = await fetch("/api/history");
         const data = await res.json();
 
         if (!data || data.length === 0) {
-            alert("暂无聊天记录可导出");
+            alert("No chat history available to export");
             return;
         }
 
-        let content = "--- 聊天记录 ---\n\n";
+        let content = "--- Chat History ---\n\n";
         data.forEach((m) => {
-            if (m.role === "system") return; // 忽略系统提示词，只导出用户和 AI 的对话
+            if (m.role === "system") return; // Ignore system prompt; export user and AI dialogs only
 
-            const role = m.role === "user" ? "【用户】" : "【AI】";
+            const role = m.role === "user" ? "[User]" : "[AI]";
             content += `${role}\n${m.content.trim()}\n\n`;
         });
 
@@ -1246,35 +1235,35 @@ async function downloadChat() {
         a.click();
         URL.revokeObjectURL(url);
     } catch (e) {
-        console.error("导出聊天记录失败:", e);
-        alert("导出失败，请重试");
+        console.error("Failed to export chat history:", e);
+        alert("Export failed, please try again.");
     }
 }
 
 async function newChat() {
-    if (confirm("清空所有对话？")) {
-        // 如果当前正在生成回复，强行打断请求
+    if (confirm("Clear all conversations?")) {
+        // Abort in-flight request if currently generating
         if (chatAbortController) {
             chatAbortController.abort();
             chatAbortController = null;
         }
 
-        // 还原按钮与加载状态
+        // Reset button and loading states
         loading.classList.add("hidden");
         sendBtn.classList.remove("is-loading");
-        sendBtn.innerHTML = "发送";
+        sendBtn.innerHTML = "Send";
 
         try {
             await fetch("/api/new-chat", { headers: getHeaders() });
             chatBox.innerHTML = `
                 <div class="flex justify-start mb-8">
                     <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
-                        你好!
+                        Hello!
                     </div>
                 </div>`;
-            get_ctx_usage(); // 刷新的同时重置 Context 计算
+            get_ctx_usage(); // Reset context calculation
         } catch (e) {
-            console.error("清空对话失败:", e);
+            console.error("Failed to clear conversation:", e);
         }
     }
 }
@@ -1296,16 +1285,14 @@ document.getElementById("download-btn").addEventListener("click", downloadChat);
 document.getElementById("theme-btn").addEventListener("click", toggleDarkMode);
 document.getElementById("new-chat-btn").addEventListener("click", newChat);
 
-// ========================= settings page =========================================
+// ========================= SETTINGS PAGE =========================================
 const modal = document.getElementById("settings-modal");
 const customUrlInput = document.getElementById("custom-url");
-// 新增获取 embedding 文本框 DOM
 const customEmbeddingUrlInput = document.getElementById("custom-embedding-url");
 const customKeyInput = document.getElementById("custom-key");
 
 document.getElementById("settings-btn").addEventListener("click", () => {
     customUrlInput.value = localStorage.getItem("custom_api_url") || "";
-    // 新增：读取本地存储的 embedding url
     if (customEmbeddingUrlInput) {
         customEmbeddingUrlInput.value = localStorage.getItem("custom_embedding_url") || "";
     }
@@ -1323,7 +1310,6 @@ modal.addEventListener("click", (e) => {
 
 document.getElementById("save-settings").addEventListener("click", () => {
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
-    // 新增：将 embedding url 保存到本地
     if (customEmbeddingUrlInput) {
         localStorage.setItem("custom_embedding_url", customEmbeddingUrlInput.value.trim());
     }
@@ -1331,7 +1317,7 @@ document.getElementById("save-settings").addEventListener("click", () => {
     modal.classList.add("hidden");
 });
 
-// ================================= indictor light ==========================================
+// ================================= INDICATOR LIGHT ==========================================
 const statusDot = document.getElementById("status-dot");
 
 async function checkLlamaConnection() {
@@ -1343,7 +1329,7 @@ async function checkLlamaConnection() {
             const urlObj = new URL(customUrl);
             healthUrl = `${urlObj.protocol}//${urlObj.host}/health`;
         } catch (e) {
-            console.error("解析自定义 URL 失败:", e);
+            console.error("Failed to parse custom URL:", e);
         }
     }
 
@@ -1364,19 +1350,19 @@ async function checkLlamaConnection() {
             if (data.status === "ok") {
                 statusDot.className =
                     "w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
-                statusDot.title = "已成功连接到 llama.cpp";
+                statusDot.title = "Connected to llama.cpp successfully";
                 return;
             }
         }
-        throw new Error("服务状态异常");
+        throw new Error("Service status abnormal");
     } catch (err) {
         statusDot.className =
             "w-2.5 h-2.5 rounded-full bg-rose-500 transition-colors duration-300 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse";
-        statusDot.title = "无法连接到 llama.cpp，请检查后端服务是否启动";
+        statusDot.title = "Unable to connect to llama.cpp. Please check backend server status.";
     }
 }
 
-// 获取并更新当前 llama.cpp 的上下文 Token 使用状态
+// Fetch and update context token usage for llama.cpp
 async function get_ctx_usage() {
     const customUrl = localStorage.getItem("custom_api_url") || "";
     const tokenDisplay = document.getElementById("token-usage");
@@ -1397,7 +1383,7 @@ async function get_ctx_usage() {
                 currentCtx = data.slots[0].n_past || 0;
             }
 
-            // 拿不到有效 maxCtx 时，直接优雅回退
+            // Fallback gracefully if maxCtx is invalid
             if (maxCtx <= 0) {
                 tokenDisplay.innerText = `-- / -- (0%)`;
                 tokenDisplay.classList.remove("text-rose-500");
@@ -1417,20 +1403,20 @@ async function get_ctx_usage() {
             }
         }
     } catch (err) {
-        console.error("获取 Context 失败:", err);
+        console.error("Failed to fetch context usage:", err);
         tokenDisplay.innerText = `-- / -- (0%)`;
         tokenDisplay.classList.remove("text-rose-500");
     }
 }
 
-// ========================= 页面内搜索功能 =========================================
+// ========================= IN-PAGE SEARCH =========================================
 const searchToggleBtn = document.getElementById("search-toggle-btn");
 const pageSearchPanel = document.getElementById("page-search-panel");
 const pageSearchInput = document.getElementById("page-search-input");
 const pageSearchList = document.getElementById("page-search-list");
 const closePageSearchBtn = document.getElementById("close-page-search");
 
-// 切换搜索面板显示状态
+// Toggle search panel visibility
 searchToggleBtn.addEventListener("click", () => {
     pageSearchPanel.classList.toggle("hidden");
     if (!pageSearchPanel.classList.contains("hidden")) {
@@ -1438,39 +1424,39 @@ searchToggleBtn.addEventListener("click", () => {
     }
 });
 
-// 关闭搜索面板
+// Close search panel
 closePageSearchBtn.addEventListener("click", () => {
     pageSearchPanel.classList.add("hidden");
     pageSearchInput.value = '';
     pageSearchList.innerHTML = '';
 });
 
-// 监听输入框内容变化
+// Listen to search input change
 pageSearchInput.addEventListener("input", function () {
     const keyword = this.value.trim();
-    pageSearchList.innerHTML = ''; // 清空结果
+    pageSearchList.innerHTML = ''; // Clear results
 
     if (!keyword) return;
 
     let hasResult = false;
-    // 获取当前聊天框内的所有用户气泡和 AI 气泡
+    // Get all user, AI, and summary bubbles in chat
     const chatBubbles = document.querySelectorAll("#chat-box .user-bubble, #chat-box .ai-bubble, #chat-box .summary-box");
 
     const lowerKeyword = keyword.toLowerCase();
 
     chatBubbles.forEach((bubble) => {
-        // 使用 textContent 只获取纯文本，避免搜到 HTML 标签 (如 class, div 等)
+        // Use textContent for plain text matching only to avoid matching HTML tags
         const text = bubble.textContent;
         const lowerText = text.toLowerCase();
 
         let startIndex = 0;
         let index;
 
-        // 一个气泡里可能多次出现关键字，用循环把它都找出来
+        // Loop to find all matches in the bubble
         while ((index = lowerText.indexOf(lowerKeyword, startIndex)) > -1) {
             hasResult = true;
 
-            // 截取摘要上下文 (前后各 15 个字符)
+            // Extract context snippet (15 characters before and after)
             const start = Math.max(0, index - 15);
             const end = Math.min(text.length, index + keyword.length + 15);
             let snippet = text.substring(start, end);
@@ -1478,17 +1464,17 @@ pageSearchInput.addEventListener("input", function () {
             if (start > 0) snippet = '...' + snippet;
             if (end < text.length) snippet = snippet + '...';
 
-            // 高亮关键字 (忽略大小写)
+            // Highlight matching keyword (case-insensitive)
             const regex = new RegExp(`(${keyword})`, 'gi');
-            // 将片段放入 HTML 前先进行简单的安全处理，防止 XSS
+            // Escape snippet before injecting into HTML to prevent XSS
             snippet = snippet.replace(/</g, "&lt;").replace(/>/g, "&gt;");
             snippet = snippet.replace(regex, '<span class="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-0.5 rounded">$1</span>');
 
-            // 创建列表项
+            // Create list item
             const li = document.createElement("li");
             li.className = "px-4 py-2 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-gray-300";
 
-            // 标识是用户的发言还是AI的发言 (可选小图标)
+            // Label message source
             let icon = "🤖";
             let label = "AI";
             if (bubble.classList.contains("user-bubble")) {
@@ -1496,22 +1482,22 @@ pageSearchInput.addEventListener("input", function () {
                 label = "User";
             } else if (bubble.classList.contains("summary-box")) {
                 icon = "⚡";
-                label = "摘要";
+                label = "Summary";
             }
 
             li.innerHTML = `<div class="text-[10px] text-gray-400 mb-0.5">${icon} ${label}</div><div>${snippet}</div>`;
 
-            // 点击跳转
+            // Click to jump to message
             li.addEventListener("click", () => {
-                // 平滑滚动到目标气泡
+                // Smooth scroll to target bubble
                 bubble.scrollIntoView({ behavior: "smooth", block: "center" });
 
-                // 添加闪烁动画
+                // Trigger highlight pulse animation
                 bubble.classList.remove("target-flash");
-                void bubble.offsetWidth; // 触发重绘
+                void bubble.offsetWidth; // Trigger reflow
                 bubble.classList.add("target-flash");
 
-                // 在移动端点击后可选是否自动收起搜索面板
+                // Auto-collapse panel on mobile after selection
                 if (window.innerWidth < 768) {
                     pageSearchPanel.classList.add("hidden");
                 }
@@ -1519,16 +1505,16 @@ pageSearchInput.addEventListener("input", function () {
 
             pageSearchList.appendChild(li);
 
-            startIndex = index + keyword.length; // 继续往后找
+            startIndex = index + keyword.length; // Continue searching remainder
         }
     });
 
     if (!hasResult) {
-        pageSearchList.innerHTML = '<li class="p-4 text-center text-gray-400 dark:text-gray-500">未找到相关内容</li>';
+        pageSearchList.innerHTML = '<li class="p-4 text-center text-gray-400 dark:text-gray-500">No results found</li>';
     }
 });
 
-//===========================upload file===========================================
+//=========================== UPLOAD FILE ===========================================
 const docInput = document.getElementById("doc-input");
 const uploadDocBtn = document.getElementById("upload-doc-btn");
 
@@ -1540,12 +1526,12 @@ if (docInput) {
         const formData = new FormData();
         formData.append("file", file);
 
-        // 读取前端设置的 API 地址并一同发送
+        // Read configured API endpoints and append to payload
         const customUrl = localStorage.getItem("custom_api_url") || "";
-        const customEmbeddingUrl = localStorage.getItem("custom_embedding_url") || ""; // 新增读取
+        const customEmbeddingUrl = localStorage.getItem("custom_embedding_url") || "";
 
         formData.append("custom_url", customUrl);
-        formData.append("custom_embedding_url", customEmbeddingUrl); // 新增传给后端
+        formData.append("custom_embedding_url", customEmbeddingUrl);
 
         if (uploadDocBtn) uploadDocBtn.style.pointerEvents = "none";
 
@@ -1561,16 +1547,16 @@ if (docInput) {
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || "文档解析或入库失败");
+                throw new Error(errData.error || "Document parsing or indexing failed");
             }
 
-            // 在聊天框提示入库成功
+            // Display indexing success notice in chat box
             const chatBox = document.getElementById("chat-box");
             if (chatBox) {
                 const noticeHtml = `
                     <div class="flex justify-center mb-4">
                         <div class="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-xs font-mono">
-                            📚 已成功将文档《${file.name}》索引至知识库
+                            📚 Document "${file.name}" indexed successfully into knowledge base
                         </div>
                     </div>`;
                 chatBox.insertAdjacentHTML("beforeend", noticeHtml);
@@ -1578,10 +1564,10 @@ if (docInput) {
             }
 
         } catch (err) {
-            console.error("上传文档失败:", err);
-            alert("文档入库失败: " + err.message);
+            console.error("Failed to upload document:", err);
+            alert("Document indexing failed: " + err.message);
         } finally {
-            // 恢复按钮状态并清空 input，允许上传同名文件
+            // Restore button state and reset input to allow uploading file with same name again
             if (uploadDocBtn) uploadDocBtn.style.pointerEvents = "auto";
             docInput.value = "";
         }

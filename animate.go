@@ -5,25 +5,25 @@ import (
 	"time"
 )
 
-// StartLoading 启动一个加载动画，返回一个用于停止的 channel
+// StartLoading starts a loading spinner animation and returns a channel to stop it
 func StartLoading(message string) chan struct{} {
 	stopChan := make(chan struct{})
 
 	go func() {
-		// 动画帧
+		// Animation frames
 		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 		i := 0
 		for {
 			select {
 			case <-stopChan:
-				// 收到停止信号，清除当前行并退出
+				// Stop signal received: clear the current line and exit
 				fmt.Print("\r\033[K")
 				return
 			default:
-				// \r 让光标回到行首，\033[K 清除光标后的内容
+				// \r returns cursor to line start; \033[K clears content after cursor
 				fmt.Printf("\r\033[K\033[36m%s\033[0m %s", frames[i%len(frames)], message)
 				i++
-				time.Sleep(100 * time.Millisecond) // 每 100 毫秒刷新一次
+				time.Sleep(100 * time.Millisecond) // Refresh every 100ms
 			}
 		}
 	}()

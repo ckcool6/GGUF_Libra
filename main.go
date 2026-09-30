@@ -15,12 +15,11 @@ var (
 	OpenRouterKey string
 	rootChain     *chatChain
 	currentChain  *chatChain
-	queryEngine   *query.Engine // 👈 新增这一行：全局查询引擎
-
+	queryEngine   *query.Engine // Global query engine
 )
 
 var (
-	// 用于长连接/流式对话请求
+	// Client for persistent connections / streaming chat requests
 	httpClient = &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
@@ -29,7 +28,7 @@ var (
 		},
 	}
 
-	// 用于常规超时请求（如生成摘要、获取 props）
+	// Client for standard timeout requests (e.g., generating summaries, fetching props)
 	httpTimeoutClient = &http.Client{
 		Timeout: 600 * time.Second,
 		Transport: &http.Transport{
@@ -44,37 +43,37 @@ func main() {
 
 	var err error
 
-	// 初始化并加载 data.bin（赋值给全局变量 queryEngine）
+	// Initialize and load data.bin (assign to global queryEngine)
 	queryEngine, err = query.NewEngine("data.bin")
 	if err != nil {
-		fmt.Printf("❌ 加载 data.bin 失败: %v\n", err)
+		fmt.Printf("❌ Failed to load data.bin: %v\n", err)
 	} else {
-		fmt.Printf("✅ data.bin 加载成功！共包含 %d 棵对话树\n", len(queryEngine.Records))
+		fmt.Printf("✅ data.bin loaded successfully! Total dialogue trees: %d\n", len(queryEngine.Records))
 	}
 
 	config_init()
 	initRAG()
 
-	// 托管整个 dist 目录
+	// Host static assets from the dist directory
 	http.Handle("/", http.FileServer(http.Dir("dist")))
 
-	// 聊天接口
+	// Chat API endpoint
 	http.HandleFunc("/api/chat", chatHandler)
 
-	// 修改 /api/history 路由
+	// History API endpoint
 	http.HandleFunc("/api/history", apiHistoryHandler)
 
-	// 修改 /api/new-chat 路由
+	// New chat API endpoint
 	http.HandleFunc("/api/new-chat", apiNewChatHandler)
 
-	// 获取ctx
+	// Retrieve context props
 	http.HandleFunc("/api/llama-props", apiLlamaPropsHandler)
 
-	// switch prompt
+	// Switch prompt endpoints
 	http.HandleFunc("/api/prompts", apiGetPromptsHandler)
 	http.HandleFunc("/api/switch-prompt", apiSwitchPromptHandler)
 
-	// 修改 /api/delete-last 路由
+	// Delete last message round endpoint
 	http.HandleFunc("/api/delete-last", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		if currentChain != nil && currentChain.DialogContent != nil {
@@ -88,12 +87,12 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// 生成侧线分支（Fork）
+	// Fork a side branch
 	http.HandleFunc("/api/fork-side", func(w http.ResponseWriter, r *http.Request) {
-		ClearVectorDB() //让side branch不受知识库污染
+		ClearVectorDB() // Prevent side branch from being affected by the vector knowledge base
 		mu.Lock()
 		if currentChain != nil {
-			// 生成侧线子节点，并将 currentChain 指向新侧线
+			// Create side branch child node and point currentChain to the new branch
 			currentChain = currentChain.AppendSideBranchNode()
 			rootChain.SaveChainToFile("chain_history.json")
 		}
@@ -101,21 +100,20 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// 将侧线合并（Merge）回主线：将侧线摘要作为新节点插入主线末尾
-	// 修改 /api/merge 路由
+	// Merge side branch back to main branch: insert side branch summary as a new node at the end of the main branch
 	http.HandleFunc("/api/merge", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
 		if rootChain == nil || currentChain == nil {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "对话未初始化"})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Dialogue session not initialized"})
 			return
 		}
 
-		// 执行合并逻辑
-		// 传入 rootChain 是因为需要它来做 DFS 路径搜索
-		// 传入 currentChain 是因为它是侧线的终点，承载着摘要
+		// Execute merge logic
+		// rootChain is needed for DFS path searching
+		// currentChain is the leaf node of the side branch carrying the summary
 		newNode, err := rootChain.Merge(currentChain)
 
 		if err != nil {
@@ -124,16 +122,16 @@ func main() {
 			return
 		}
 
-		// 这一步非常关键：合并后，将用户的操作指针指回主线的新节点
+		// Crucial step: point the user's active pointer back to the newly merged main line node
 		currentChain = newNode
 
-		// 保存状态到文件
+		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "success",
-			"message": "已将侧线成果合并至主线末尾",
+			"message": "Side branch successfully merged into the end of main branch",
 		})
 	})
 
@@ -155,19 +153,19 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		// 如果节点根本不存在，直接抛出 400 错误，不返回空对象
+		// If the node does not exist, return 400 Bad Request
 		if targetChain == nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{
-				"error": "当前节点不存在，无法生成摘要",
+				"error": "Current node does not exist, unable to generate summary",
 			})
 			return
 		}
 
-		// 调用 AI 生成摘要
+		// Call AI to generate summary
 		abstract, err := targetChain.GenerateAbstract(body.CustomUrl, body.CustomKey)
 
-		// 拦截任何报错（包括超时、401、网络异常、没对话记录等）
+		// Catch any error (timeout, 401, network failure, empty history, etc.)
 		if err != nil {
 			if err.Error() == "AUTH_ERROR" {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -176,21 +174,21 @@ func main() {
 
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{
-				"error": "生成摘要失败: " + err.Error(),
+				"error": "Failed to generate summary: " + err.Error(),
 			})
 			return
 		}
 
-		// 剥离前后空格后如果还是空的，直接拒绝落盘并报错
+		// Reject and return error if summary is empty after trimming
 		if strings.TrimSpace(abstract) == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{
-				"error": "大模型返回了空的摘要，已被系统拦截",
+				"error": "LLM returned an empty summary, rejected by system",
 			})
 			return
 		}
 
-		// 只有确保内容不为空，才落盘并返回成功响应
+		// Persist state to file and respond with success only when content is not empty
 		mu.Lock()
 		rootChain.SaveChainToFile("chain_history.json")
 		mu.Unlock()
@@ -198,7 +196,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{
 			"abstract": abstract,
 		})
-		ClearVectorDB() //让模型忘记知识库,只记总结
+		ClearVectorDB() // Clear vector database so model only relies on the summary
 	})
 
 	http.HandleFunc("/api/switch-side-to-main", func(w http.ResponseWriter, r *http.Request) {
@@ -210,19 +208,18 @@ func main() {
 			return
 		}
 
-		// 寻找该侧线是从主线哪个点分出来的
+		// Locate the fork point where this side branch diverged from the main branch
 		forkNode := rootChain.BackToMainForkedNode(currentChain)
 
-		// 如果找不到分叉点，说明已经在主线上了，或者树结构异常
+		// If fork point not found, it is already on the main branch or tree structure is abnormal
 		if forkNode == nil {
-			// 保险起见，直接把 currentChain 指向主线末尾
+			// Fallback: point currentChain directly to the tail of the main branch
 			currentChain = rootChain
 			for currentChain.DialogMain != nil {
 				currentChain = currentChain.DialogMain
 			}
 		} else {
-
-			// 【回归正史】寻找主线现在的最末尾
+			// Return to canonical branch: locate the current tail of the main branch
 			mainTail := rootChain
 			for mainTail.DialogMain != nil {
 				mainTail = mainTail.DialogMain
@@ -230,17 +227,17 @@ func main() {
 			currentChain = mainTail
 		}
 
-		// 保存状态，文件里的侧线历史会瞬间消失
+		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "success",
-			"message": "侧线已丢弃，已回到主线末尾",
+			"message": "Side branch discarded, returned to main branch tail",
 		})
 	})
 
-	// 修改摘要的接口
+	// API endpoint for editing summary
 	http.HandleFunc("/api/edit-abstract", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Abstract string `json:"abstract"`
@@ -255,7 +252,7 @@ func main() {
 
 		if currentChain != nil {
 			currentChain.EditAbstract(body.Abstract)
-			// 修改完立刻落盘，防止丢失
+			// Persist immediately to prevent data loss
 			rootChain.SaveChainToFile("chain_history.json")
 
 			w.WriteHeader(http.StatusOK)
@@ -263,7 +260,7 @@ func main() {
 			return
 		}
 
-		http.Error(w, "节点不存在", http.StatusNotFound)
+		http.Error(w, "Node not found", http.StatusNotFound)
 	})
 
 	http.HandleFunc("/api/archive-main", func(w http.ResponseWriter, r *http.Request) {
@@ -271,40 +268,40 @@ func main() {
 		defer mu.Unlock()
 
 		if currentChain == nil {
-			http.Error(w, "未初始化", http.StatusBadRequest)
+			http.Error(w, "Not initialized", http.StatusBadRequest)
 			return
 		}
 
-		// 1. 校验：必须是主线才能点这个“归档”
+		// Validation: archive action is strictly limited to the main branch
 		if currentChain.BranchColor != YellowNode {
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(map[string]string{"error": "归档功能仅限主线使用"})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Archiving is only permitted on the main branch"})
 			return
 		}
 
-		// 2. 校验：必须先有摘要才能归档
+		// Validation: a summary must exist prior to archiving
 		if currentChain.DialogAbstract == "" {
 			w.WriteHeader(http.StatusPreconditionFailed) // 412
 			return
 		}
 
-		// 3. 【核心操作】调用你的封装函数开启新主线节点
-		// 这会自动创建 newNode，并将摘要作为 system 消息塞进去
+		// Core operation: spawn a new main branch node
+		// This automatically creates newNode and injects the summary as a system message
 		newNode := currentChain.AppendMainBranchNode()
 
-		// 4. 更新指针并保存
+		// Update pointer and persist state
 		currentChain = newNode
 		rootChain.SaveChainToFile("chain_history.json")
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "success",
-			"message": "主线已翻页，开启新章节",
+			"message": "Main branch archived, started a new chapter",
 		})
 	})
 
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 
-	fmt.Println("服务已启动，请在浏览器中打开: http://127.0.0.1:8099")
+	fmt.Println("Server started, please open in browser: http://127.0.0.1:8099")
 	http.ListenAndServe(":8099", nil)
 }
