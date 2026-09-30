@@ -3,8 +3,8 @@ package main
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
-	// 用于在历史记录中存储图片的 Base64 数据
-	// omitempty 表示如果没有图片，生成的 JSON 就不包含这个字段
+	// Base64-encoded image data stored in history.
+	// omitempty omits this field from the generated JSON if no image is present.
 	Image string `json:"image,omitempty"`
 
 	Archives [][]Message `json:"archives,omitempty"`
@@ -24,7 +24,7 @@ type PromptItem struct {
 
 type reqBody struct {
 	Message string `json:"message"`
-	// 接收前端 JS 发来的图片 Base64
+	// Receives the base64-encoded image sent from the frontend.
 	Image              string `json:"image"`
 	CustomUrl          string `json:"custom_url"`
 	CustomKey          string `json:"custom_key"`
@@ -44,10 +44,11 @@ type LlamaContent struct {
 }
 
 type LlamaImageDetail struct {
-	URL string `json:"url"` // 格式: "data:image/jpeg;base64,xxxx"
+	URL string `json:"url"` // Format: "data:image/jpeg;base64,xxxx"
 }
 
 type LlamaMessage struct {
 	Role    string      `json:"role"`
-	Content interface{} `json:"content"` // 这里可以是 string 或 []LlamaContent
+	Content interface{} `json:"content"` // Can be either a string or []LlamaContent.
+
 }
