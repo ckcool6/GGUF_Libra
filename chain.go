@@ -196,8 +196,8 @@ func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	return newNode
 }
 
-// AppendSideBranchNode appends a new side branch child node to the current node
-func (chain *chatChain) AppendSideBranchNode() *chatChain {
+// AppendSideBranchNode creates and initializes a side branch node
+func (chain *chatChain) AppendSideBranchNode(withSummary bool) *chatChain {
 	if chain == nil {
 		return nil
 	}
@@ -207,7 +207,8 @@ func (chain *chatChain) AppendSideBranchNode() *chatChain {
 	newNode.IsForkedNode = true
 	newNode.BranchColor = GreenNode
 
-	if chain.DialogAbstract != "" {
+	// Inject previous context summary only if requested and available
+	if withSummary && chain.DialogAbstract != "" {
 		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
 			Role:    "system",
 			Content: "[Previous Context / Context Summary]:\n" + chain.DialogAbstract,

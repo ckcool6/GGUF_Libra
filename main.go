@@ -87,13 +87,23 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Fork a side branch
+	// Fork a side branch handler
 	http.HandleFunc("/api/fork-side", func(w http.ResponseWriter, r *http.Request) {
 		ClearVectorDB() // Prevent side branch from being affected by the vector knowledge base
+
+		// Inherit summary by default
+		withSummary := true
+		if r.Method == http.MethodPost {
+			var req ForkSideRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+				withSummary = req.WithSummary
+			}
+		}
+
 		mu.Lock()
 		if currentChain != nil {
 			// Create side branch child node and point currentChain to the new branch
-			currentChain = currentChain.AppendSideBranchNode()
+			currentChain = currentChain.AppendSideBranchNode(withSummary)
 			rootChain.SaveChainToFile("chain_history.json")
 		}
 		mu.Unlock()

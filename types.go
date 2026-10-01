@@ -52,3 +52,7 @@ type LlamaMessage struct {
 	Content interface{} `json:"content"` // Can be either a string or []LlamaContent.
 
 }
+
+type ForkSideRequest struct {
+	WithSummary bool `json:"with_summary"`
+}

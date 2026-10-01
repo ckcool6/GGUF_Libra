@@ -696,35 +696,58 @@ function createNotebookBar() {
         "notebook-bar group relative flex flex-col items-center justify-center my-4 opacity-40 hover:opacity-100 transition-opacity duration-200";
 
     notebookBar.innerHTML = `
-        <div class="w-full relative flex items-center justify-center">
-            <!-- Background horizontal line -->
-            <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-gray-200 dark:border-gray-800"></div>
-            </div>
-            
-            <!-- Floating action button group -->
-            <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
-                <button class="switch-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">s</span> switch to main 
-                </button>
-                <span class="text-gray-300 dark:text-gray-700">|</span>
+    <div class="w-full relative flex items-center justify-center">
+        <!-- Background horizontal line -->
+        <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-200 dark:border-gray-800"></div>
+        </div>
+        
+        <!-- Floating action button group -->
+        <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
+            <button class="switch-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="text-grey-400 font-bold">s</span> switch to main 
+            </button>
+            <span class="text-gray-300 dark:text-gray-700">|</span>
+
+            <!-- Container for Fork Side Chat with Popover -->
+            <div class="relative inline-block">
                 <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="text-grey-400 font-bold">🌿</span> Side Chat
                 </button>
-                <span class="text-gray-300 dark:text-gray-700">|</span>
-                <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">⚡</span> Summary
-                </button>
-                <span class="text-gray-300 dark:text-gray-700">|</span>
-                 <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">m</span> Merge
-                </button>
-                <span class="text-gray-300 dark:text-gray-700">|</span>
-                <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">📑</span> Archive main
-                </button>
+                
+                <!-- Floating options popover (hidden by default) -->
+                <div class="fork-options-popover hidden absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 bg-white dark:bg-[#1e1f20] border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
+                    <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
+                        <span>⚡</span>
+                        <div>
+                            <div class="font-medium">With Summary</div>
+                            <div class="text-[9px] text-gray-400">Keep core context</div>
+                        </div>
+                    </button>
+                    <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
+                        <span>🌱</span>
+                        <div>
+                            <div class="font-medium">Isolated Sandbox</div>
+                            <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
+                        </div>
+                    </button>
+                </div>
             </div>
+
+            <span class="text-gray-300 dark:text-gray-700">|</span>
+            <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="text-grey-400 font-bold">⚡</span> Summary
+            </button>
+            <span class="text-gray-300 dark:text-gray-700">|</span>
+            <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="text-grey-400 font-bold">m</span> Merge
+            </button>
+            <span class="text-gray-300 dark:text-gray-700">|</span>
+            <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="text-grey-400 font-bold">📑</span> Archive main
+            </button>
         </div>
+    </div>
     `;
 
     // Archive event
@@ -767,24 +790,60 @@ function createNotebookBar() {
     });
 
     // Bind Fork Side event
-    notebookBar
-        .querySelector(".fork-side-btn")
-        .addEventListener("click", async () => {
-            try {
-                const res = await fetch("/api/fork-side", { method: "POST" });
-                if (res.ok) {
-                    updateBranchIndicator("side");
-                    const notice = document.createElement("div");
-                    notice.className =
-                        "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
-                    notice.innerText = "🌿 Switched to side branch (Side Chat)";
-                    chatBox.appendChild(notice);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                }
-            } catch (e) {
-                console.error("Fork Side failed:", e);
+    const doForkSide = async (withSummary) => {
+        try {
+            const res = await fetch("/api/fork-side", {
+                method: "POST",
+                headers: getHeaders(),
+                body: JSON.stringify({ with_summary: withSummary })
+            });
+            if (res.ok) {
+                updateBranchIndicator("side");
+                const notice = document.createElement("div");
+                notice.className =
+                    "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
+
+                notice.innerText = withSummary
+                    ? "🌿 Switched to side branch (Inherited summary)"
+                    : "🌱 Switched to isolated side branch (Clean context)";
+
+                chatBox.appendChild(notice);
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-        });
+        } catch (e) {
+            console.error("Fork Side failed:", e);
+        }
+    };
+
+    const forkBtn = notebookBar.querySelector(".fork-side-btn");
+    const popover = notebookBar.querySelector(".fork-options-popover");
+
+    // Toggle options popover visibility
+    forkBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        popover.classList.toggle("hidden");
+    });
+
+    // Option: Fork with summary
+    notebookBar.querySelector(".fork-with-summary").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        popover.classList.add("hidden");
+        await doForkSide(true);
+    });
+
+    // Option: Fork isolated sandbox
+    notebookBar.querySelector(".fork-clean").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        popover.classList.add("hidden");
+        await doForkSide(false);
+    });
+
+    // Close popover when clicking anywhere else on the document
+    document.addEventListener("click", () => {
+        if (!popover.classList.contains("hidden")) {
+            popover.classList.add("hidden");
+        }
+    }, { once: false });
 
     // Bind Summary event
     notebookBar
