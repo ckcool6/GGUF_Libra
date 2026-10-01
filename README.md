@@ -155,9 +155,12 @@ To index high-value reasoning trees into the persistent memory store:
 
 ---
 
+## screenshot
 
 <img width="1790" height="951" alt="Image" src="https://github.com/user-attachments/assets/6a4e15b7-da91-4183-abbd-02b28be4c600" />
+
 <img width="1467" height="831" alt="Image" src="https://github.com/user-attachments/assets/99e177b0-28f5-484b-83cf-cefe2a6db973" />
+
 <img width="1781" height="899" alt="Image" src="https://github.com/user-attachments/assets/4ae89cb7-ab3e-4223-ba33-395c79bf1f72" />
 
 
