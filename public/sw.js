@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 Lu ZhiYuan
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 const CACHE_NAME = 'gguf-libra-v3.1';
 
 

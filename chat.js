@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 Lu ZhiYuan
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import twemoji from "twemoji";

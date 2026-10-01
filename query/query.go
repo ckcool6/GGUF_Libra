@@ -1,3 +1,6 @@
+// Copyright 2026 Lu ZhiYuan
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package query
 
 import (
