@@ -39,6 +39,16 @@ var (
 	}
 )
 
+func getCurrentBranchName(chain *chatChain) string {
+	if chain == nil {
+		return "main"
+	}
+	if chain.BranchColor == GreenNode || chain.IsForkedNode {
+		return "side"
+	}
+	return "main"
+}
+
 func main() {
 
 	var err error

@@ -92,6 +92,7 @@ async function initPromptSelect() {
                 await fetch(
                     `/api/new-chat?custom_url=${encodeURIComponent(customUrl)}`,
                 );
+                updateBranchIndicator("main");
 
                 // Reset frontend UI
                 chatBox.innerHTML = `
@@ -243,6 +244,12 @@ window.onload = () => {
 async function loadHistory() {
     try {
         const res = await fetch("/api/history", { headers: getHeaders() });
+
+        const currentBranch = res.headers.get("X-Current-Branch");
+        if (currentBranch) {
+            updateBranchIndicator(currentBranch);
+        }
+
         const historyList = await res.json();
 
         if (Array.isArray(historyList) && historyList.length > 0) {
@@ -1314,6 +1321,7 @@ async function newChat() {
 
         try {
             await fetch("/api/new-chat", { headers: getHeaders() });
+            updateBranchIndicator("main");
             chatBox.innerHTML = `
                 <div class="flex justify-start mb-8">
                     <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">

@@ -265,6 +265,9 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	w.Header().Set("X-Current-Branch", getCurrentBranchName(currentChain))
+	w.Header().Set("Access-Control-Expose-Headers", "X-Current-Branch")
+
 	// Traverse rootChain directly from memory rather than re-reading the file
 	// In-memory rootChain contains the most up-to-date state
 	if rootChain == nil {
