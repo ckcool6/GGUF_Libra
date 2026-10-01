@@ -1,6 +1,6 @@
-const CACHE_NAME = 'gguf-player-v3';
+const CACHE_NAME = 'gguf-libra-v3.1';
 
-// 安装阶段：只预缓存必有的根入口和图标
+
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (e) => {
         return networkResponse;
       })
       .catch(() => {
-        // 断网或本地服务异常时，回落使用本地缓存
+
         return caches.match(e.request);
       })
   );

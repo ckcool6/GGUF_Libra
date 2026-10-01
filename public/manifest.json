@@ -1,7 +1,7 @@
 {
-  "name": "GGUF Player",
-  "short_name": "GPlayer",
-  "description": "极简 AI 聊天客户端",
+  "name": "GGUF Libra",
+  "short_name": "GLibra",
+  "description": "no description",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#131314",

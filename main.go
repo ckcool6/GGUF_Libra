@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"gguf-player/query"
+	"gguf-libra/query"
 	"net/http"
 	"strings"
 	"sync"

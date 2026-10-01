@@ -4,7 +4,7 @@
 # 忽略编译后的二进制文件
 node_modules/
 dist/
-gguf-player.exe
+gguf-libra.exe
 parser_py/.venv
 parser_py/__pycache__
 parser_py/app.log

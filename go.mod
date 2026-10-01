@@ -1,4 +1,4 @@
-module gguf-player
+module gguf-libra
 
 go 1.22.2
 
