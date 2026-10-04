@@ -89,21 +89,28 @@ func NewEngine(binPath string) (*Engine, error) {
 	}, nil
 }
 
-// Query searches within the topK logical trees by keyword and backtracks the full reasoning path
+// Query implements a two-stage search strategy:
+//  1. Fast Path: Match against the terminal leaf nodes of the topK trees.
+//  2. Reverse Search: If unmatched, scan backwards from the latest/deepest node across
+//     intermediate nodes and safely backtrack to the tree's local root (preventing cross-tree pollution).
 func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// Boundary check: constrain topK range
 	limit := topK
 	if limit <= 0 || limit > len(e.Records) {
 		limit = len(e.Records)
 	}
 
-	// Iterate through topK trees to match keyword
-	var matchedRecord *Record
+	cleanInput := strings.Trim(strings.ToLower(keyword), " \t\r\n\"'“”‘’")
+	if cleanInput == "" {
+		return nil, errors.New("empty query keyword")
+	}
+
+	// =========================================================================
+	// Stage 1: Fast Path - Match terminal nodes across topK trees
+	// =========================================================================
 	for i := 0; i < limit; i++ {
-		// Prioritize responding to context cancellation or timeout
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -111,46 +118,87 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		}
 
 		rec := &e.Records[i]
-		// Sanitize input and perform bidirectional substring matching
-		// Strip leading and trailing whitespaces and quote marks
-		cleanInput := strings.Trim(strings.ToLower(keyword), " \t\r\n\"'“”‘’")
 		cleanRecKey := strings.Trim(strings.ToLower(rec.Keyword), " \t\r\n\"'“”‘’")
 
-		if cleanRecKey == "" {
-			continue
-		}
-
-		// Bidirectional match: query contains keyword or keyword contains query
-		if strings.Contains(cleanInput, cleanRecKey) || strings.Contains(cleanRecKey, cleanInput) {
-			matchedRecord = rec
-			break
+		// Check if keyword matches the tree's terminal summary
+		if cleanRecKey != "" && (strings.Contains(cleanInput, cleanRecKey) || strings.Contains(cleanRecKey, cleanInput)) {
+			if len(rec.Matrix.Entries) > 0 {
+				// Matched the terminal leaf node of the current tree
+				targetLeafID := rec.Matrix.Entries[len(rec.Matrix.Entries)-1].EndID
+				return e.backtrackWithinTree(ctx, rec, targetLeafID)
+			}
 		}
 	}
 
-	if matchedRecord == nil {
-		return nil, errors.New("no matching conversation record found within the topK trees")
+	// =========================================================================
+	// Stage 2: Fallback - Flatten and reverse deep search from the latest node
+	// =========================================================================
+	// Scan backwards from the last tree and its deepest edge (prioritizes latest relevant context)
+	for i := limit - 1; i >= 0; i-- {
+		rec := &e.Records[i]
+		entries := rec.Matrix.Entries
+
+		// Traverse all directed edges of the current tree in reverse order
+		for j := len(entries) - 1; j >= 0; j-- {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
+
+			entry := entries[j]
+			pText, cText := "", ""
+			if len(entry.RawData) > 0 {
+				pText = strings.ToLower(entry.RawData[0])
+			}
+			if len(entry.RawData) > 1 {
+				cText = strings.ToLower(entry.RawData[1])
+			}
+
+			// 1. Check Child node (derived intermediate node or branch leaf)
+			if cText != "" && strings.Contains(cText, cleanInput) {
+				// Hit EndID; trigger isolated backtracking within current tree
+				return e.backtrackWithinTree(ctx, rec, entry.EndID)
+			}
+
+			// 2. Check Parent node (intermediate branch point or local root)
+			if pText != "" && strings.Contains(pText, cleanInput) {
+				// Hit StartID; trigger isolated backtracking within current tree
+				return e.backtrackWithinTree(ctx, rec, entry.StartID)
+			}
+		}
 	}
 
-	entries := matchedRecord.Matrix.Entries
+	return nil, errors.New("no matching node found in topK trees")
+}
+
+// backtrackWithinTree enforces strict tree-scoped isolation:
+// The parent lookup table is sandboxed exclusively within the current Record.
+// Backtracking terminates naturally upon reaching the tree's local root (in-degree 0),
+// physically preventing any cross-tree leakage or ID collision.
+func (e *Engine) backtrackWithinTree(ctx context.Context, rec *Record, targetNodeID int) (*QueryResult, error) {
+	entries := rec.Matrix.Entries
 	if len(entries) == 0 {
-		return nil, errors.New("record contains no edge topology information")
+		return &QueryResult{
+			Record:   *rec,
+			RootID:   targetNodeID,
+			LeafID:   targetNodeID,
+			NodePath: []int{targetNodeID},
+			EdgePath: []PathStep{},
+		}, nil
 	}
 
-	// Build reverse map of end_id -> Entry for O(1) backtracking towards the root
+	// 1. Build local EndID -> Entry mapping strictly for the current tree
 	parentLookup := make(map[int]Entry, len(entries))
 	for _, entry := range entries {
 		parentLookup[entry.EndID] = entry
 	}
 
-	// Locate target starting point: target keyword corresponds to the end_id of the last edge
-	targetLeafID := entries[len(entries)-1].EndID
-
-	// Backtrack to find the root node (traverse upwards along parent pointers)
+	// 2. Backtrack upwards from targetNodeID towards the local root
 	var reversedSteps []PathStep
-	currID := targetLeafID
+	currID := targetNodeID
 
 	for {
-		// Check context status during each backtracking step
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -159,11 +207,11 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 
 		edge, hasParent := parentLookup[currID]
 		if !hasParent {
-			// If node is not an end_id in any edge, it is the root node
+			// Boundary stop: No parent found means we have reached the local root
+			// of this tree. Terminate immediately to avoid leaking into other trees.
 			break
 		}
 
-		// Extract conversation text for this step
 		pText, cText := "", ""
 		if len(edge.RawData) > 0 {
 			pText = edge.RawData[0]
@@ -179,13 +227,12 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 			ChildText:  cText,
 		})
 
-		// Move one step up to parent
 		currID = edge.StartID
 	}
 
-	rootID := currID // Backtracking terminated at root
+	rootID := currID // Backtracking converges at the local root of this tree
 
-	// Reverse the path to get forward progression: [Root -> ... -> Leaf]
+	// 3. Reverse the path into forward reasoning order: [Local Root -> ... -> Target Node]
 	stepCount := len(reversedSteps)
 	orderedSteps := make([]PathStep, stepCount)
 	nodePath := make([]int, 0, stepCount+1)
@@ -198,9 +245,9 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 	}
 
 	return &QueryResult{
-		Record:   *matchedRecord,
+		Record:   *rec,
 		RootID:   rootID,
-		LeafID:   targetLeafID,
+		LeafID:   targetNodeID, // Semantically represents the query's targeted endpoint
 		NodePath: nodePath,
 		EdgePath: orderedSteps,
 	}, nil
