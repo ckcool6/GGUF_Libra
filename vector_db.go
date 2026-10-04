@@ -140,7 +140,7 @@ func splitCodeWithTreeSitter(content []byte, fileName string) []string {
 
 	// If the language is unsupported, fall back to plain text chunking.
 	if lang == nil {
-		return fallbackTextSplitter(string(content), 500)
+		return splitLinesWithOverlap(string(content), 1200, 200)
 	}
 
 	parser := sitter.NewParser()
@@ -148,7 +148,8 @@ func splitCodeWithTreeSitter(content []byte, fileName string) []string {
 
 	tree, err := parser.ParseCtx(context.Background(), nil, content)
 	if err != nil || tree == nil {
-		return fallbackTextSplitter(string(content), 500)
+		return splitLinesWithOverlap(string(content), 1200, 200)
+
 	}
 
 	var chunks []string
@@ -185,7 +186,18 @@ func splitCodeWithTreeSitter(content []byte, fileName string) []string {
 
 		if isTargetNode {
 			chunkText := string(content[child.StartByte():child.EndByte()])
-			if strings.TrimSpace(chunkText) != "" {
+			chunkText = strings.TrimSpace(chunkText)
+			if chunkText == "" {
+				continue
+			}
+
+			const maxLen = 1200
+			const overlap = 200
+
+			if len(chunkText) > maxLen {
+				subChunks := splitLinesWithOverlap(chunkText, maxLen, overlap)
+				chunks = append(chunks, subChunks...)
+			} else {
 				chunks = append(chunks, chunkText)
 			}
 		}
@@ -193,20 +205,48 @@ func splitCodeWithTreeSitter(content []byte, fileName string) []string {
 
 	// Fall back automatically if no eligible syntax nodes are matched.
 	if len(chunks) == 0 {
-		return fallbackTextSplitter(string(content), 500)
+		return splitLinesWithOverlap(string(content), 1200, 200)
 	}
 	return chunks
 }
 
-func fallbackTextSplitter(text string, chunkSize int) []string {
+func splitLinesWithOverlap(text string, maxChunk, overlap int) []string {
+	lines := strings.Split(text, "\n")
 	var chunks []string
-	runes := []rune(text)
-	for i := 0; i < len(runes); i += chunkSize {
-		end := i + chunkSize
-		if end > len(runes) {
-			end = len(runes)
+	var currentLines []string
+	currentLen := 0
+
+	for _, line := range lines {
+		lineLen := len(line) + 1
+
+		if currentLen+lineLen > maxChunk && len(currentLines) > 0 {
+			chunkStr := strings.TrimSpace(strings.Join(currentLines, "\n"))
+			if chunkStr != "" {
+				chunks = append(chunks, chunkStr)
+			}
+
+			var overlapLines []string
+			accumulated := 0
+			for i := len(currentLines) - 1; i >= 0; i-- {
+				accumulated += len(currentLines[i]) + 1
+				overlapLines = append([]string{currentLines[i]}, overlapLines...)
+				if accumulated >= overlap {
+					break
+				}
+			}
+			currentLines = overlapLines
+			currentLen = accumulated
 		}
-		chunks = append(chunks, string(runes[i:end]))
+
+		currentLines = append(currentLines, line)
+		currentLen += lineLen
+	}
+
+	if len(currentLines) > 0 {
+		chunkStr := strings.TrimSpace(strings.Join(currentLines, "\n"))
+		if chunkStr != "" {
+			chunks = append(chunks, chunkStr)
+		}
 	}
 	return chunks
 }
