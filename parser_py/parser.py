@@ -64,6 +64,20 @@ def parse_json():
     # Execute conversion
     entries, total_nodes = build_entry(rawdata) 
     
+    if total_nodes < 2 or len(entries) == 0:
+        elapsed = time.time() - start_time
+        print("\033[93m[WARN]\033[0m Conversation has no messages/edges, skipped saving.")
+        return {
+            "status": "skipped",
+            "reason": "empty_conversation",
+            "tree_count": len(rawdata),
+            "entry_count": 0,
+            "logic_t": 0.0,
+            "source_size_mb": round(source_json.stat().st_size / (1024 * 1024), 2),
+            "packed_size_mb": round(target_msgpack.stat().st_size / (1024 * 1024), 2) if target_msgpack.exists() else 0.0,
+            "elapsed_seconds": round(elapsed, 3)
+        }
+    
     matrix = TreeMatrix(
         node_count=total_nodes,
         entry_count=len(entries),
@@ -210,8 +224,8 @@ def extract_by_stack(root_node: ChatChain, start_global_id: int = 0) -> Tuple[Li
 
 def compute_logic_t(matrix_struct: TreeMatrix) -> float:
     """Compute the reciprocal of the second smallest Laplacian eigenvalue (logic_T)."""
-    if matrix_struct.node_count <= 2: 
-        return float('inf')
+    if matrix_struct.node_count < 2 or matrix_struct.entry_count == 0: 
+        return 0.0
     num_nodes = matrix_struct.node_count
     start_ids = [entry.start_id for entry in matrix_struct.entries]
     end_ids = [entry.end_id for entry in matrix_struct.entries]
@@ -269,19 +283,22 @@ if __name__ == "__main__":
         print(f"Processing data in target directory: {PARENT_DIR}")
         result = parse_json()
         
-        print("\n✅ Processed successfully! Statistics:")
-        print("-" * 30)
-        print(f"🌲 Tree Count        : {result['tree_count']}")
-        print(f"🔗 Parent-Child Edges: {result['entry_count']}")
-        print(f"✨ Logic T Value     : {result['logic_t']}")  
-        print(f"📁 Source JSON Size  : {result['source_size_mb']} MB")
-        print(f"📦 Msgpack Size      : {result['packed_size_mb']} MB")
-        print(f"⏱️  Elapsed Time     : {result['elapsed_seconds']} s")
-        print("-" * 30)
+        if result.get("status") == "skipped":
+            print(f"\n[INFO] Skipped saving: {result.get('reason')}")
+        else:
+            print("\n[OK] Processed successfully! Statistics:")
+            print("-" * 30)
+            print(f"Tree Count        : {result['tree_count']}")
+            print(f"Parent-Child Edges: {result['entry_count']}")
+            print(f"Logic T Value     : {result['logic_t']}")  
+            print(f"Source JSON Size  : {result['source_size_mb']} MB")
+            print(f"Msgpack Size      : {result['packed_size_mb']} MB")
+            print(f"Elapsed Time      : {result['elapsed_seconds']} s")
+            print("-" * 30)
         
     except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
     except msgspec.ValidationError as e:
-        print(f"❌ JSON validation failed: {e}")
+        print(f"JSON validation failed: {e}")
     except Exception as e:
-        print(f"❌ Unexpected error occurred: {e}")
+        print(f"Unexpected error occurred: {e}")

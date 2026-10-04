@@ -7,6 +7,7 @@ dist/
 gguf-libra.exe
 parser_py/.venv
 parser_py/__pycache__
+parser_py/exported_records.json
 parser_py/app.log
 data.bin
 chromem_db
