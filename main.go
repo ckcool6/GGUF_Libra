@@ -30,6 +30,41 @@ const (
 	tagDone  = "\033[1;32m[DONE]\033[0m"
 )
 
+// log info
+var appStartTime = time.Now()
+
+func uptime() string {
+	d := time.Since(appStartTime)
+	totalSec := int(d.Seconds())
+	h := totalSec / 3600
+	m := (totalSec % 3600) / 60
+	s := totalSec % 60
+	ms := d.Milliseconds() % 1000
+
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
+}
+
+func logPrintf(format string, a ...any) {
+	msg := fmt.Sprintf(format, a...)
+
+	for strings.HasPrefix(msg, "\n") {
+		fmt.Print("\n")
+		msg = msg[1:]
+	}
+
+	if strings.HasPrefix(msg, "\r") {
+		fmt.Printf("\r%s %s", uptime(), msg[1:])
+		return
+	}
+
+	fmt.Printf("%s %s", uptime(), msg)
+}
+
+func logPrintln(a ...any) {
+	fmt.Print(uptime(), " ")
+	fmt.Println(a...)
+}
+
 var (
 	// Client for persistent connections / streaming chat requests
 	httpClient = &http.Client{
@@ -68,9 +103,9 @@ func main() {
 	// Initialize and load data.bin (assign to global queryEngine)
 	queryEngine, err = query.NewEngine("data.bin")
 	if err != nil {
-		fmt.Printf("%s Failed to load data.bin: %v\n", tagError, err)
+		logPrintf("%s Failed to load data.bin: %v\n", tagError, err)
 	} else {
-		fmt.Printf("%s data.bin loaded successfully! Total dialogue trees: %d\n", tagOK, len(queryEngine.Records))
+		logPrintf("%s data.bin loaded successfully! Total dialogue trees: %d\n", tagOK, len(queryEngine.Records))
 	}
 
 	config_init()
@@ -334,6 +369,6 @@ func main() {
 
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 
-	fmt.Printf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:8099\033[0m\n", tagInfo)
+	logPrintf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:8099\033[0m\n", tagInfo)
 	http.ListenAndServe(":8099", nil)
 }

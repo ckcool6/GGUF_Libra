@@ -75,17 +75,17 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	matchedDocs, vErr := queryVectorDB(ctx, body.Message, 3)
 
-	fmt.Println("================ RAG Vector Debug Info ================")
-	fmt.Printf("1. User query: %s\n", body.Message)
+	logPrintln("====================== RAG Vector Debug Info ============================")
+	logPrintf("1. User query: %s\n", body.Message)
 	if vErr != nil {
-		fmt.Printf("2. %s Retrieval missed: %v\n", tagWarn, vErr)
+		logPrintf("2. %s Retrieval missed: %v\n", tagWarn, vErr)
 	} else {
-		fmt.Printf("2. %s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
+		logPrintf("2. %s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
 		if len(matchedDocs) > 0 {
-			fmt.Printf("3. %s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
+			logPrintf("3. %s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
 		}
 	}
-	fmt.Println("=======================================================")
+	logPrintln("=========================================================================")
 
 	// =========================================================================
 	// Core addition: Topological chain-of-thought retrieval (data.bin) + detailed logs
@@ -103,19 +103,19 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			if localChain.ActiveThoughtChain != "" {
 				// Reusing previous thought map
 				thoughtChainSnippet = localChain.ActiveThoughtChain
-				fmt.Printf("%s [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!\n", tagInfo)
+				logPrintf("%s [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!\n", tagInfo)
 			} else {
-				fmt.Printf("%s [Chain of Thought] No external tree triggered; retaining existing context\n", tagInfo)
+				logPrintf("%s [Chain of Thought] No external tree triggered; retaining existing context\n", tagInfo)
 			}
 		} else {
 			// ==========================================
 			// Case 2: New tree matched! Log details and anchor to current branch
 			// ==========================================
-			fmt.Printf("================== %s Matched & Anchored New Thought Tree (data.bin) ==================\n", tagMatch)
-			fmt.Printf("  - Matched Tree UUID : %d\n", qRes.Record.UUID)
-			fmt.Printf("  - Tree Logic T      : %.4f\n", qRes.Record.LogicT)
-			fmt.Printf("  - Matched Keyword   : [%s]\n", qRes.Record.Keyword)
-			fmt.Printf("  - Derivation Chain  : %v (%d reasoning steps)\n", qRes.NodePath, len(qRes.EdgePath))
+			logPrintf("========= %s Matched & Anchored New Thought Tree (data.bin) ========\n", tagMatch)
+			logPrintf("  - Matched Tree UUID : %d\n", qRes.Record.UUID)
+			logPrintf("  - Tree Logic T      : %.4f\n", qRes.Record.LogicT)
+			logPrintf("  - Matched Keyword   : [%s]\n", qRes.Record.Keyword)
+			logPrintf("  - Derivation Chain  : %v (%d reasoning steps)\n", qRes.NodePath, len(qRes.EdgePath))
 
 			// Assemble chain-of-thought prompt snippet
 			var sb strings.Builder
@@ -133,16 +133,16 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			if len(qRes.EdgePath) > 0 {
 				firstStep := qRes.EdgePath[0]
 				lastStep := qRes.EdgePath[len(qRes.EdgePath)-1]
-				fmt.Printf("  - Initial Step : [%d] %s... -> [%d] %s...\n",
+				logPrintf("  - Initial Step : [%d] %s... -> [%d] %s...\n",
 					firstStep.ParentID, firstStep.ParentText[:min(20, len(firstStep.ParentText))],
 					firstStep.ChildID, firstStep.ChildText[:min(20, len(firstStep.ChildText))])
-				fmt.Printf("  - Terminal Step: [%d] -> [%d] %s...\n",
+				logPrintf("  - Terminal Step: [%d] -> [%d] %s...\n",
 					lastStep.ParentID, lastStep.ChildID, lastStep.ChildText[:min(30, len(lastStep.ChildText))])
 			}
-			fmt.Println("================================================================")
+			logPrintln("=========================================================================")
 		}
 	}
-	fmt.Println("==================================================")
+	logPrintln("=========================================================================")
 
 	// =========================================================================
 	// Hybrid context augmentation (chain-of-thought + reference docs + user query)
@@ -184,7 +184,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
-		fmt.Printf("%s Failed to connect to llama.cpp service: %v\n", tagError, err)
+		logPrintf("%s Failed to connect to llama.cpp service: %v\n", tagError, err)
 		rollbackHistory(localChain)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -392,9 +392,9 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Clean up chromem-go in-memory collections and disk .gob files
 	if err := ClearVectorDB(); err != nil {
-		fmt.Printf("%s Failed to clean up vector database/gob files: %v\n", tagWarn, err)
+		logPrintf("%s Failed to clean up vector database/gob files: %v\n", tagWarn, err)
 	} else {
-		fmt.Printf("%s Successfully reset chromem-go vector database and cleared persisted .gob files!\n", tagOK)
+		logPrintf("%s Successfully reset chromem-go vector database and cleared persisted .gob files!\n", tagOK)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -459,7 +459,7 @@ Loop:
 	for {
 		select {
 		case <-r.Context().Done():
-			fmt.Printf("\n%s Client disconnected; stopped receiving stream.\n", tagWarn)
+			logPrintf("\n%s Client disconnected; stopped receiving stream.\n", tagWarn)
 			respBody.Close()
 			break Loop
 		default:
@@ -468,7 +468,7 @@ Loop:
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				fmt.Printf("%s Non-EOF error encountered while reading stream: %v\n", tagWarn, err)
+				logPrintf("%s Non-EOF error encountered while reading stream: %v\n", tagWarn, err)
 			}
 			break
 		}
@@ -488,7 +488,7 @@ Loop:
 			data = bytes.TrimSpace(data)
 
 			if bytes.Equal(data, []byte("[DONE]")) || bytes.Contains(data, []byte(`"done":true`)) {
-				fmt.Printf("\n> %s\n", tagDone)
+				logPrintf("\n> %s\n", tagDone)
 				streamSuccess = true
 				break
 			}
@@ -575,11 +575,11 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		fmt.Printf("%s Failed to parse client request: %v\n", tagError, err)
+		logPrintf("%s Failed to parse client request: %v\n", tagError, err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return err
 	}
-	fmt.Printf("%s User Input: %s\n", tagInfo, body.Message)
+	logPrintf("%s User Input: %s\n", tagInfo, body.Message)
 	return nil
 }
 
@@ -653,7 +653,7 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("%s Extracted %d syntax chunks from \"%s\" and indexed into vector DB\n", tagOK, len(chunks), header.Filename)
+	logPrintf("%s Extracted %d syntax chunks from \"%s\" and indexed into vector DB\n", tagOK, len(chunks), header.Filename)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{

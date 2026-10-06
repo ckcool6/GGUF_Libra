@@ -24,10 +24,10 @@ func config_init() {
 	// Attempt to load saved tree-structured dialogue history from local file
 	rootChain, err = LoadChainFromFile("chain_history.json")
 	if err != nil || rootChain == nil {
-		fmt.Printf("%s No history chain file found, initializing a new chain...\n", tagInfo)
+		logPrintf("%s No history chain file found, initializing a new chain...\n", tagInfo)
 		rootChain = NewChatChain()
 	} else {
-		fmt.Printf("%s Successfully loaded history chain structure\n", tagOK)
+		logPrintf("%s Successfully loaded history chain structure\n", tagOK)
 	}
 
 	// Default currentChain to the deepest leaf node of the main branch
@@ -42,16 +42,16 @@ func config_init() {
 
 	stopLoading()
 	if err != nil {
-		fmt.Printf("\r\033[K%s Failed to initialize token encoder: %v\n", tagError, err)
+		logPrintf("\r\033[K%s Failed to initialize token encoder: %v\n", tagError, err)
 		panic(err)
 	}
-	fmt.Printf("\r\033[K%s Token encoder initialized\n", tagOK)
+	logPrintf("\r\033[K%s Token encoder initialized\n", tagOK)
 
 	err = loadSystemPrompt("system_prompt.json")
 	if err != nil {
 		panic(fmt.Sprintf("%s Failed to load system prompt: %v", tagError, err))
 	}
-	fmt.Printf("%s Prompt configuration file loaded successfully\n", tagOK)
+	logPrintf("%s Prompt configuration file loaded successfully\n", tagOK)
 }
 
 func loadSystemPrompt(filePath string) error {

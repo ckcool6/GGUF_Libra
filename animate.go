@@ -22,7 +22,7 @@ func StartLoading(message string) func() {
 			case <-stopChan:
 				return
 			default:
-				fmt.Printf("\r\033[K\033[1;36m[WAIT]\033[0m [\033[36m%s\033[0m] %s", frames[i%len(frames)], message)
+				fmt.Printf("\r\033[K%s \033[1;36m[WAIT]\033[0m [\033[36m%s\033[0m] %s", uptime(), frames[i%len(frames)], message)
 				i++
 				time.Sleep(100 * time.Millisecond)
 			}
