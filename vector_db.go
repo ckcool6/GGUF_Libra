@@ -103,18 +103,18 @@ func initRAG() {
 	ragOnce.Do(func() {
 		db, err := chromem.NewPersistentDB("./chromem_db", false)
 		if err != nil {
-			fmt.Println("⚠️ Failed to initialize vector database:", err)
+			fmt.Printf("%s Failed to initialize vector database: %v\n", tagWarn, err)
 			return
 		}
 
 		collection, err := db.GetOrCreateCollection("code_knowledge_base", nil, llamaEmbeddingFunc)
 		if err != nil {
-			fmt.Println("⚠️ Failed to create vector collection:", err)
+			fmt.Printf("%s Failed to create vector collection: %v\n", tagWarn, err)
 			return
 		}
 
 		ragCollection = collection
-		fmt.Println("[OK] Chromem-go vector database ready (storage directory: ./chromem_db)")
+		fmt.Printf("%s Chromem-go vector database ready (storage directory: ./chromem_db)\n", tagOK)
 	})
 }
 

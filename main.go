@@ -21,6 +21,15 @@ var (
 	queryEngine   *query.Engine // Global query engine
 )
 
+const (
+	tagOK    = "\033[1;32m[OK]\033[0m"
+	tagError = "\033[1;31m[ERROR]\033[0m"
+	tagWarn  = "\033[1;33m[WARN]\033[0m"
+	tagInfo  = "\033[1;36m[INFO]\033[0m"
+	tagMatch = "\033[1;35m[MATCH]\033[0m"
+	tagDone  = "\033[1;32m[DONE]\033[0m"
+)
+
 var (
 	// Client for persistent connections / streaming chat requests
 	httpClient = &http.Client{
@@ -59,9 +68,9 @@ func main() {
 	// Initialize and load data.bin (assign to global queryEngine)
 	queryEngine, err = query.NewEngine("data.bin")
 	if err != nil {
-		fmt.Printf("❌ Failed to load data.bin: %v\n", err)
+		fmt.Printf("%s Failed to load data.bin: %v\n", tagError, err)
 	} else {
-		fmt.Printf("✅ data.bin loaded successfully! Total dialogue trees: %d\n", len(queryEngine.Records))
+		fmt.Printf("%s data.bin loaded successfully! Total dialogue trees: %d\n", tagOK, len(queryEngine.Records))
 	}
 
 	config_init()
@@ -325,6 +334,6 @@ func main() {
 
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 
-	fmt.Println("Server started, please open in browser: http://127.0.0.1:8099")
+	fmt.Printf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:8099\033[0m\n", tagInfo)
 	http.ListenAndServe(":8099", nil)
 }

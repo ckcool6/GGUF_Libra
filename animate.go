@@ -8,28 +8,29 @@ import (
 	"time"
 )
 
-// StartLoading starts a loading spinner animation and returns a channel to stop it
-func StartLoading(message string) chan struct{} {
+// StartLoading starts a loading spinner animation and returns a stop function
+func StartLoading(message string) func() {
 	stopChan := make(chan struct{})
+	doneChan := make(chan struct{})
 
 	go func() {
-		// Animation frames
-		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		defer close(doneChan)
+		frames := []string{"|", "/", "-", "\\"}
 		i := 0
 		for {
 			select {
 			case <-stopChan:
-				// Stop signal received: clear the current line and exit
-				fmt.Print("\r\033[K")
 				return
 			default:
-				// \r returns cursor to line start; \033[K clears content after cursor
-				fmt.Printf("\r\033[K\033[36m%s\033[0m %s", frames[i%len(frames)], message)
+				fmt.Printf("\r\033[K\033[1;36m[WAIT]\033[0m [\033[36m%s\033[0m] %s", frames[i%len(frames)], message)
 				i++
-				time.Sleep(100 * time.Millisecond) // Refresh every 100ms
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
 
-	return stopChan
+	return func() {
+		close(stopChan)
+		<-doneChan
+	}
 }

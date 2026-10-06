@@ -75,6 +75,11 @@ console.log(`${TAG.info} Copied directory: dist/`);
 copyIfExists('system_prompt.json', RELEASE_DIR);
 copyIfExists('chain_history.json', RELEASE_DIR);
 
+// create empty data.bin 
+const dataBinPath = path.join(RELEASE_DIR, 'data.bin');
+fs.writeFileSync(dataBinPath, Buffer.alloc(0));
+console.log(`${TAG.ok} Created empty data.bin placeholder in release directory`);
+
 // 4. Compile Python parser into standalone executable
 console.log(`\n${TAG.info} Compiling Python parser to standalone executable...`);
 const targetParserPy = path.join(RELEASE_DIR, 'parser_py');
@@ -90,6 +95,7 @@ console.log(`
 Release package structure:
 release/
 ├── ${EXE_NAME}
+├── data.bin               (empty placeholder)
 ├── system_prompt.json
 ├── chain_history.json
 ├── dist/                  (bundled frontend assets)

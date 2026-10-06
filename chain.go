@@ -119,7 +119,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("❌ Failed to create summary request:", err)
+		fmt.Printf("%s Failed to create summary request: %v\n", tagError, err)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -135,7 +135,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	resp, err := httpTimeoutClient.Do(req)
 	if err != nil {
-		fmt.Println("❌ Summary API request failed:", err)
+		fmt.Printf("%s Summary API request failed: %v\n", tagError, err)
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -147,7 +147,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		fmt.Printf("❌ Failed to generate summary, status code %d: %s\n", resp.StatusCode, string(bodyBytes))
+		fmt.Printf("%s Failed to generate summary, status code %d: %s\n", tagError, resp.StatusCode, string(bodyBytes))
 		return "", fmt.Errorf("API response error: %d", resp.StatusCode)
 	}
 
@@ -160,7 +160,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		fmt.Println("❌ Failed to parse summary response:", err)
+		fmt.Printf("%s Failed to parse summary response: %v\n", tagError, err)
 		return "", err
 	}
 
@@ -370,7 +370,7 @@ func (chain *chatChain) SaveChainToFile(filePath string) error {
 
 	data, err := json.MarshalIndent(chain, "", "  ")
 	if err != nil {
-		fmt.Println("❌ Failed to serialize chatChain:", err)
+		fmt.Printf("%s Failed to serialize chatChain: %v\n", tagError, err)
 		return err
 	}
 
@@ -386,7 +386,7 @@ func LoadChainFromFile(filePath string) (*chatChain, error) {
 
 	var root chatChain
 	if err := json.Unmarshal(data, &root); err != nil {
-		fmt.Println("❌ Failed to deserialize chatChain:", err)
+		fmt.Printf("%s Failed to deserialize chatChain: %v\n", tagError, err)
 		return nil, err
 	}
 

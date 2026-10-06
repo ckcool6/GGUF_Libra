@@ -78,11 +78,11 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("================ RAG Vector Debug Info ================")
 	fmt.Printf("1. User query: %s\n", body.Message)
 	if vErr != nil {
-		fmt.Printf("2. [warning] Retrieval missed: %v\n", vErr)
+		fmt.Printf("2. %s Retrieval missed: %v\n", tagWarn, vErr)
 	} else {
-		fmt.Printf("2. [OK] Retrieval successful, matched %d snippet(s)\n", len(matchedDocs))
+		fmt.Printf("2. %s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
 		if len(matchedDocs) > 0 {
-			fmt.Printf("3. 📌 Preview of first matched snippet:\n%s\n", matchedDocs[0])
+			fmt.Printf("3. %s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
 		}
 	}
 	fmt.Println("=======================================================")
@@ -103,15 +103,15 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			if localChain.ActiveThoughtChain != "" {
 				// Reusing previous thought map
 				thoughtChainSnippet = localChain.ActiveThoughtChain
-				fmt.Println("ℹ️  [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!")
+				fmt.Printf("%s [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!\n", tagInfo)
 			} else {
-				fmt.Println("ℹ️  [Chain of Thought] No external tree triggered; retaining existing context")
+				fmt.Printf("%s [Chain of Thought] No external tree triggered; retaining existing context\n", tagInfo)
 			}
 		} else {
 			// ==========================================
 			// Case 2: New tree matched! Log details and anchor to current branch
 			// ==========================================
-			fmt.Println("================== 🎯 Matched & Anchored New Thought Tree (data.bin) ==================")
+			fmt.Printf("================== %s Matched & Anchored New Thought Tree (data.bin) ==================\n", tagMatch)
 			fmt.Printf("  - Matched Tree UUID : %d\n", qRes.Record.UUID)
 			fmt.Printf("  - Tree Logic T      : %.4f\n", qRes.Record.LogicT)
 			fmt.Printf("  - Matched Keyword   : [%s]\n", qRes.Record.Keyword)
@@ -184,7 +184,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := sendRequestToLlama(r, &body, localChain.DialogContent.SendHistory)
 	if err != nil {
-		fmt.Println("❌ Failed to connect to llama.cpp service:", err)
+		fmt.Printf("%s Failed to connect to llama.cpp service: %v\n", tagError, err)
 		rollbackHistory(localChain)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -392,9 +392,9 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Clean up chromem-go in-memory collections and disk .gob files
 	if err := ClearVectorDB(); err != nil {
-		fmt.Printf("⚠️ Failed to clean up vector database/gob files: %v\n", err)
+		fmt.Printf("%s Failed to clean up vector database/gob files: %v\n", tagWarn, err)
 	} else {
-		fmt.Println("🧹 Successfully reset chromem-go vector database and cleared persisted .gob files!")
+		fmt.Printf("%s Successfully reset chromem-go vector database and cleared persisted .gob files!\n", tagOK)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -459,7 +459,7 @@ Loop:
 	for {
 		select {
 		case <-r.Context().Done():
-			fmt.Println("\n🛑 Client disconnected; stopped receiving stream.")
+			fmt.Printf("\n%s Client disconnected; stopped receiving stream.\n", tagWarn)
 			respBody.Close()
 			break Loop
 		default:
@@ -468,7 +468,7 @@ Loop:
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
-				fmt.Println("⚠️ Non-EOF error encountered while reading stream:", err)
+				fmt.Printf("%s Non-EOF error encountered while reading stream: %v\n", tagWarn, err)
 			}
 			break
 		}
@@ -488,7 +488,7 @@ Loop:
 			data = bytes.TrimSpace(data)
 
 			if bytes.Equal(data, []byte("[DONE]")) || bytes.Contains(data, []byte(`"done":true`)) {
-				fmt.Println("\n> [DONE]")
+				fmt.Printf("\n> %s\n", tagDone)
 				streamSuccess = true
 				break
 			}
@@ -575,11 +575,11 @@ func sendRequestToLlama(r *http.Request, body *reqBody, history []Message) (*htt
 
 func parse_input(r *http.Request, w http.ResponseWriter, body *reqBody) error {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		fmt.Println("❌ Failed to parse client request:", err)
+		fmt.Printf("%s Failed to parse client request: %v\n", tagError, err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return err
 	}
-	fmt.Println("> User Input:", body.Message)
+	fmt.Printf("%s User Input: %s\n", tagInfo, body.Message)
 	return nil
 }
 
@@ -653,7 +653,7 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Successfully extracted %d syntax chunks from \"%s\" and indexed into vector DB\n", len(chunks), header.Filename)
+	fmt.Printf("%s Extracted %d syntax chunks from \"%s\" and indexed into vector DB\n", tagOK, len(chunks), header.Filename)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
