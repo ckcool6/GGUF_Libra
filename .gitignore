@@ -1,7 +1,6 @@
-# 忽略环境变量文件（保护你的 API Key）
 .env
 
-# 忽略编译后的二进制文件
+
 node_modules/
 dist/
 gguf-libra.exe
@@ -9,5 +8,8 @@ parser_py/.venv
 parser_py/__pycache__
 parser_py/exported_records.json
 parser_py/app.log
+parser_py/parser.spec
+parser_py/build
+release
 data.bin
 chromem_db

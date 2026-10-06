@@ -10,9 +10,14 @@ import numpy as np
 from scipy.sparse import csr_matrix, diags
 from scipy.sparse.linalg import eigsh
 import random
+import sys
+
+if getattr(sys, 'frozen', False):
+    CURRENT_DIR = Path(sys.executable).resolve().parent
+else:
+    CURRENT_DIR = Path(__file__).resolve().parent
 
 # Get parent directory
-CURRENT_DIR = Path(__file__).resolve().parent
 PARENT_DIR = CURRENT_DIR.parent
 
 # Ignore extra fields in JSON
