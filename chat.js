@@ -1713,3 +1713,28 @@ if (docInput) {
     });
 }
 
+// open parser
+const openParserBtn = document.getElementById("open-parser-btn");
+if (openParserBtn) {
+    openParserBtn.addEventListener("click", async () => {
+        try {
+            openParserBtn.classList.add("opacity-50", "pointer-events-none");
+
+            const res = await fetch("/api/open-parser", {
+                method: "POST",
+                headers: getHeaders()
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to trigger parser");
+            }
+        } catch (e) {
+            console.error("Failed to launch parser:", e);
+            alert("Could not launch parser.exe. Please ensure it exists in parser_py/");
+        } finally {
+            setTimeout(() => {
+                openParserBtn.classList.remove("opacity-50", "pointer-events-none");
+            }, 800);
+        }
+    });
+}

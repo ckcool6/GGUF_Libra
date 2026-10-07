@@ -182,6 +182,7 @@ npm run build
 # 2. build parser py
 cd parser_py
 uv sync
+uv run pyinstaller --onefile --console --clean --distpath . --name parser main.py
 cd ..
 
 # 3. Compile the Go backend binary

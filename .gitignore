@@ -10,6 +10,7 @@ parser_py/exported_records.json
 parser_py/app.log
 parser_py/parser.spec
 parser_py/build
+parser_py/parser.exe
 release
 data.bin
 chromem_db

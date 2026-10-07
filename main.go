@@ -8,6 +8,10 @@ import (
 	"fmt"
 	"gguf-libra/query"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -110,6 +114,35 @@ func main() {
 
 	config_init()
 	initRAG()
+
+	// open parser.exe
+	http.HandleFunc("/api/open-parser", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		go func() {
+			parserPath := filepath.Join("parser_py", "parser.exe")
+			if _, err := os.Stat(parserPath); os.IsNotExist(err) {
+				parserPath = "parser.exe"
+			}
+
+			var cmd *exec.Cmd
+			if runtime.GOOS == "windows" {
+				cmd = exec.Command("cmd", "/c", "start", "GGUF Libra - Graph Parser Console", parserPath)
+			} else {
+				cmd = exec.Command(parserPath)
+			}
+
+			if err := cmd.Start(); err != nil {
+				logPrintf("%s Failed to start parser: %v\n", tagError, err)
+			}
+		}()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
 
 	// Host static assets from the dist directory
 	http.Handle("/", http.FileServer(http.Dir("dist")))
