@@ -48,87 +48,65 @@ GGUF Libra relies on `llama.cpp` for local inference. Two concurrent services ar
 - **Chat Model**: Handles conversational responses and summarization (e.g., Gemma 4 E4B on port `8021`).
 - **Embedding Model**: Handles vectorization for RAG retrieval (e.g., Embedding Gemma 300M on port `8022`).
 
-Use the following Python script to launch both services in the background:
+Use the following powershell script to launch both services in the background:
 
-```python
-import subprocess
-import os
-import sys
+```powershell
+# Change working directory
+Set-Location -Path "D:\llama_cpp"
 
-def main():
-    os.system("")
+Write-Host "======================================================" -ForegroundColor Yellow
+Write-Host " Starting dual services in a single window:" -ForegroundColor Yellow
+Write-Host "   ▶ Main Model API:      http://0.0.0.0:8021" -ForegroundColor Green
+Write-Host "   ▶ Embedding API:       http://0.0.0.0:8022" -ForegroundColor Cyan
+Write-Host " Logs from both services will stream here. Press Ctrl + C to exit." -ForegroundColor Yellow
+Write-Host "======================================================`n" -ForegroundColor Yellow
 
-    # Working directory (adjust to your local llama.cpp path)
-    work_dir = r"D:\llama_cpp"
-    
-    if not os.path.exists(work_dir):
-        print(f"Error: Directory not found: {work_dir}")
-        sys.exit(1)
+# Arguments for Embedding service (Port 8022)
+$embedArgs = @(
+    "-m", "models\embeddinggemma-300M-Q8_0.gguf",
+    "-ngl", "0",
+    "-c", "2048",
+    "-b", "2048",
+    "-ub", "2048",
+    "--port", "8022",
+    "--host", "0.0.0.0",
+    "--embedding",
+    "--pooling", "mean"
+)
 
-    log_file1_path = os.path.join(work_dir, "llama_main_8021.log")
-    log_file2_path = os.path.join(work_dir, "llama_embedding_8022.log")
+# Arguments for Main Model service (Port 8021)
+$mainArgs = @(
+    "-m", "models\gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+    "--mmproj", "models\gemma-4-12b-mmproj-F16.gguf",
+    "-ngl", "45",
+    "-c", "16384",
+    "--port", "8021",
+    "--host", "0.0.0.0",
+    "--cache-ram", "2048",
+    "--cache-type-k", "q8_0",
+    "--cache-type-v", "q8_0",
+    "--keep", "0",
+    "-fa", "on",
+    "-np", "1",
+    "--reasoning", "off",
+    "--repeat-penalty", "1.1"
+)
 
-    # Service 1: Main chat model (Port 8021)
-    cmd1 = [
-        "llama-server.exe",
-        "-m", r"models\gemma-4-E4B-it-Q5_K_M.gguf",
-        "--mmproj", r"models\gemma-4-e4b-mmproj-F16.gguf",
-        "-ngl", "99",
-        "-c", "32768",
-        "--port", "8021",
-        "--host", "0.0.0.0",
-        "--cache-ram", "512",
-        "--cache-type-k", "q8_0",
-        "--cache-type-v", "q8_0",
-        "--keep", "0",
-        "-fa", "on",
-        "-np", "1",
-        "--reasoning", "off",
-        "--repeat-penalty", "1.15",
-        "--mlock"
-    ]
+# 1. Start Embedding service in background (-NoNewWindow routes stdout/stderr directly into this console)
+$embedProcess = Start-Process -FilePath ".\llama-server.exe" -ArgumentList $embedArgs -PassThru -NoNewWindow
 
-    # Service 2: Embedding model (Port 8022)
-    cmd2 = [
-        "llama-server.exe",
-        "-m", r"models\embeddinggemma-300M-Q8_0.gguf", 
-        "-ngl", "99",
-        "-c", "8192",
-        "--port", "8022",
-        "--host", "0.0.0.0",
-        "--embedding",
-        "--pooling", "mean"
-    ]
+try {
+    # 2. Run Main Model in the foreground (streaming logs to the same window)
+    & ".\llama-server.exe" @mainArgs
+}
+finally {
+    # 3. Clean up: Automatically kill the Embedding background process when exiting or pressing Ctrl + C
+    if ($embedProcess -and -not $embedProcess.HasExited) {
+        Write-Host "`nStopping Embedding service..." -ForegroundColor Yellow
+        Stop-Process -Id $embedProcess.Id -Force
+    }
+}
 
-    print("Starting llama.cpp services...")
-    print(f"[Service 1] Main model: http://127.0.0.1:8021")
-    print(f"[Service 2] Embedding : http://127.0.0.1:8022")
-    print("Loading models into VRAM...")
-
-    try:
-        log1 = open(log_file1_path, "w", encoding="utf-8")
-        log2 = open(log_file2_path, "w", encoding="utf-8")
-
-        process1 = subprocess.Popen(cmd1, cwd=work_dir, stdout=log1, stderr=subprocess.STDOUT)
-        process2 = subprocess.Popen(cmd2, cwd=work_dir, stdout=log2, stderr=subprocess.STDOUT)
-        
-        print("Both services are running in the background.")
-        print("Press Ctrl + C to terminate both services.\n")
-        
-        process1.wait()
-        process2.wait()
-        
-    except KeyboardInterrupt:
-        print("\nShutting down services...")
-        if 'process1' in locals(): process1.terminate()
-        if 'process2' in locals(): process2.terminate()
-        print("Services shut down successfully.")
-    finally:
-        if 'log1' in locals() and not log1.closed: log1.close()
-        if 'log2' in locals() and not log2.closed: log2.close()
-
-if __name__ == "__main__":
-    main()
 ```
 
 ### 2. Launch the Application Client

@@ -19,7 +19,7 @@
         {
             "id": "test",
             "name": "test",
-            "content": "Maintain a natural, human-like conversational tone"
+            "content": "1.Respond in Chinese. 2.Maintain a natural, human-like conversational tone"
         },
         {
             "id": "ocr",
