@@ -704,61 +704,56 @@ function finalizeAiBubble(ctx) {
 
 function createNotebookBar() {
     const notebookBar = document.createElement("div");
+
     notebookBar.className =
-        "notebook-bar group relative flex flex-col items-center justify-center my-4 opacity-40 hover:opacity-100 transition-opacity duration-200";
+        "notebook-bar relative flex items-center justify-start my-3 transition-opacity duration-200";
 
     notebookBar.innerHTML = `
-    <div class="w-full relative flex items-center justify-center">
-        <!-- Background horizontal line -->
-        <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-gray-200 dark:border-gray-800"></div>
-        </div>
+    <div class="inline-flex items-center gap-2 text-xs font-mono">
         
-        <!-- Floating action button group -->
-        <div class="relative flex items-center gap-2 bg-white dark:bg-[#1e1f20] px-3 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-mono">
-            <button class="switch-btn hover:text-rose-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                <span class="text-grey-400 font-bold">s</span> switch to main 
-            </button>
-            <span class="text-gray-300 dark:text-gray-700">|</span>
+        <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-500/50 hover:bg-rose-50/60 dark:hover:bg-rose-500/10 shadow-xs active:scale-[0.98] transition-all">
+            <span class="font-bold text-gray-400 group-hover:text-rose-500">s</span>
+            <span>switch to main</span>
+        </button>
 
-            <!-- Container for Fork Side Chat with Popover -->
-            <div class="relative inline-block">
-                <button class="fork-side-btn hover:text-emerald-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="text-grey-400 font-bold">🌿</span> Side Chat
+        <div class="relative inline-block">
+            <button class="fork-side-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:bg-emerald-50/60 dark:hover:bg-emerald-500/10 shadow-xs active:scale-[0.98] transition-all">
+                <span>🌿</span>
+                <span>Side Chat</span>
+            </button>
+            
+            <div class="fork-options-popover hidden absolute bottom-full mb-2 left-0 w-52 bg-white dark:bg-[#202124] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
+                <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
+                    <span>⚡</span>
+                    <div>
+                        <div class="font-medium">With Summary</div>
+                        <div class="text-[9px] text-gray-400">Keep core context</div>
+                    </div>
                 </button>
-                
-                <!-- Floating options popover (hidden by default) -->
-                <div class="fork-options-popover hidden absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 bg-white dark:bg-[#1e1f20] border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
-                    <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                        <span>⚡</span>
-                        <div>
-                            <div class="font-medium">With Summary</div>
-                            <div class="text-[9px] text-gray-400">Keep core context</div>
-                        </div>
-                    </button>
-                    <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                        <span>🌱</span>
-                        <div>
-                            <div class="font-medium">Isolated Sandbox</div>
-                            <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
-                        </div>
-                    </button>
-                </div>
+                <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
+                    <span>🌱</span>
+                    <div>
+                        <div class="font-medium">Isolated Sandbox</div>
+                        <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
+                    </div>
+                </button>
             </div>
-
-            <span class="text-gray-300 dark:text-gray-700">|</span>
-            <button class="summary-btn hover:text-amber-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                <span class="text-grey-400 font-bold">⚡</span> Summary
-            </button>
-            <span class="text-gray-300 dark:text-gray-700">|</span>
-            <button class="merge-btn hover:text-purple-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                <span class="text-grey-400 font-bold">m</span> Merge
-            </button>
-            <span class="text-gray-300 dark:text-gray-700">|</span>
-            <button class="archive-btn hover:text-blue-500 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/5">
-                <span class="text-grey-400 font-bold">📑</span> Archive main
-            </button>
         </div>
+
+        <button class="summary-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-500/50 hover:bg-amber-50/60 dark:hover:bg-amber-500/10 shadow-xs active:scale-[0.98] transition-all">
+            <span>⚡</span>
+            <span>Summary</span>
+        </button>
+
+        <button class="merge-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:border-purple-300 dark:hover:border-purple-500/50 hover:bg-purple-50/60 dark:hover:bg-purple-500/10 shadow-xs active:scale-[0.98] transition-all">
+            <span class="font-bold text-gray-400">m</span>
+            <span>Merge</span>
+        </button>
+
+        <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50/60 dark:hover:bg-blue-500/10 shadow-xs active:scale-[0.98] transition-all">
+            <span>📑</span>
+            <span>Archive main</span>
+        </button>
     </div>
     `;
 

@@ -8,17 +8,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-    --bg-main: #fcfcfb;
-    --bg-header: #fcfcfb;
+    --bg-main: #ffffff;
+    --bg-header: #ffffff;
     --text-main: #1f1f1f;
-    --border-color: #5e6062;
+    --border-color: #e5e7eb;
 }
 
 .dark-mode-active {
-    --bg-main: #131314;
-    --bg-header: #131314;
+    --bg-main: #18191a;
+    --bg-header: #242526;
     --text-main: #e3e3e3;
-    --border-color: #4b5563;
+    --border-color: #3e4042;
 }
 
 body {

@@ -115,7 +115,8 @@
     </div>
 
     <!-- Header -->
-    <header class="p-4 px-6 flex items-center justify-between z-50">
+    <header
+        class="p-3.5 px-6 flex items-center justify-between z-50 border-b border-gray-200/80 dark:border-[#3e4042] shadow-[0_1px_2px_0_rgba(0,0,0,0.03)] transition-colors">
         <div class="flex items-center gap-2">
             <span class="font-bold text-xl text-[#0b57d0] tracking-tight">GGUF Libra</span>
             <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-400 transition-colors duration-300 shadow-sm"
@@ -169,24 +170,24 @@
         </div>
     </header>
 
-    <main id="chat-box" class="p-4 space-y-6 max-w-4xl mx-auto w-full">
+    <main id="chat-box" class="p-4 space-y-6 max-w-3xl mx-auto w-full">
         <div class="flex justify-start">
             <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">Hello!</div>
         </div>
     </main>
 
     <div id="ai-loading-template"
-        class="hidden flex justify-start items-start gap-3 px-4 max-w-4xl mx-auto w-full mb-6">
-        <div class="mt-4 flex-shrink-0">
-            <div class="w-4 h-4 border-2 border-[#0b57d0] border-t-transparent rounded-full animate-spin"></div>
+        class="hidden flex justify-start items-center gap-3 px-4 max-w-3xl mx-auto w-full mb-6">
+        <div class="ai-bubble p-4 rounded-2xl text-sm italic opacity-70 flex items-center gap-2">
+            <div class="w-3.5 h-3.5 border-2 border-[#0b57d0] border-t-transparent rounded-full animate-spin"></div>
+            <span>Thinking...</span>
         </div>
-        <div class="ai-bubble p-4 rounded-2xl text-sm italic opacity-70">Thinking...</div>
     </div>
     <footer>
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="flex justify-end mb-2">
+        <div class="max-w-3xl mx-auto px-4 py-3">
+            <div class="flex justify-end mb-1.5">
                 <div id="branch-indicator"
-                    class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-white/10 text-amber-600 dark:text-amber-400 transition-colors shadow-sm cursor-default">
+                    class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-white/10 text-amber-600 dark:text-amber-400 transition-colors shadow-xs cursor-default">
                     Current: Main
                 </div>
             </div>
@@ -205,14 +206,13 @@
                 </div>
             </div>
 
-            <div
-                class="flex items-end rounded-3xl border border-gray-200 dark:border-gray-700 px-4 py-2 bg-white dark:bg-[#1e1f20] transition-all duration-300 shadow-sm focus-within:border-gray-300 dark:focus-within:border-gray-600">
+            <div class="flex items-center rounded-xl bg-white dark:bg-[#1e1f20] border border-gray-300 dark:border-gray-700 px-2.5 py-1.5 transition-all duration-200
+    focus-within:border-gray-400 dark:focus-within:border-gray-500 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
 
-                <!-- Knowledge base document upload button -->
                 <label for="doc-input" id="upload-doc-btn"
-                    class="p-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors text-gray-500 flex items-center justify-center shrink-0"
+                    class="p-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-gray-500 flex items-center justify-center shrink-0"
                     title="Import knowledge base document">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
                         </path>
@@ -220,10 +220,9 @@
                     <input type="file" id="doc-input" accept=".cpp,.py,.go,.js" class="hidden">
                 </label>
 
-                <!-- Image upload button -->
                 <label for="image-input"
-                    class="p-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors text-gray-500 flex items-center justify-center shrink-0">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="p-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-gray-500 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
                         </path>
@@ -232,9 +231,12 @@
                 </label>
 
                 <textarea id="user-input" rows="1" placeholder="Type a message..."
-                    class="flex-1 bg-transparent border-none focus:outline-none text-base py-2.5 px-2 resize-none leading-relaxed text-gray-800 dark:text-gray-200"></textarea>
+                    class="flex-1 bg-transparent border-none focus:outline-none text-sm py-1.5 px-2.5 resize-none leading-relaxed text-gray-800 dark:text-gray-200"></textarea>
+
                 <button id="send-btn"
-                    class="ml-2 bg-[#0b57d0] text-white rounded-full font-medium shrink-0 active:scale-95 transition-all w-20 h-10 flex items-center justify-center">Send</button>
+                    class="ml-1.5 px-4 h-8 bg-[#0b57d0] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shrink-0 active:scale-95 transition-all flex items-center justify-center">
+                    Send
+                </button>
             </div>
 
             <p class="mt-2 text-xs text-gray-400 dark:text-gray-400 text-center tracking-wide">
