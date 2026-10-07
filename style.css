@@ -146,8 +146,9 @@ header button:hover {
     overflow-y: hidden;
     overflow-x: hidden;
     overflow-wrap: anywhere;
-    /* Scrollbar hidden by default; visibility controlled via JS */
     scrollbar-width: thin;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 
 /* Prevent send button deformation when input area expands */
