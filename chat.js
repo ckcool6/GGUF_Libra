@@ -12,6 +12,11 @@ import "katex/dist/katex.min.css";
 import "highlight.js/styles/atom-one-light.min.css";
 
 // ==================================== UTILITY FUNCTIONS =====================================
+const SEND_ICON_HTML = `
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"></path>
+</svg>`;
+
 // Escape user plain text and handle line breaks
 function formatUserText(str) {
     // Create a temporary div to escape text using the browser's textContent property
@@ -80,7 +85,7 @@ async function initPromptSelect() {
             // Reset button and loading states
             loading.classList.add("hidden");
             sendBtn.classList.remove("is-loading");
-            sendBtn.innerHTML = "Send";
+            sendBtn.innerHTML = SEND_ICON_HTML;
 
             try {
                 // Notify backend to switch prompt
@@ -399,8 +404,7 @@ async function send() {
 
     sendBtn.classList.add("is-loading");
     // Change button UI to stop icon
-    sendBtn.innerHTML = `<svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clip-rule="evenodd" /></svg>`;
-
+    sendBtn.innerHTML = `<svg class="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>`;
     // Stash image and reset input
     const imageToSend = currentImageBase64;
     input.value = "";
@@ -496,7 +500,7 @@ async function send() {
     } finally {
         loading.classList.add("hidden");
         sendBtn.classList.remove("is-loading");
-        sendBtn.innerHTML = "Send";
+        sendBtn.innerHTML = SEND_ICON_HTML;
         chatAbortController = null;
         get_ctx_usage();
     }
@@ -1385,7 +1389,7 @@ async function newChat() {
         // Reset button and loading states
         loading.classList.add("hidden");
         sendBtn.classList.remove("is-loading");
-        sendBtn.innerHTML = "Send";
+        sendBtn.innerHTML = SEND_ICON_HTML;
 
         try {
             await fetch("/api/new-chat", { headers: getHeaders() });
