@@ -146,6 +146,15 @@ func main() {
 
 	// Fork a side branch handler
 	http.HandleFunc("/api/fork-side", func(w http.ResponseWriter, r *http.Request) {
+		// Validation: A summary must exist prior to forking, otherwise reject
+		if currentChain == nil || currentChain.DialogAbstract == "" {
+			w.WriteHeader(http.StatusPreconditionFailed) // 412
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "A summary and archive are required on the main branch before forking.",
+			})
+			return
+		}
+
 		ClearVectorDB() // Prevent side branch from being affected by the vector knowledge base
 
 		// Inherit summary by default

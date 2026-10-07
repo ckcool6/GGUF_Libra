@@ -271,8 +271,6 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Current-Branch", getCurrentBranchName(currentChain))
 	w.Header().Set("Access-Control-Expose-Headers", "X-Current-Branch")
 
-	// Traverse rootChain directly from memory rather than re-reading the file
-	// In-memory rootChain contains the most up-to-date state
 	if rootChain == nil {
 		json.NewEncoder(w).Encode([]Message{})
 		return
@@ -281,27 +279,28 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	history := []Message{}
 
 	var collectMessages func(node *chatChain)
+
 	collectMessages = func(node *chatChain) {
 		if node == nil {
 			return
 		}
 
+		collectMessages(node.DialogSide)
+
 		if node.DialogContent != nil && len(node.DialogContent.ChatHistory) > 0 {
-			// Extract non-system messages for this node
+			branchType := getCurrentBranchName(node)
 			nodeMsgs := []Message{}
 			for _, msg := range node.DialogContent.ChatHistory {
 				if msg.Role != "system" {
+					msg.Branch = branchType
 					nodeMsgs = append(nodeMsgs, msg)
 				}
 			}
 
-			// Mount summary to node
 			if len(nodeMsgs) > 0 {
 				lastIdx := len(nodeMsgs) - 1
-				// Assign node summary to the last visible message of this node
 				nodeMsgs[lastIdx].Abstract = node.DialogAbstract
 
-				// Process history archives
 				if len(node.HistoryArchives) > 0 {
 					for _, archChain := range node.HistoryArchives {
 						archMsgs := extractAllMessages(archChain)
@@ -313,8 +312,6 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 			history = append(history, nodeMsgs...)
 		}
 
-		// Reverse DFS traversal
-		collectMessages(node.DialogSide)
 		collectMessages(node.DialogMain)
 	}
 

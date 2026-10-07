@@ -801,16 +801,68 @@ function createNotebookBar() {
         }
     });
 
-    // Bind Fork Side event
+    // Bind Fork Side event (Enforces pipeline: Generate Summary -> Archive Main -> Fork Side)
     const doForkSide = async (withSummary) => {
         try {
+            // Check if a valid summary box is already rendered on screen
+            const existingSummary = notebookBar.parentElement?.querySelector(".summary-box textarea")?.value?.trim();
+
+            // 1. If no summary exists yet, generate it first
+            if (!existingSummary) {
+                const loadingNotice = document.createElement("div");
+                loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
+                loadingNotice.innerText = "⏳ Generating summary and archiving main branch...";
+                chatBox.appendChild(loadingNotice);
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                const customUrl = localStorage.getItem("custom_api_url") || "";
+                const customKey = localStorage.getItem("custom_api_key") || "";
+
+                const absRes = await fetch("/api/generate-abstract", {
+                    method: "POST",
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        custom_url: customUrl,
+                        custom_key: customKey,
+                    }),
+                });
+
+                loadingNotice.remove();
+
+                if (!absRes.ok) {
+                    alert("Failed to generate summary; unable to fork side branch.");
+                    return;
+                }
+            }
+
+            // 2. Archive main branch (spawn new chapter node)
+            const archRes = await fetch("/api/archive-main", {
+                method: "POST",
+                headers: getHeaders(),
+            });
+
+            if (!archRes.ok) {
+                const err = await archRes.json().catch(() => ({}));
+                alert(err.error || "Failed to archive main branch; unable to fork side branch.");
+                return;
+            }
+
+            // 3. Execute fork side branch
             const res = await fetch("/api/fork-side", {
                 method: "POST",
                 headers: getHeaders(),
-                body: JSON.stringify({ with_summary: withSummary })
+                body: JSON.stringify({ with_summary: withSummary }),
             });
+
             if (res.ok) {
                 updateBranchIndicator("side");
+
+                // 4. CRITICAL: Reload history to render the yellow summary box into the chat flow
+                if (typeof loadHistory === "function") {
+                    await loadHistory();
+                }
+
+                // 5. Append side branch switch notification
                 const notice = document.createElement("div");
                 notice.className =
                     "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
@@ -824,6 +876,7 @@ function createNotebookBar() {
             }
         } catch (e) {
             console.error("Fork Side failed:", e);
+            alert("Failed to fork side branch, please try again.");
         }
     };
 
@@ -1278,10 +1331,9 @@ function clearImage() {
     imageInput.value = "";
 }
 
-// Download/Export chat
+// Download/Export chat (supports inline side-branch detours)
 async function downloadChat() {
     try {
-        // Fetch raw Markdown chat history from backend
         const res = await fetch("/api/history");
         const data = await res.json();
 
@@ -1290,20 +1342,36 @@ async function downloadChat() {
             return;
         }
 
-        let content = "--- Chat History ---\n\n";
-        data.forEach((m) => {
-            if (m.role === "system") return; // Ignore system prompt; export user and AI dialogs only
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10);
+        let content = `==================== Chat History (${dateStr}) ====================\n\n`;
 
-            const role = m.role === "user" ? "[User]" : "[AI]";
+        data.forEach((m) => {
+            // Tag role based on branch: Main Branch vs. Side Branch
+            const branchTag = m.branch === "side" ? " [Side Branch]" : " [Main Branch]";
+            const role = m.role === "user" ? `[User${branchTag}]` : `[AI${branchTag}]`;
+
             content += `${role}\n${m.content.trim()}\n\n`;
+
+            // Append summary if present
+            if (m.abstract && m.abstract.trim() !== "") {
+                content += `[Summary]\n${m.abstract.trim()}\n\n`;
+            }
+
+            content += "--------------------------------------------------\n\n";
         });
 
+        // Generate .txt file and trigger download
         const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `chat-${Date.now()}.txt`;
+        a.download = `chat-${dateStr}.txt`;
+
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+
         URL.revokeObjectURL(url);
     } catch (e) {
         console.error("Failed to export chat history:", e);
