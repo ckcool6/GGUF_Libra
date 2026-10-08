@@ -144,18 +144,15 @@ function updateBranchIndicator(text) {
     if (indicator) {
         indicator.innerText = `current：${text}`;
 
-        // Strip any existing color classes
         indicator.classList.remove(
             "text-gray-600", "dark:text-gray-300",
             "text-emerald-600", "dark:text-emerald-400",
             "text-amber-600", "dark:text-amber-400"
         );
 
-        if (text === "side") {
-            // Side branch: text turns green
+        if (text.startsWith("side")) {
             indicator.classList.add("text-emerald-600", "dark:text-emerald-400");
         } else {
-            // Main branch: text turns amber
             indicator.classList.add("text-amber-600", "dark:text-amber-400");
         }
     }

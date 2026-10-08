@@ -90,14 +90,53 @@ var (
 	}
 )
 
+// Calculate the lateral branch depth of the current node relative to the backbone
+func getSideBranchDepth(root, current *chatChain) int {
+	if root == nil || current == nil || current.BranchColor == YellowNode {
+		return 0
+	}
+
+	var path []*chatChain
+	var findPath func(node *chatChain) bool
+	findPath = func(node *chatChain) bool {
+		if node == nil {
+			return false
+		}
+		path = append(path, node)
+		if node == current {
+			return true
+		}
+		if findPath(node.DialogMain) || findPath(node.DialogSide) {
+			return true
+		}
+		path = path[:len(path)-1]
+		return false
+	}
+
+	if !findPath(root) {
+		return 1
+	}
+
+	// side node count
+	depth := 0
+	for _, n := range path {
+		if n.BranchColor == GreenNode {
+			depth++
+		}
+	}
+	if depth == 0 {
+		return 1
+	}
+	return depth
+}
+
 func getCurrentBranchName(chain *chatChain) string {
-	if chain == nil {
+	if chain == nil || chain.BranchColor == YellowNode {
 		return "main"
 	}
-	if chain.BranchColor == GreenNode || chain.IsForkedNode {
-		return "side"
-	}
-	return "main"
+	// eg. side#1, side#2
+	depth := getSideBranchDepth(rootChain, chain)
+	return fmt.Sprintf("side#%d", depth)
 }
 
 func main() {
