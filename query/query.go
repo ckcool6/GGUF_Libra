@@ -89,6 +89,21 @@ func NewEngine(binPath string) (*Engine, error) {
 	}, nil
 }
 
+// Check whether the text contains all the keywords from the input (split by spaces)
+func matchAllKeywords(text, input string) bool {
+	words := strings.Fields(input) // Automatically split into a word list by spaces
+
+	if len(words) == 0 {
+		return false
+	}
+	for _, w := range words {
+		if !strings.Contains(text, w) {
+			return false
+		}
+	}
+	return true
+}
+
 // Query implements a two-stage search strategy:
 //  1. Fast Path: Match against the terminal leaf nodes of the topK trees.
 //  2. Reverse Search: If unmatched, scan backwards from the latest/deepest node across
@@ -121,7 +136,7 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		cleanRecKey := strings.Trim(strings.ToLower(rec.Keyword), " \t\r\n\"'“”‘’")
 
 		// Check if keyword matches the tree's terminal summary
-		if cleanRecKey != "" && (strings.Contains(cleanInput, cleanRecKey) || strings.Contains(cleanRecKey, cleanInput)) {
+		if cleanRecKey != "" && (matchAllKeywords(cleanRecKey, cleanInput) || matchAllKeywords(cleanInput, cleanRecKey)) {
 			if len(rec.Matrix.Entries) > 0 {
 				// Matched the terminal leaf node of the current tree
 				targetLeafID := rec.Matrix.Entries[len(rec.Matrix.Entries)-1].EndID

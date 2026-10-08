@@ -756,7 +756,7 @@ function createNotebookBar() {
 
         <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50/60 dark:hover:bg-blue-500/10 shadow-xs active:scale-[0.98] transition-all">
             <span>📑</span>
-            <span>Archive main</span>
+            <span>Checkpoint Main</span>
         </button>
     </div>
     `;
@@ -803,6 +803,9 @@ function createNotebookBar() {
     // Bind Fork Side event (Enforces pipeline: Generate Summary -> Archive Main -> Fork Side)
     const doForkSide = async (withSummary) => {
         try {
+            const histRes = await fetch("/api/history", { headers: getHeaders() });
+            const currentBranch = histRes.headers.get("X-Current-Branch") || "main";
+
             // Check if a valid summary box is already rendered on screen
             const existingSummary = notebookBar.parentElement?.querySelector(".summary-box textarea")?.value?.trim();
 
@@ -810,7 +813,7 @@ function createNotebookBar() {
             if (!existingSummary) {
                 const loadingNotice = document.createElement("div");
                 loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
-                loadingNotice.innerText = "⏳ Generating summary and archiving main branch...";
+                loadingNotice.innerText = "⏳ Generating summary...";
                 chatBox.appendChild(loadingNotice);
                 chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -834,16 +837,18 @@ function createNotebookBar() {
                 }
             }
 
-            // 2. Archive main branch (spawn new chapter node)
-            const archRes = await fetch("/api/archive-main", {
-                method: "POST",
-                headers: getHeaders(),
-            });
+            // 2. Archive main branch (must main)
+            if (currentBranch === "main") {
+                const archRes = await fetch("/api/archive-main", {
+                    method: "POST",
+                    headers: getHeaders(),
+                });
 
-            if (!archRes.ok) {
-                const err = await archRes.json().catch(() => ({}));
-                alert(err.error || "Failed to archive main branch; unable to fork side branch.");
-                return;
+                if (!archRes.ok) {
+                    const err = await archRes.json().catch(() => ({}));
+                    alert(err.error || "Failed to archive main branch; unable to fork side branch.");
+                    return;
+                }
             }
 
             // 3. Execute fork side branch
