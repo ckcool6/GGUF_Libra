@@ -6,6 +6,7 @@ package query
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -13,6 +14,16 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 )
+
+var LogFunc func(format string, a ...any)
+
+func logDebug(format string, a ...any) {
+	if LogFunc != nil {
+		LogFunc(format, a...)
+	} else {
+		fmt.Printf(format, a...)
+	}
+}
 
 type Entry struct {
 	StartID int      `msgpack:"start_id"`
@@ -104,17 +115,17 @@ func matchAllKeywords(text, input string) bool {
 	return true
 }
 
-// Query implements a two-stage search strategy:
-//  1. Fast Path: Match against the terminal leaf nodes of the topK trees.
-//  2. Reverse Search: If unmatched, scan backwards from the latest/deepest node across
-//     intermediate nodes and safely backtrack to the tree's local root (preventing cross-tree pollution).
+// Query implements a dynamic forgetting mechanism (activating only the top 15%
+// highest-dimensional deep memories, while pruning 90% of shallow data).
+// topK serves as an optional caller-defined hard cap; passing 0 delegates full control
+// to the dynamic 15% retention ratio.
 func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	limit := topK
-	if limit <= 0 || limit > len(e.Records) {
-		limit = len(e.Records)
+	total := len(e.Records)
+	if total == 0 {
+		return nil, errors.New("empty database")
 	}
 
 	cleanInput := strings.Trim(strings.ToLower(keyword), " \t\r\n\"'“”‘’")
@@ -123,7 +134,30 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 	}
 
 	// =========================================================================
-	// Stage 1: Fast Path - Match terminal nodes across topK trees
+	// Dynamic 15% Memory Retention (Prunes 90% of Shallow Data)
+	// =========================================================================
+	// 1. Dynamically compute the top 15% active memory capacity
+	retentionRatio := 0.15
+	limit := int(float64(total) * retentionRatio)
+
+	// 2. Cold-start floor: ensure at least minKeep records are retained when
+	// the dataset is small (prevents limit from dropping to 0)
+	const minKeep = 3
+	if limit < minKeep {
+		limit = minKeep
+	}
+	if limit > total {
+		limit = total
+	}
+
+	// 3. Compatibility fallback: respect caller-specified topK if it is stricter than the 15% ratio
+	if topK > 0 && topK < limit {
+		limit = topK
+	}
+	logDebug("[DEBUG Query] total: %d, topK: %d, calculated limit: %d\n", total, topK, limit)
+
+	// =========================================================================
+	// Stage 1: Fast Path - Match terminal summaries in the active 15% memory pool
 	// =========================================================================
 	for i := 0; i < limit; i++ {
 		select {
@@ -146,9 +180,9 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 	}
 
 	// =========================================================================
-	// Stage 2: Fallback - Flatten and reverse deep search from the latest node
+	// Stage 2: Fallback - Reverse deep search across intermediate nodes
 	// =========================================================================
-	// Scan backwards from the last tree and its deepest edge (prioritizes latest relevant context)
+	// Strictly confined to the [0, limit) active memory window
 	for i := limit - 1; i >= 0; i-- {
 		rec := &e.Records[i]
 		entries := rec.Matrix.Entries
@@ -184,7 +218,7 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		}
 	}
 
-	return nil, errors.New("no matching node found in topK trees")
+	return nil, errors.New("no matching node found in active 15% memory")
 }
 
 // backtrackWithinTree enforces strict tree-scoped isolation:

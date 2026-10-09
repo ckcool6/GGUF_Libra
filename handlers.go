@@ -93,8 +93,8 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	var thoughtChainSnippet string
 
 	if queryEngine != nil {
-		// Query top 5 dialogue trees
-		qRes, qErr := queryEngine.Query(r.Context(), 5, body.Message)
+		// Query active top 15% memory pool (pass 0 to let dynamic retention take over)
+		qRes, qErr := queryEngine.Query(r.Context(), 0, body.Message)
 
 		if qErr != nil {
 			// ==========================================

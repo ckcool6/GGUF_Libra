@@ -31,7 +31,7 @@ class AppTUI(cmd.Cmd):
     TAG_INFO = f"{CYAN}[INFO]{RESET}"
     TAG_WARN = f"{YELLOW}[WARN]{RESET}"
 
-    prompt = 'my-app> '
+    prompt = 'DB > '
 
     intro = (
         f"{BOLD}Welcome to the Console!{RESET}\n\n"

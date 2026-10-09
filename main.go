@@ -142,6 +142,7 @@ func getCurrentBranchName(chain *chatChain) string {
 func main() {
 
 	var err error
+	query.LogFunc = logPrintf
 
 	// Initialize and load data.bin (assign to global queryEngine)
 	queryEngine, err = query.NewEngine("data.bin")
