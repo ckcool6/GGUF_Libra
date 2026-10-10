@@ -307,6 +307,12 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 						nodeMsgs[lastIdx].Archives = append(nodeMsgs[lastIdx].Archives, archMsgs)
 					}
 				}
+			} else if len(node.HistoryArchives) > 0 && len(history) > 0 {
+				prevIdx := len(history) - 1
+				for _, archChain := range node.HistoryArchives {
+					archMsgs := extractAllMessages(archChain)
+					history[prevIdx].Archives = append(history[prevIdx].Archives, archMsgs)
+				}
 			}
 
 			history = append(history, nodeMsgs...)
