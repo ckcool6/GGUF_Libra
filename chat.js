@@ -11,12 +11,59 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/atom-one-light.min.css";
 
-// ==================================== UTILITY FUNCTIONS =====================================
+//=====================================icons===================================================
 const SEND_ICON_HTML = `
 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"></path>
 </svg>`;
 
+const SIDE_BRANCH_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+  <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+</svg>
+`
+const CHECKPOINT_MAIN_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <rect width="14" height="18" x="3" y="3" rx="2"/>
+  <path d="M17 7h4v3h-4"/>
+  <path d="M17 14h4v3h-4"/>
+</svg>
+`
+const SANDBOX_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <path d="M12 10a6 6 0 0 0-6-6H3v2a6 6 0 0 0 6 6h3"/>
+  <path d="M12 14a6 6 0 0 1 6-6h3v1a6 6 0 0 1-6 6h-3"/>
+  <path d="M12 20v-10"/>
+</svg>
+`
+const LOADING_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -0.125em;">
+  <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4z"/>
+</svg>
+`
+const SUMMARY_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+</svg>
+`
+
+const SWITCH_MAIN_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <path d="M9 14 4 9l5-5"/>
+  <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
+</svg>
+`;
+
+const MERGE_ICON_HTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -0.125em;">
+  <circle cx="18" cy="18" r="3"/>
+  <circle cx="6" cy="6" r="3"/>
+  <path d="M6 21V9a9 9 0 0 0 9 9"/>
+</svg>
+`;
+
+// ==================================== UTILITY FUNCTIONS =====================================
 // Escape user plain text and handle line breaks
 function formatUserText(str) {
     // Create a temporary div to escape text using the browser's textContent property
@@ -324,7 +371,7 @@ async function loadHistory() {
                         summaryBox.innerHTML = `
                             <div class="flex items-center justify-between mb-1.5">
                                 <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
-                                    <span>⚡</span> Conversation Summary
+                                    <span>${SUMMARY_HTML}</span> Conversation Summary
                                 </div>
                             </div>
                             <div class="summary-content markdown-body text-xs opacity-90">${m.abstract}</div>
@@ -713,26 +760,26 @@ function createNotebookBar() {
     <div class="inline-flex items-center gap-2 text-xs font-mono">
         
         <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-500/50 hover:bg-rose-50/60 dark:hover:bg-rose-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span class="font-bold text-gray-400 group-hover:text-rose-500">s</span>
-            <span>switch to main</span>
+            <span>${SWITCH_MAIN_HTML}</span>
+            <span>Switch to main</span>
         </button>
 
         <div class="relative inline-block">
             <button class="fork-side-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:bg-emerald-50/60 dark:hover:bg-emerald-500/10 shadow-xs active:scale-[0.98] transition-all">
-                <span>🌿</span>
+                <span>${SIDE_BRANCH_HTML}</span>
                 <span>Side Chat</span>
             </button>
             
             <div class="fork-options-popover hidden absolute bottom-full mb-2 left-0 w-52 bg-white dark:bg-[#202124] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
                 <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                    <span>⚡</span>
+                    <span>${SUMMARY_HTML}</span>
                     <div>
                         <div class="font-medium">With Summary</div>
                         <div class="text-[9px] text-gray-400">Keep core context</div>
                     </div>
                 </button>
                 <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                    <span>🌱</span>
+                    <span>${SANDBOX_HTML}</span>
                     <div>
                         <div class="font-medium">Isolated Sandbox</div>
                         <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
@@ -742,17 +789,17 @@ function createNotebookBar() {
         </div>
 
         <button class="summary-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-500/50 hover:bg-amber-50/60 dark:hover:bg-amber-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>⚡</span>
+            <span>${SUMMARY_HTML}</span>
             <span>Summary</span>
         </button>
 
         <button class="merge-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:border-purple-300 dark:hover:border-purple-500/50 hover:bg-purple-50/60 dark:hover:bg-purple-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span class="font-bold text-gray-400">m</span>
+            <span>${MERGE_ICON_HTML}</span>
             <span>Merge</span>
         </button>
 
         <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50/60 dark:hover:bg-blue-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>📑</span>
+            <span>${CHECKPOINT_MAIN_HTML}</span>
             <span>Checkpoint Main</span>
         </button>
     </div>
@@ -762,8 +809,17 @@ function createNotebookBar() {
     const archiveBtn = notebookBar.querySelector(".archive-btn");
 
     archiveBtn.addEventListener("click", async () => {
+        const indicator = document.getElementById("branch-indicator");
+        if (indicator && indicator.innerText.includes("side")) {
+            alert("Cannot checkpoint main while in a side branch! Please switch back to main or merge first.");
+            return;
+        }
+
+        const originalContent = archiveBtn.innerHTML;
+
         try {
-            archiveBtn.innerHTML = `<span class="text-blue-500 animate-spin">⏳</span> Archiving...`;
+            archiveBtn.innerHTML = `<span class="text-blue-500 animate-spin">${LOADING_HTML}</span> Archiving...`;
+            archiveBtn.disabled = true;
 
             let res = await fetch("/api/archive-main", {
                 method: "POST",
@@ -773,7 +829,8 @@ function createNotebookBar() {
             // If no summary exists, prompt to generate summary first
             if (res.status === 412) {
                 alert("Please click Summary to generate a summary before archiving.");
-                archiveBtn.innerHTML = `<span class="text-grey-500 font-bold">📑</span> Archive`;
+                archiveBtn.innerHTML = originalContent;
+                archiveBtn.disabled = false;
                 return;
             }
 
@@ -791,9 +848,13 @@ function createNotebookBar() {
             } else {
                 const err = await res.json();
                 alert(err.error || "Archive failed");
+                archiveBtn.innerHTML = originalContent;
+                archiveBtn.disabled = false;
             }
         } catch (e) {
             console.error(e);
+            archiveBtn.innerHTML = originalContent;
+            archiveBtn.disabled = false;
         }
     });
 
@@ -810,7 +871,7 @@ function createNotebookBar() {
             if (!existingSummary) {
                 const loadingNotice = document.createElement("div");
                 loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
-                loadingNotice.innerText = "⏳ Generating summary...";
+                loadingNotice.innerText = "Generating summary...";
                 chatBox.appendChild(loadingNotice);
                 chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -866,11 +927,10 @@ function createNotebookBar() {
                 // 5. Append side branch switch notification
                 const notice = document.createElement("div");
                 notice.className =
-                    "text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
-
-                notice.innerText = withSummary
-                    ? "🌿 Switched to side branch (Inherited summary)"
-                    : "🌱 Switched to isolated side branch (Clean context)";
+                    "flex items-center justify-center gap-1.5 text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
+                notice.innerHTML = withSummary
+                    ? `<span>${SIDE_BRANCH_HTML}</span> Switched to side branch (Inherited summary)`
+                    : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
 
                 chatBox.appendChild(notice);
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -950,7 +1010,7 @@ function createNotebookBar() {
             summaryBox.innerHTML = `
             <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
-                    <span>⚡</span> Conversation Summary
+                    <span>${SUMMARY_HTML}</span> Conversation Summary
                 </div>
                 <div id="summary-actions" class="flex items-center gap-2">
                     <!-- Save button injected here -->
@@ -973,7 +1033,7 @@ function createNotebookBar() {
             const customKey = localStorage.getItem("custom_api_key") || "";
 
             try {
-                btn.innerHTML = `<span class="text-amber-500 animate-spin">⏳</span> Summarizing...`;
+                btn.innerHTML = `<span class="text-amber-500 animate-spin">${LOADING_HTML}</span> Summarizing...`;
 
                 const res = await fetch("/api/generate-abstract", {
                     method: "POST",
@@ -1014,7 +1074,7 @@ function createNotebookBar() {
 
                 // Define save action logic
                 const performSave = async () => {
-                    saveBtn.innerHTML = `<span>⏳</span> Saving...`;
+                    saveBtn.innerHTML = `<span>${LOADING_HTML}</span> Saving...`;
                     try {
                         await fetch("/api/edit-abstract", {
                             method: "POST",
@@ -1063,7 +1123,7 @@ function createNotebookBar() {
             } catch (e) {
                 console.error("Summary failed:", e);
                 contentDiv.innerHTML = `<span class="text-rose-500">Error generating summary: ${e.message}</span>`;
-                btn.innerHTML = `<span class="text-amber-500 font-bold">⚡</span> Summary`;
+                btn.innerHTML = `<span class="text-amber-500 font-bold">${SUMMARY_HTML}</span> Summary`;
             }
         });
 
@@ -1079,7 +1139,7 @@ function createNotebookBar() {
         if (!confirm("Are you sure you want to discard the current side branch?")) return;
 
         try {
-            switchBtn.innerHTML = `<span class="text-rose-500 animate-spin">⏳</span> switching...`;
+            switchBtn.innerHTML = `<span class="text-rose-500 animate-spin">${LOADING_HTML}</span> switching...`;
 
             const res = await fetch("/api/switch-side-to-main", {
                 method: "POST",
@@ -1108,7 +1168,7 @@ async function handleMergeAction(btn) {
     const originalContent = btn.innerHTML;
 
     try {
-        btn.innerHTML = `<span class="text-purple-500 animate-spin">⏳</span> Merging...`;
+        btn.innerHTML = `<span class="text-purple-500 animate-spin">${LOADING_HTML}</span> Merging...`;
         btn.disabled = true;
 
         const customUrl = localStorage.getItem("custom_api_url") || "";
@@ -1122,7 +1182,7 @@ async function handleMergeAction(btn) {
 
         // If 412 (Precondition Failed), summary is missing; trigger summary first
         if (res.status === 412) {
-            btn.innerHTML = `<span class="text-amber-500 animate-pulse">📝</span> Summarizing first...`;
+            btn.innerHTML = `<span class="text-amber-500 animate-pulse">${SUMMARY_HTML}</span> Summarizing first...`;
 
             const sumRes = await fetch("/api/generate-abstract", {
                 method: "POST",
@@ -1616,7 +1676,7 @@ pageSearchInput.addEventListener("input", function () {
             li.className = "px-4 py-2 border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-gray-300";
 
             // Label message source
-            let icon = "🤖";
+            let icon = "✨";
             let label = "AI";
             if (bubble.classList.contains("user-bubble")) {
                 icon = "👤";
