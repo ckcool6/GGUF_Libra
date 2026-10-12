@@ -412,6 +412,8 @@ const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
 const loading = document.getElementById("ai-loading-template");
 const sendBtn = document.getElementById("send-btn");
+const openParserBtn = document.getElementById("open-parser-btn");
+
 
 if (input) {
     input.addEventListener("input", () => {
@@ -449,6 +451,11 @@ async function send() {
     sendBtn.classList.add("is-loading");
     // Change button UI to stop icon
     sendBtn.innerHTML = `<svg class="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>`;
+
+    if (openParserBtn) {
+        openParserBtn.classList.add("opacity-40", "pointer-events-none", "cursor-not-allowed");
+    }
+
     // Stash image and reset input
     const imageToSend = currentImageBase64;
     input.value = "";
@@ -546,6 +553,9 @@ async function send() {
         sendBtn.classList.remove("is-loading");
         sendBtn.innerHTML = SEND_ICON_HTML;
         chatAbortController = null;
+        if (openParserBtn) {
+            openParserBtn.classList.remove("opacity-40", "pointer-events-none", "cursor-not-allowed");
+        }
         get_ctx_usage();
     }
 }
@@ -1776,7 +1786,7 @@ if (docInput) {
 }
 
 // open parser
-const openParserBtn = document.getElementById("open-parser-btn");
+
 if (openParserBtn) {
     openParserBtn.addEventListener("click", async () => {
         try {
