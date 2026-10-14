@@ -16,7 +16,7 @@
 
 .dark-mode-active {
     --bg-main: #18191a;
-    --bg-header: #242526;
+    --bg-header: #18191a;
     --text-main: #e3e3e3;
     --border-color: #3e4042;
 }
