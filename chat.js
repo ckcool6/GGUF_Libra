@@ -1515,10 +1515,6 @@ document.getElementById("close-settings").addEventListener("click", () => {
     modal.classList.add("hidden");
 });
 
-modal.addEventListener("click", (e) => {
-    if (e.target === modal) modal.classList.add("hidden");
-});
-
 document.getElementById("save-settings").addEventListener("click", () => {
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
     if (customEmbeddingUrlInput) {
