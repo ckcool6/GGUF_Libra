@@ -5,8 +5,10 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"gguf-libra/query"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -451,6 +453,27 @@ func main() {
 
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 
-	logPrintf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:8099\033[0m\n", tagInfo)
-	http.ListenAndServe(":8099", nil)
+	// port configs
+	defaultPort := os.Getenv("PORT")
+	if defaultPort == "" {
+		defaultPort = "8099"
+	}
+
+	portStr := flag.String("port", defaultPort, "Server listen port (set to 0 for random port)")
+	flag.Parse()
+
+	listener, err := net.Listen("tcp", ":"+*portStr)
+	if err != nil {
+		logPrintf("%s Failed to bind port %s: %v\n", tagError, *portStr, err)
+		return
+	}
+	defer listener.Close()
+
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+
+	logPrintf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:%d\033[0m\n", tagInfo, actualPort)
+
+	if err := http.Serve(listener, nil); err != nil {
+		logPrintf("%s Server error: %v\n", tagError, err)
+	}
 }
