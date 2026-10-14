@@ -7,6 +7,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ========================================================================== */
+/* THEME VARIABLES                                                            */
+/* ========================================================================== */
+
 :root {
     --bg-main: #ffffff;
     --bg-header: #ffffff;
@@ -20,6 +24,10 @@
     --text-main: #e3e3e3;
     --border-color: #3e4042;
 }
+
+/* ========================================================================== */
+/* BASE LAYOUT                                                                */
+/* ========================================================================== */
 
 body {
     background-color: var(--bg-main);
@@ -40,6 +48,16 @@ header {
     flex-shrink: 0;
 }
 
+footer {
+    flex-shrink: 0;
+    background-color: var(--bg-main);
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+/* ========================================================================== */
+/* IMMERSIVE CHAT SCROLLBAR (LIGHT & DARK MODES)                              */
+/* ========================================================================== */
+
 #chat-box {
     flex: 1;
     min-height: 0;
@@ -48,37 +66,68 @@ header {
     padding-top: 1.5rem;
     padding-bottom: 2.5rem;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+    /* Invisible by default on Firefox */
+    scrollbar-color: transparent transparent;
 }
 
-.dark-mode-active #chat-box {
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-}
-
+/* Slim modern scrollbar geometry */
 #chat-box::-webkit-scrollbar {
-    width: 6px;
-}
-
-#chat-box::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-.dark-mode-active #chat-box::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.1);
+    width: 4.5px;
 }
 
 #chat-box::-webkit-scrollbar-track {
     background: transparent;
 }
 
-footer {
-    flex-shrink: 0;
-    background-color: var(--bg-main);
-    padding-bottom: env(safe-area-inset-bottom, 1rem);
+/* --- Light Mode Scrollbar States --- */
+#chat-box::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+    transition: background-color 0.25s ease;
 }
 
-/* Transparent bordered message bubbles */
+#chat-box:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+#chat-box:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+#chat-box::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* --- Dark Mode Scrollbar States --- */
+.dark-mode-active #chat-box {
+    scrollbar-color: transparent transparent;
+}
+
+.dark-mode-active #chat-box:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.dark-mode-active #chat-box::-webkit-scrollbar-thumb {
+    background-color: transparent;
+}
+
+.dark-mode-active #chat-box:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode-active #chat-box::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* ========================================================================== */
+/* MESSAGE BUBBLES & CARDS                                                    */
+/* ========================================================================== */
+
+.message-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 100px;
+}
+
 #chat-box .ai-bubble,
 #chat-box .user-bubble {
     background-color: transparent;
@@ -93,29 +142,37 @@ footer {
     border-color: #0b57d0;
 }
 
-.markdown-body pre {
-    background: #fafafa;
-    padding: 1rem;
-    border-radius: 0.75rem;
-    margin: 0.5rem 0;
-    overflow-x: auto;
-}
-
-img.emoji {
-    height: 1.2em;
-    width: 1.2em;
-    display: inline-block;
-    margin: 0 0.25em;
-    vertical-align: -0.15em;
-    object-fit: contain;
-}
-
 .ai-bubble p {
     margin-bottom: 0.85rem;
 }
 
 .ai-bubble p:last-child {
     margin-bottom: 0;
+}
+
+/* ========================================================================== */
+/* INPUT & INTERACTION CONTROLS                                               */
+/* ========================================================================== */
+
+#user-input {
+    max-height: 200px;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
+    scrollbar-width: thin;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+#send-btn {
+    flex-shrink: 0;
+    margin-bottom: 2px;
+}
+
+label[for="image-input"],
+label[for="doc-input"] {
+    flex-shrink: 0;
+    margin-bottom: 2px;
 }
 
 #send-btn,
@@ -132,37 +189,16 @@ header button:hover {
     transform: scale(1.05);
 }
 
-/* Message row container */
-.message-row {
-    content-visibility: auto;
-    /* Provide estimated height to prevent scrollbar jumping before rendering */
-    /* 100px represents average message height */
-    contain-intrinsic-size: auto 100px;
-}
+/* ========================================================================== */
+/* MARKDOWN & SYNTAX RENDERING                                                */
+/* ========================================================================== */
 
-/* Limit max input height; enable internal scrolling beyond this limit */
-#user-input {
-    max-height: 200px;
-    overflow-y: hidden;
-    overflow-x: hidden;
-    overflow-wrap: anywhere;
-    scrollbar-width: thin;
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
-/* Prevent send button deformation when input area expands */
-#send-btn {
-    flex-shrink: 0;
-    margin-bottom: 2px;
-    /* Fine-tune alignment */
-}
-
-/* Ensure document and image upload icons align properly and prevent scaling */
-label[for="image-input"],
-label[for="doc-input"] {
-    flex-shrink: 0;
-    margin-bottom: 2px;
+.markdown-body pre {
+    background: #fafafa;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin: 0.5rem 0;
+    overflow-x: auto;
 }
 
 .markdown-body hr {
@@ -173,23 +209,42 @@ label[for="doc-input"] {
     margin: 24px 0;
 }
 
-/* ==================================== Markdown Table Styles ==================================== */
+img.emoji {
+    height: 1.2em;
+    width: 1.2em;
+    display: inline-block;
+    margin: 0 0.25em;
+    vertical-align: -0.15em;
+    object-fit: contain;
+}
 
-/* Base table container styles */
+/* Force dark theme for code blocks */
+.dark pre,
+.dark pre code,
+.dark .hljs,
+.dark-mode-active pre,
+.dark-mode-active pre code,
+.dark-mode-active .hljs {
+    background-color: #1e1f22 !important;
+    color: #abb2bf !important;
+    border-color: #333 !important;
+}
+
+/* ========================================================================== */
+/* MARKDOWN TABLES                                                            */
+/* ========================================================================== */
+
 .markdown-body table {
     width: 100%;
     margin: 1rem 0;
     border-collapse: collapse;
     border-spacing: 0;
     display: block;
-    /* Allow horizontal scrolling on mobile viewports */
     overflow-x: auto;
     border: 1.5px solid var(--border-color);
-    /* Use defined theme variable */
     border-radius: 0.75rem;
 }
 
-/* Cell borders and padding */
 .markdown-body th,
 .markdown-body td {
     padding: 10px 16px;
@@ -197,23 +252,19 @@ label[for="doc-input"] {
     text-align: left;
 }
 
-/* Darkened header background */
 .markdown-body th {
     background-color: rgba(0, 0, 0, 0.03);
     font-weight: 600;
 }
 
-/* Dark mode adjustments (when .dark-mode-active is active) */
 .dark-mode-active .markdown-body th {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Normalize paragraph margin inside table cells to prevent expansion */
 .markdown-body td p {
     margin: 0 !important;
 }
 
-/* Alternating row colors for readability */
 .markdown-body tr:nth-child(even) {
     background-color: rgba(0, 0, 0, 0.01);
 }
@@ -222,21 +273,10 @@ label[for="doc-input"] {
     background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* Force dark theme for code blocks when .dark or .dark-mode-active is present */
-.dark pre,
-.dark pre code,
-.dark .hljs,
-.dark-mode-active pre,
-.dark-mode-active pre code,
-.dark-mode-active .hljs {
-    background-color: #1e1f22 !important;
-    /* Premium dark background for code blocks */
-    color: #abb2bf !important;
-    /* Soft off-white text color */
-    border-color: #333 !important;
-}
+/* ========================================================================== */
+/* SEARCH & FLASH ANIMATIONS                                                  */
+/* ========================================================================== */
 
-/* ==================================== Search Target Flash Animation ==================================== */
 .target-flash {
     animation: flash-bubble 1.5s ease-out;
 }
@@ -244,7 +284,6 @@ label[for="doc-input"] {
 @keyframes flash-bubble {
     0% {
         background-color: rgba(250, 204, 21, 0.4);
-        /* Semi-transparent yellow */
     }
 
     100% {
@@ -266,7 +305,6 @@ label[for="doc-input"] {
     }
 }
 
-/* Search results scrollbar styling */
 #page-search-list::-webkit-scrollbar {
     width: 4px;
 }
