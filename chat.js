@@ -1403,10 +1403,11 @@ function clearImage() {
     imageInput.value = "";
 }
 
-// Download/Export chat (supports inline side-branch detours)
+// Download/Export chat (supports inline side-branch detours & merged archives)
 async function downloadChat() {
     try {
-        const res = await fetch("/api/history");
+        const res = await fetch("/api/history", { headers: getHeaders() });
+        const currentBranch = res.headers.get("X-Current-Branch") || "main";
         const data = await res.json();
 
         if (!data || data.length === 0) {
@@ -1418,22 +1419,41 @@ async function downloadChat() {
         const dateStr = now.toISOString().slice(0, 10);
         let content = `==================== Chat History (${dateStr}) ====================\n\n`;
 
-        data.forEach((m) => {
-            // Tag role based on branch: Main Branch vs. Side Branch
-            const branchTag = m.branch === "side" ? " [Side Branch]" : " [Main Branch]";
-            const role = m.role === "user" ? `[User${branchTag}]` : `[AI${branchTag}]`;
+        const isSideBranch = (branchName) => {
+            if (!branchName) return false;
+            return branchName.toLowerCase().startsWith("side");
+        };
 
-            content += `${role}\n${m.content.trim()}\n\n`;
+        const formatMessage = (m, defaultBranch) => {
+            const branch = m.branch || defaultBranch;
+            const branchLabel = isSideBranch(branch) ? "Side Branch" : "Main Branch";
+            const roleLabel = m.role === "user" ? `[User [${branchLabel}]]` : `[AI [${branchLabel}]]`;
 
-            // Append summary if present
+            let text = `${roleLabel}\n${(m.content || "").trim()}\n\n`;
+
             if (m.abstract && m.abstract.trim() !== "") {
-                content += `[Summary]\n${m.abstract.trim()}\n\n`;
+                text += `[Summary]\n${m.abstract.trim()}\n\n`;
+            }
+            return text;
+        };
+
+        data.forEach((m, index) => {
+            content += formatMessage(m, currentBranch);
+
+            if (m.archives && Array.isArray(m.archives) && m.archives.length > 0) {
+                m.archives.forEach((branchMsgs, bIdx) => {
+                    content += `>>> [Archived Merged Side Branch #${bIdx + 1} Under Message #${index + 1}] <<<\n\n`;
+                    branchMsgs.forEach((archivedMsg) => {
+                        const role = archivedMsg.role === "user" ? "[User [Side Branch (Merged)]]" : "[AI [Side Branch (Merged)]]";
+                        content += `${role}\n${(archivedMsg.content || "").trim()}\n\n`;
+                    });
+                    content += `>>> [End of Merged Side Branch #${bIdx + 1}] <<<\n\n`;
+                });
             }
 
             content += "--------------------------------------------------\n\n";
         });
 
-        // Generate .txt file and trigger download
         const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
