@@ -394,6 +394,7 @@ async function loadHistory() {
             chatBox
                 .querySelectorAll(".ai-bubble pre code")
                 .forEach((el) => hljs.highlightElement(el));
+            attachCodeCopyButtons(chatBox);
             chatBox
                 .querySelectorAll(".ai-bubble, .user-bubble")
                 .forEach((el) => {
@@ -740,6 +741,7 @@ function finalizeAiBubble(ctx) {
         .querySelectorAll("pre code")
         .forEach((el) => hljs.highlightElement(el));
     twemoji.parse(ctx.aiBubbleDiv, { folder: "svg", ext: ".svg" });
+    attachCodeCopyButtons(ctx.aiBubbleDiv);
 
     // Update speed and token usage statistics
     if (ctx.startTime && ctx.currentBubbleId) {
@@ -1825,5 +1827,42 @@ if (openParserBtn) {
                 openParserBtn.classList.remove("opacity-50", "pointer-events-none");
             }, 800);
         }
+    });
+}
+
+// copy btn
+const COPY_ICON_SVG = `<svg class="w-3.5 h-3.5 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`;
+const CHECK_ICON_SVG = `<svg class="w-3.5 h-3.5 inline-block text-emerald-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>`;
+
+/**
+ * copy buttons
+ * @param {HTMLElement} container 
+ */
+function attachCodeCopyButtons(container = document) {
+    container.querySelectorAll(".markdown-body pre").forEach((pre) => {
+
+        if (pre.querySelector(".code-copy-btn")) return;
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "code-copy-btn flex items-center gap-1 font-mono";
+        copyBtn.innerHTML = `${COPY_ICON_SVG} <span>Copy</span>`;
+
+        copyBtn.onclick = async () => {
+            const codeEl = pre.querySelector("code");
+
+            const textToCopy = codeEl ? codeEl.innerText : pre.innerText;
+
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                copyBtn.innerHTML = `${CHECK_ICON_SVG} <span class="text-emerald-500">Copied!</span>`;
+                setTimeout(() => {
+                    copyBtn.innerHTML = `${COPY_ICON_SVG} <span>Copy</span>`;
+                }, 1500);
+            } catch (err) {
+                console.error("copy error:", err);
+            }
+        };
+
+        pre.appendChild(copyBtn);
     });
 }

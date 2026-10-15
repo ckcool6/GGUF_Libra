@@ -208,11 +208,63 @@ header button:hover {
 /* ========================================================================== */
 
 .markdown-body pre {
+    position: relative;
     background: #fafafa;
     padding: 1rem;
     border-radius: 0.75rem;
     margin: 0.5rem 0;
     overflow-x: auto;
+}
+
+.code-copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    border-radius: 0.5rem;
+    color: #6b7280;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background-color 0.2s;
+    user-select: none;
+}
+
+.markdown-body pre:hover .code-copy-btn {
+    opacity: 1;
+}
+
+.code-copy-btn:hover {
+    background-color: #ffffff;
+    color: #111827;
+}
+
+.dark-mode-active .code-copy-btn {
+    color: #9ca3af;
+    background-color: rgba(40, 40, 40, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode-active .code-copy-btn:hover {
+    background-color: #2e3035;
+    color: #f3f4f6;
+}
+
+code,
+pre,
+.markdown-body pre,
+.markdown-body code,
+.hljs {
+    font-family: "JetBrains Mono", "Xhei Intel", monospace !important;
+}
+
+.markdown-body pre code {
+    font-size: 0.95em;
+    line-height: 1.65;
 }
 
 .markdown-body hr {
