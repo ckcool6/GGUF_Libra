@@ -205,6 +205,59 @@ function updateBranchIndicator(text) {
     }
 }
 
+/**
+ * Unified modal dialog for both alert notices and confirmations
+ * (Replaces native alert/confirm to prevent Electron/Tabby webview focus-freeze bugs)
+ * @param {string} message - Message text to display
+ * @param {boolean} isAlert - If true, displays as an alert dialog with only the OK button
+ * @returns {Promise<boolean>}
+ */
+function showModalDialog(message, isAlert = false) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("confirm-modal");
+        const msgEl = document.getElementById("confirm-modal-msg");
+        const okBtn = document.getElementById("confirm-modal-ok");
+        const cancelBtn = document.getElementById("confirm-modal-cancel");
+
+        msgEl.innerText = message;
+
+        // If alert mode: hide the Cancel button; otherwise show it
+        if (isAlert) {
+            cancelBtn.classList.add("hidden");
+            okBtn.innerText = "Got it";
+            okBtn.className = "px-4 py-2 text-xs font-medium bg-[#0b57d0] hover:bg-blue-600 text-white rounded-xl shadow-xs transition-colors";
+        } else {
+            cancelBtn.classList.remove("hidden");
+            okBtn.innerText = "Confirm";
+            okBtn.className = "px-4 py-2 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors";
+        }
+
+        modal.classList.remove("hidden");
+
+        const close = (result) => {
+            modal.classList.add("hidden");
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            // Smoothly restore focus back to the user input field
+            setTimeout(() => input?.focus(), 50);
+            resolve(result);
+        };
+
+        okBtn.onclick = () => close(true);
+        cancelBtn.onclick = () => close(false);
+    });
+}
+
+// Confirmation helper returning a Promise<boolean>
+function showConfirm(message) {
+    return showModalDialog(message, false);
+}
+
+// Globally override native window.alert with custom modal
+window.alert = function (message) {
+    showModalDialog(message, true);
+};
+
 // ==================================== INIT & EXTENSIONS LOAD =============================
 // Custom marked extension to accurately intercept $$ and $
 const latexExtension = {
@@ -1149,7 +1202,7 @@ function createNotebookBar() {
     // switch-side-to-main event
     const switchBtn = notebookBar.querySelector(".switch-btn");
     switchBtn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to discard the current side branch?")) return;
+        if (!await showConfirm("Are you sure you want to discard the current side branch?")) return;
 
         try {
             switchBtn.innerHTML = `<span class="text-rose-500 animate-spin">${LOADING_HTML}</span> switching...`;
@@ -1474,7 +1527,7 @@ async function downloadChat() {
 }
 
 async function newChat() {
-    if (confirm("Clear all conversations?")) {
+    if (await showConfirm("Clear all conversations?")) {
         // Abort in-flight request if currently generating
         if (chatAbortController) {
             chatAbortController.abort();
@@ -1866,3 +1919,4 @@ function attachCodeCopyButtons(container = document) {
         pre.appendChild(copyBtn);
     });
 }
+
