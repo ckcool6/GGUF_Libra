@@ -100,25 +100,75 @@ func NewEngine(binPath string) (*Engine, error) {
 	}, nil
 }
 
-// Check whether the text contains all the keywords from the input (split by spaces)
-func matchAllKeywords(text, input string) bool {
-	words := strings.Fields(input) // Automatically split into a word list by spaces
+// isClauseDelimiter identifies true sentence/clause boundaries:
+// Commas, periods, exclamation/question marks, colons, semicolons, and line breaks.
+// NOTE: Apostrophes (') and hyphens (-) MUST NOT be delimiters, as they belong to words like "Green's" or "Navier-Stokes".
+func isClauseDelimiter(r rune) bool {
+	switch r {
+	// ASCII sentence & clause terminators
+	case ',', '.', '!', '?', ';', ':', '\n', '\r':
+		return true
 
-	if len(words) == 0 {
+	// Full-width CJK sentence & clause terminators
+	case '，', '。', '！', '？', '；', '：', '、':
+		return true
+
+	default:
 		return false
 	}
-	for _, w := range words {
-		if !strings.Contains(text, w) {
-			return false
-		}
-	}
-	return true
 }
 
-// Query implements a dynamic forgetting mechanism (activating only the top 15%
-// highest-dimensional deep memories, while pruning 90% of shallow data).
-// topK serves as an optional caller-defined hard cap; passing 0 delegates full control
-// to the dynamic 15% retention ratio.
+// splitIntoClauses segments any text into individual clauses using universal punctuation boundaries.
+func splitIntoClauses(s string) []string {
+	s = strings.ToLower(s)
+	return strings.FieldsFunc(s, isClauseDelimiter)
+}
+
+// cleanClause trims surrounding spaces, quotes, Markdown asterisks, and edge punctuation.
+func cleanClause(s string) string {
+	s = strings.ToLower(s)
+	return strings.TrimFunc(s, func(r rune) bool {
+		return isClauseDelimiter(r) ||
+			r == ' ' || r == '\t' || r == '\n' || r == '\r' ||
+			r == '"' || r == '\'' || r == '“' || r == '”' || r == '‘' || r == '’' ||
+			r == '*' || r == '_' || r == '`' || r == '(' || r == ')' || r == '[' || r == ']'
+	})
+}
+
+// matchFullClause enforces a strict complete-clause matching contract:
+// The query must match an ENTIRE clause from the target text.
+// Isolated keywords or fragments (e.g., "vector", "Green's Theorem") will not trigger a match.
+func matchFullClause(targetText, query string) bool {
+	cleanQ := cleanClause(query)
+	if cleanQ == "" {
+		return false
+	}
+
+	qNoSpace := strings.ReplaceAll(cleanQ, " ", "")
+	targetClauses := splitIntoClauses(targetText)
+
+	for _, clause := range targetClauses {
+		cleanC := cleanClause(clause)
+		if cleanC == "" {
+			continue
+		}
+
+		// 1. Direct clause equality (e.g., exact English clause match)
+		if cleanQ == cleanC {
+			return true
+		}
+
+		// 2. Whitespace-agnostic clause equality
+		// Solves cross-language space variations (e.g., "perl 语言的知识" == "perl语言的知识")
+		cNoSpace := strings.ReplaceAll(cleanC, " ", "")
+		if qNoSpace == cNoSpace {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -128,13 +178,13 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		return nil, errors.New("empty database")
 	}
 
-	cleanInput := strings.Trim(strings.ToLower(keyword), " \t\r\n\"'“”‘’")
+	cleanInput := strings.TrimSpace(keyword)
 	if cleanInput == "" {
 		return nil, errors.New("empty query keyword")
 	}
 
 	// =========================================================================
-	// Dynamic 15% Memory Retention (Prunes 90% of Shallow Data)
+	// Dynamic 15% Memory Retention
 	// =========================================================================
 	// 1. Dynamically compute the top 15% active memory capacity
 	retentionRatio := 0.15
@@ -167,12 +217,10 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		}
 
 		rec := &e.Records[i]
-		cleanRecKey := strings.Trim(strings.ToLower(rec.Keyword), " \t\r\n\"'“”‘’")
 
-		// Check if keyword matches the tree's terminal summary
-		if cleanRecKey != "" && (matchAllKeywords(cleanRecKey, cleanInput) || matchAllKeywords(cleanInput, cleanRecKey)) {
+		// Must match an entire sentence/clause within rec.Keyword
+		if matchFullClause(rec.Keyword, cleanInput) {
 			if len(rec.Matrix.Entries) > 0 {
-				// Matched the terminal leaf node of the current tree
 				targetLeafID := rec.Matrix.Entries[len(rec.Matrix.Entries)-1].EndID
 				return e.backtrackWithinTree(ctx, rec, targetLeafID)
 			}
@@ -198,27 +246,27 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 			entry := entries[j]
 			pText, cText := "", ""
 			if len(entry.RawData) > 0 {
-				pText = strings.ToLower(entry.RawData[0])
+				pText = entry.RawData[0]
 			}
 			if len(entry.RawData) > 1 {
-				cText = strings.ToLower(entry.RawData[1])
+				cText = entry.RawData[1]
 			}
 
-			// 1. Check Child node (derived intermediate node or branch leaf)
-			if cText != "" && strings.Contains(cText, cleanInput) {
+			// 1. Check child node text (must match full clause)
+			if cText != "" && matchFullClause(cText, cleanInput) {
 				// Hit EndID; trigger isolated backtracking within current tree
 				return e.backtrackWithinTree(ctx, rec, entry.EndID)
 			}
 
-			// 2. Check Parent node (intermediate branch point or local root)
-			if pText != "" && strings.Contains(pText, cleanInput) {
+			// 2. Check parent node text (must match full clause)
+			if pText != "" && matchFullClause(pText, cleanInput) {
 				// Hit StartID; trigger isolated backtracking within current tree
 				return e.backtrackWithinTree(ctx, rec, entry.StartID)
 			}
 		}
 	}
 
-	return nil, errors.New("no matching node found in active 15% memory")
+	return nil, errors.New("no full-clause match found in active 15% memory")
 }
 
 // backtrackWithinTree enforces strict tree-scoped isolation:
