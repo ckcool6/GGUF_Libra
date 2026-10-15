@@ -19,10 +19,10 @@
 }
 
 .dark-mode-active {
-    --bg-main: #18191a;
-    --bg-header: #18191a;
-    --text-main: #e3e3e3;
-    --border-color: #3e4042;
+    --bg-main: #100F0F;
+    --bg-header: #100F0F;
+    --text-main: #CECDC3;
+    --border-color: #282726;
 }
 
 /* ========================================================================== */
@@ -32,15 +32,18 @@
 body {
     background-color: var(--bg-main);
     color: var(--text-main);
-    height: 100vh;
-    height: 100dvh;
+    width: calc(100vw / 1.1);
+    height: calc(100vh / 1.1);
+    height: calc(100dvh / 1.1);
     display: flex;
     flex-direction: column;
     margin: 0;
     overflow: hidden;
     transition: background-color 0.3s, color 0.3s;
-    font-family: Roboto, "Xhei Intel", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
+    -webkit-font-smoothing: subpixel-antialiased;
+    font-family: "JetBrains Mono", "Xhei Intel", "PingFang SC", "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    zoom: 1.1;
+
 }
 
 header {
@@ -130,6 +133,10 @@ footer {
 
 #chat-box .ai-bubble,
 #chat-box .user-bubble {
+    /*  font-size: 1.125rem; */
+    font-size: 1.0625rem;
+
+    text-shadow: 0 0 0.5px rgba(255, 255, 255, 0.12);
     background-color: transparent;
     border: 1.5px solid var(--border-color);
     color: var(--text-main);
@@ -148,6 +155,13 @@ footer {
 
 .ai-bubble p:last-child {
     margin-bottom: 0;
+}
+
+#chat-box .ai-bubble p,
+#chat-box .ai-bubble li {
+    /* font-size: 1.125rem; */
+    font-size: 1.0625rem;
+
 }
 
 /* ========================================================================== */

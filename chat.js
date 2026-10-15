@@ -592,7 +592,7 @@ const streamChunkHandlers = {
                             <div class="flex flex-col max-w-[90%]">
                                 <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
                                 </div>
-                                <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-mono opacity-80">
+                                <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-['JetBrains_Mono'] opacity-80">
                                     <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
                                     <span id="speed-${ctx.currentBubbleId}">⏱️ Calculating...</span>
                                 </div>
@@ -767,7 +767,8 @@ function createNotebookBar() {
         "notebook-bar relative flex items-center justify-start my-3 transition-opacity duration-200";
 
     notebookBar.innerHTML = `
-    <div class="inline-flex items-center gap-2 text-xs font-mono">
+    <div class="inline-flex items-center gap-2 text-xs font-['JetBrains_Mono']">
+
         
         <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-500/50 hover:bg-rose-50/60 dark:hover:bg-rose-500/10 shadow-xs active:scale-[0.98] transition-all">
             <span>${SWITCH_MAIN_HTML}</span>
