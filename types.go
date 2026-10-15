@@ -18,14 +18,14 @@ type Message struct {
 }
 
 type SystemPromptConfig struct {
-	Active  string       `json:"active"`
-	Prompts []PromptItem `json:"prompts"`
+	Active  string       `json:"active"  yaml:"active"`
+	Prompts []PromptItem `json:"prompts" yaml:"prompts"`
 }
 
 type PromptItem struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
+	ID      string `json:"id"      yaml:"id"`
+	Name    string `json:"name"    yaml:"name"`
+	Content string `json:"content" yaml:"content"`
 }
 
 type reqBody struct {

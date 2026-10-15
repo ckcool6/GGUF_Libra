@@ -72,7 +72,7 @@ console.log(`\n${TAG.info} Archiving base runtime assets...`);
 fs.cpSync(path.join(__dirname, 'dist'), path.join(RELEASE_DIR, 'dist'), { recursive: true });
 console.log(`${TAG.info} Copied directory: dist/`);
 
-copyIfExists('system_prompt.json', RELEASE_DIR);
+copyIfExists('system_prompt.yaml', RELEASE_DIR);
 copyIfExists('chain_history.json', RELEASE_DIR);
 
 // create empty data.bin 

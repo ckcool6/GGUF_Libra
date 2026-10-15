@@ -4,12 +4,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/pkoukk/tiktoken-go"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -47,7 +47,7 @@ func config_init() {
 	}
 	logPrintf("\r\033[K%s Token encoder initialized\n", tagOK)
 
-	err = loadSystemPrompt("system_prompt.json")
+	err = loadSystemPrompt("system_prompt.yaml")
 	if err != nil {
 		panic(fmt.Sprintf("%s Failed to load system prompt: %v", tagError, err))
 	}
@@ -60,7 +60,7 @@ func loadSystemPrompt(filePath string) error {
 		return err
 	}
 
-	if err := json.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal(data, &config); err != nil {
 		return err
 	}
 
