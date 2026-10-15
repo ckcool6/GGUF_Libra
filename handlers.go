@@ -591,6 +591,10 @@ func apiGetPromptsHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	if err := loadSystemPrompt("system_prompt.yaml"); err != nil {
+		logPrintf("%s loading YAML error: %v\n", tagWarn, err)
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"active":  config.Active,
 		"prompts": config.Prompts,
@@ -607,6 +611,9 @@ func apiSwitchPromptHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mu.Lock()
+	if err := loadSystemPrompt("system_prompt.yaml"); err != nil {
+		logPrintf("%s loading YAML error: %v\n", tagWarn, err)
+	}
 	success := setActivePrompt(body.ID)
 	mu.Unlock()
 
