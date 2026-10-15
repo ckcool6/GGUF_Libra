@@ -86,7 +86,7 @@ const targetParserPy = path.join(RELEASE_DIR, 'parser_py');
 
 // Output parser.exe directly into release/parser_py
 run(
-    `uv run pyinstaller --onefile --console --clean --distpath "${targetParserPy}" --name parser main.py`,
+    `uv run pyinstaller --onefile --console --clean --icon=NONE --distpath "${targetParserPy}" --name parser main.py`,
     path.join(__dirname, 'parser_py')
 );
 
