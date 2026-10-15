@@ -153,8 +153,9 @@ async function initPromptSelect() {
 
                 // Reset frontend UI
                 chatBox.innerHTML = `
-                    <div class="flex justify-start mb-8">
-                        <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
+                    <div class="message-row flex justify-start items-start gap-3 mb-8">
+                        ${getAiAvatarHtml()}
+                        <div class="ai-bubble p-4 rounded-2xl max-w-[85%] markdown-body">
                             Hello!
                         </div>
                     </div>`;
@@ -380,16 +381,18 @@ async function loadHistory() {
                     }
 
                     const html = `
-                        <div class="message-row flex justify-start mb-8">
-                            <div class="user-bubble p-4 rounded-2xl max-w-[90%]">
+                        <div class="message-row flex justify-start items-start gap-3 mb-8">
+                            ${getUserAvatarHtml()}
+                            <div class="user-bubble p-4 rounded-2xl max-w-[85%]">
                                 ${userBubbleInner}
                             </div>
                         </div>`;
                     chatBox.insertAdjacentHTML("beforeend", html);
                 } else {
                     const wrapper = document.createElement("div");
-                    wrapper.className = "message-row flex justify-start mb-8";
+                    wrapper.className = "message-row flex justify-start items-start gap-3 mb-8";
                     wrapper.innerHTML = `
+                         ${getAiAvatarHtml()}
                         <div class="flex flex-col max-w-[90%] w-full">
                             <div class="ai-bubble p-4 rounded-2xl markdown-body">
                                 ${content}
@@ -518,8 +521,7 @@ async function send() {
 
     // Build user UI bubble
     const safeUserText = formatUserText(text);
-    let userBubbleHtml = `<div class="message-row flex justify-start mb-8"><div class="user-bubble p-4 rounded-2xl max-w-[85%]">`;
-
+    let userBubbleHtml = `<div class="message-row flex justify-start items-start gap-3 mb-8">${getUserAvatarHtml()}<div class="user-bubble p-4 rounded-2xl max-w-[85%]">`;
     // Insert image node if present
     if (imageToSend) {
         userBubbleHtml += `<img src="${imageToSend}" class="max-w-full rounded-lg mb-2 shadow-sm border border-black/5 dark:border-white/5">`;
@@ -642,16 +644,17 @@ const streamChunkHandlers = {
             loading.classList.add("hidden");
             ctx.currentBubbleId = "ai-" + Date.now();
             const html = `
-                        <div class="message-row flex justify-start mb-8">
-                            <div class="flex flex-col max-w-[90%]">
-                                <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
-                                </div>
-                                <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-['JetBrains_Mono'] opacity-80">
-                                    <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
-                                    <span id="speed-${ctx.currentBubbleId}">⏱️ Calculating...</span>
-                                </div>
-                            </div>
-                        </div>`;
+                <div class="message-row flex justify-start items-start gap-3 mb-8">
+                    ${getAiAvatarHtml()}
+                    <div class="flex flex-col max-w-[85%]">
+                        <div id="${ctx.currentBubbleId}" class="ai-bubble p-4 rounded-2xl markdown-body">
+                        </div>
+                        <div id="meta-${ctx.currentBubbleId}" class="flex items-center gap-3 px-2 mt-1.5 text-xs text-gray-400 dark:text-gray-400 font-['JetBrains_Mono'] opacity-80">
+                            <span class="bg-gray-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[11px]">${ctx.modelName}</span>
+                            <span id="speed-${ctx.currentBubbleId}">⏱️ Calculating...</span>
+                        </div>
+                    </div>
+                </div>`;
             chatBox.insertAdjacentHTML("beforeend", html);
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
@@ -1543,8 +1546,9 @@ async function newChat() {
             await fetch("/api/new-chat", { headers: getHeaders() });
             updateBranchIndicator("main");
             chatBox.innerHTML = `
-                <div class="flex justify-start mb-8">
-                    <div class="ai-bubble p-4 rounded-2xl max-w-[90%] markdown-body">
+                <div class="message-row flex justify-start items-start gap-3 mb-8">
+                    ${getAiAvatarHtml()}
+                    <div class="ai-bubble p-4 rounded-2xl max-w-[85%] markdown-body">
                         Hello!
                     </div>
                 </div>`;
@@ -1578,18 +1582,88 @@ const customUrlInput = document.getElementById("custom-url");
 const customEmbeddingUrlInput = document.getElementById("custom-embedding-url");
 const customKeyInput = document.getElementById("custom-key");
 
+const userAvatarInput = document.getElementById("upload-user-avatar");
+const aiAvatarInput = document.getElementById("upload-ai-avatar");
+const userPreview = document.getElementById("setting-user-preview");
+const aiPreview = document.getElementById("setting-ai-preview");
+const resetUserBtn = document.getElementById("reset-user-avatar");
+const resetAiBtn = document.getElementById("reset-ai-avatar");
+
+let tempUserAvatar = null;
+let tempAiAvatar = null;
+
+async function compressAvatar(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const size = 128;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+                const minSide = Math.min(img.width, img.height);
+                const sx = (img.width - minSide) / 2;
+                const sy = (img.height - minSide) / 2;
+                ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+                resolve(canvas.toDataURL("image/jpeg", 0.85));
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+}
+
+function refreshAvatarPreviews() {
+    const curUser = tempUserAvatar !== null ? tempUserAvatar : (localStorage.getItem("custom_user_avatar") || "");
+    const curAi = tempAiAvatar !== null ? tempAiAvatar : (localStorage.getItem("custom_ai_avatar") || "");
+
+    const defaultUserSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%23666' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+    const defaultAiSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%23666' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+    userPreview.src = curUser || defaultUserSvg;
+    aiPreview.src = curAi || defaultAiSvg;
+}
+
 document.getElementById("settings-btn").addEventListener("click", () => {
     customUrlInput.value = localStorage.getItem("custom_api_url") || "";
     if (customEmbeddingUrlInput) {
         customEmbeddingUrlInput.value = localStorage.getItem("custom_embedding_url") || "";
     }
     customKeyInput.value = localStorage.getItem("custom_api_key") || "";
+
+    tempUserAvatar = null;
+    tempAiAvatar = null;
+    refreshAvatarPreviews();
     modal.classList.remove("hidden");
 });
 
-document.getElementById("close-settings").addEventListener("click", () => {
-    modal.classList.add("hidden");
+userAvatarInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        tempUserAvatar = await compressAvatar(file);
+        refreshAvatarPreviews();
+    }
 });
+
+aiAvatarInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        tempAiAvatar = await compressAvatar(file);
+        refreshAvatarPreviews();
+    }
+});
+
+resetUserBtn.onclick = () => {
+    tempUserAvatar = "";
+    refreshAvatarPreviews();
+};
+resetAiBtn.onclick = () => {
+    tempAiAvatar = "";
+    refreshAvatarPreviews();
+};
 
 document.getElementById("save-settings").addEventListener("click", () => {
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
@@ -1597,8 +1671,31 @@ document.getElementById("save-settings").addEventListener("click", () => {
         localStorage.setItem("custom_embedding_url", customEmbeddingUrlInput.value.trim());
     }
     localStorage.setItem("custom_api_key", customKeyInput.value.trim());
+
+    if (tempUserAvatar !== null) {
+        if (tempUserAvatar === "") localStorage.removeItem("custom_user_avatar");
+        else localStorage.setItem("custom_user_avatar", tempUserAvatar);
+    }
+    if (tempAiAvatar !== null) {
+        if (tempAiAvatar === "") localStorage.removeItem("custom_ai_avatar");
+        else localStorage.setItem("custom_ai_avatar", tempAiAvatar);
+    }
+
+    document.querySelectorAll(".user-avatar-node").forEach(el => {
+        el.outerHTML = getUserAvatarHtml();
+    });
+    document.querySelectorAll(".ai-avatar-node").forEach(el => {
+        el.outerHTML = getAiAvatarHtml();
+    });
+
     modal.classList.add("hidden");
 });
+
+
+document.getElementById("close-settings").addEventListener("click", () => {
+    modal.classList.add("hidden");
+});
+
 
 // ================================= INDICATOR LIGHT ==========================================
 const statusDot = document.getElementById("status-dot");
@@ -1920,3 +2017,35 @@ function attachCodeCopyButtons(container = document) {
     });
 }
 
+// ==================== default avator SVG ====================
+const PERSON_SVG_PATH = `
+<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+</svg>`;
+
+const DEFAULT_AI_ICON = `
+<div class="w-full h-full bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 flex items-center justify-center">
+    ${PERSON_SVG_PATH}
+</div>`;
+
+const DEFAULT_USER_ICON = `
+<div class="w-full h-full bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 flex items-center justify-center">
+    ${PERSON_SVG_PATH}
+</div>`;
+
+
+function getUserAvatarHtml() {
+    const custom = localStorage.getItem("custom_user_avatar");
+    const inner = custom
+        ? `<img src="${custom}" class="w-full h-full object-cover">`
+        : DEFAULT_USER_ICON;
+    return `<div class="user-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden">${inner}</div>`;
+}
+
+function getAiAvatarHtml() {
+    const custom = localStorage.getItem("custom_ai_avatar");
+    const inner = custom
+        ? `<img src="${custom}" class="w-full h-full object-cover">`
+        : DEFAULT_AI_ICON;
+    return `<div class="ai-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden">${inner}</div>`;
+}
