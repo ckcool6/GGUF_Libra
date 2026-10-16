@@ -63,6 +63,11 @@ const MERGE_ICON_HTML = `
 </svg>
 `;
 
+const WARNING_ICON_HTML = `
+<svg class="w-4 h-4 text-amber-500 shrink-0 inline-block align-sub" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+</svg>`;
+
 // ==================================== UTILITY FUNCTIONS =====================================
 // Escape user plain text and handle line breaks
 function formatUserText(str) {
@@ -174,7 +179,7 @@ async function initPromptSelect() {
 
 // Helper function to display error/empty state in prompt select
 function showPromptError(select, message) {
-    select.innerHTML = `<option value="" disabled selected>⚠️ ${message}</option>`;
+    select.innerHTML = `<option value="" disabled selected>[!] ${message}</option>`;
     select.disabled = true;
 }
 
@@ -581,7 +586,7 @@ async function send() {
             console.log("User aborted the AI response");
         } else {
             loading.classList.add("hidden");
-            let displayTitle = "⚠️ System Error Encountered";
+            let displayTitle = `${WARNING_ICON_HTML} System Error Encountered`;
             let displayMsg = formatUserText(
                 err.message || "Connection error. Please check backend server.",
             );
@@ -595,7 +600,7 @@ async function send() {
             const errorHtml = `
                 <div class="flex justify-start mb-4">
                     <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
-                        <div class="font-bold mb-1">${displayTitle}</div>
+                            <div class="font-bold mb-1 flex items-center gap-1.5">${displayTitle}</div>
                         <div>${displayMsg}</div>
                     </div>
                 </div>`;
