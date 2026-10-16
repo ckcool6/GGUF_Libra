@@ -94,7 +94,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	if queryEngine != nil {
 		// Query active top 15% memory pool (pass 0 to let dynamic retention take over)
-		qRes, qErr := queryEngine.Query(r.Context(), 0, body.Message)
+		qRes, qErr := queryEngine.QuerySemantic(ctx, body.Message, 0, llamaEmbeddingFunc)
 
 		if qErr != nil {
 			// ==========================================

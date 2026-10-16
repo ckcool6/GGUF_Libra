@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -64,9 +65,10 @@ type QueryResult struct {
 
 // Engine is an in-memory cached query engine to avoid redundant disk reads
 type Engine struct {
-	mu      sync.RWMutex
-	Records []Record         // Exported Records for external access
-	UUIDMap map[int64]Record // Exported UUIDMap for external access
+	mu          sync.RWMutex
+	Records     []Record         // Exported Records for external access
+	UUIDMap     map[int64]Record // Exported UUIDMap for external access
+	vectorCache map[string][]float32
 }
 
 // NewEngine initializes and loads data from a binary file
@@ -95,103 +97,108 @@ func NewEngine(binPath string) (*Engine, error) {
 	}
 
 	return &Engine{
-		Records: records,
-		UUIDMap: uuidMap,
+		Records:     records,
+		UUIDMap:     uuidMap,
+		vectorCache: make(map[string][]float32),
 	}, nil
 }
 
-// isClauseDelimiter identifies true sentence/clause boundaries:
-// Commas, periods, exclamation/question marks, colons, semicolons, and line breaks.
-// NOTE: Apostrophes (') and hyphens (-) MUST NOT be delimiters, as they belong to words like "Green's" or "Navier-Stokes".
-func isClauseDelimiter(r rune) bool {
-	switch r {
-	// ASCII sentence & clause terminators
-	case ',', '.', '!', '?', ';', ':', '\n', '\r':
-		return true
+// EmbeddingFunc defines the standard signature for vector generation callbacks.
+type EmbeddingFunc func(ctx context.Context, text string) ([]float32, error)
 
-	// Full-width CJK sentence & clause terminators
-	case '，', '。', '！', '？', '；', '：', '、':
-		return true
+// ==========================================
+// Mathematical Helpers & Cache Access
+// ==========================================
 
-	default:
-		return false
-	}
-}
-
-// splitIntoClauses segments any text into individual clauses using universal punctuation boundaries.
-func splitIntoClauses(s string) []string {
-	s = strings.ToLower(s)
-	return strings.FieldsFunc(s, isClauseDelimiter)
-}
-
-// cleanClause trims surrounding spaces, quotes, Markdown asterisks, and edge punctuation.
-func cleanClause(s string) string {
-	s = strings.ToLower(s)
-	return strings.TrimFunc(s, func(r rune) bool {
-		return isClauseDelimiter(r) ||
-			r == ' ' || r == '\t' || r == '\n' || r == '\r' ||
-			r == '"' || r == '\'' || r == '“' || r == '”' || r == '‘' || r == '’' ||
-			r == '*' || r == '_' || r == '`' || r == '(' || r == ')' || r == '[' || r == ']'
-	})
-}
-
-// matchFullClause enforces a strict complete-clause matching contract:
-// The query must match an ENTIRE clause from the target text.
-// Isolated keywords or fragments (e.g., "vector", "Green's Theorem") will not trigger a match.
-func matchFullClause(targetText, query string) bool {
-	cleanQ := cleanClause(query)
-	if cleanQ == "" {
-		return false
+// cosineSimilarity computes the cosine similarity between two float32 vectors.
+// Returns a normalized score in the range [-1.0, 1.0].
+func cosineSimilarity(a, b []float32) float32 {
+	if len(a) != len(b) || len(a) == 0 {
+		return 0.0
 	}
 
-	qNoSpace := strings.ReplaceAll(cleanQ, " ", "")
-	targetClauses := splitIntoClauses(targetText)
-
-	for _, clause := range targetClauses {
-		cleanC := cleanClause(clause)
-		if cleanC == "" {
-			continue
-		}
-
-		// 1. Direct clause equality (e.g., exact English clause match)
-		if cleanQ == cleanC {
-			return true
-		}
-
-		// 2. Whitespace-agnostic clause equality
-		// Solves cross-language space variations (e.g., "perl 语言的知识" == "perl语言的知识")
-		cNoSpace := strings.ReplaceAll(cleanC, " ", "")
-		if qNoSpace == cNoSpace {
-			return true
-		}
+	var dotProduct, normA, normB float32
+	for i := range a {
+		dotProduct += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
 	}
 
-	return false
+	if normA == 0 || normB == 0 {
+		return 0.0
+	}
+
+	return dotProduct / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))
 }
 
-func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryResult, error) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+// getOrFetchVector retrieves the embedding vector for a given text snippet.
+// It checks the in-memory cache first; on a cache miss, it invokes the embedding API
+// and caches the result without modifying underlying persistent structs.
+func (e *Engine) getOrFetchVector(ctx context.Context, text string, embedFn EmbeddingFunc) ([]float32, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, errors.New("cannot embed empty text")
+	}
+
+	// 1. Fast path: return cached vector from memory
+	if vec, ok := e.vectorCache[text]; ok {
+		return vec, nil
+	}
+
+	// 2. Slow path: call remote/local embedding model via HTTP
+	vec, err := embedFn(ctx, text)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Cache the newly computed vector in volatile memory
+	if e.vectorCache == nil {
+		e.vectorCache = make(map[string][]float32)
+	}
+	e.vectorCache[text] = vec
+
+	return vec, nil
+}
+
+// ==========================================
+// Semantic Query Engine
+// ==========================================
+
+// QuerySemantic executes dual-stage semantic retrieval using volatile embedding caches.
+// The persistent structs (Entry and Record) and data.bin remain completely untouched.
+func (e *Engine) QuerySemantic(
+	ctx context.Context,
+	query string,
+	topK int,
+	embedFn EmbeddingFunc,
+) (*QueryResult, error) {
+	// Acquire write lock because vectorCache may be populated on cache misses
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	total := len(e.Records)
 	if total == 0 {
 		return nil, errors.New("empty database")
 	}
 
-	cleanInput := strings.TrimSpace(keyword)
-	if cleanInput == "" {
-		return nil, errors.New("empty query keyword")
+	if embedFn == nil {
+		return nil, errors.New("embedding function cannot be nil")
+	}
+
+	// 1. Generate dense query embedding vector
+	queryVec, err := embedFn(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
 
 	// =========================================================================
 	// Dynamic 15% Memory Retention
 	// =========================================================================
-	// 1. Dynamically compute the top 15% active memory capacity
+	// Limit search space exclusively to the top 15% topologically complex reasoning trees
 	retentionRatio := 0.15
 	limit := int(float64(total) * retentionRatio)
 
-	// 2. Cold-start floor: ensure at least minKeep records are retained when
-	// the dataset is small (prevents limit from dropping to 0)
+	// Cold-start floor: guarantee at least minKeep records during initial runs
 	const minKeep = 3
 	if limit < minKeep {
 		limit = minKeep
@@ -200,15 +207,22 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		limit = total
 	}
 
-	// 3. Compatibility fallback: respect caller-specified topK if it is stricter than the 15% ratio
+	// Respect caller-specified topK if stricter than the 15% retention limit
 	if topK > 0 && topK < limit {
 		limit = topK
 	}
-	logDebug("[DEBUG Query] total: %d, topK: %d, calculated limit: %d\n", total, topK, limit)
+	logDebug("[DEBUG QuerySemantic] total: %d, topK: %d, calculated limit: %d\n", total, topK, limit)
+
+	// Semantic similarity acceptance thresholds
+	const stage1Threshold float32 = 0.70 // Stricter threshold for macroscopic topic match
+	const stage2Threshold float32 = 0.65 // Tolerant threshold for microscopic step match
 
 	// =========================================================================
-	// Stage 1: Fast Path - Match terminal summaries in the active 15% memory pool
+	// Stage 1: Fast Path - Macroscopic semantic matching on terminal summaries
 	// =========================================================================
+	var bestStage1Rec *Record
+	var bestStage1Sim float32 = -1.0
+
 	for i := 0; i < limit; i++ {
 		select {
 		case <-ctx.Done():
@@ -217,25 +231,44 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 		}
 
 		rec := &e.Records[i]
+		if rec.Keyword == "" {
+			continue
+		}
 
-		// Must match an entire sentence/clause within rec.Keyword
-		if matchFullClause(rec.Keyword, cleanInput) {
-			if len(rec.Matrix.Entries) > 0 {
-				targetLeafID := rec.Matrix.Entries[len(rec.Matrix.Entries)-1].EndID
-				return e.backtrackWithinTree(ctx, rec, targetLeafID)
-			}
+		// Retrieve or compute vector for the Keyword string directly
+		kwVec, err := e.getOrFetchVector(ctx, rec.Keyword, embedFn)
+		if err != nil {
+			continue
+		}
+
+		sim := cosineSimilarity(queryVec, kwVec)
+		if sim > bestStage1Sim {
+			bestStage1Sim = sim
+			bestStage1Rec = rec
+		}
+	}
+
+	// If macroscopic confidence meets threshold, backtrack full reasoning chain from the leaf
+	if bestStage1Rec != nil && bestStage1Sim >= stage1Threshold {
+		logDebug("[DEBUG Stage 1 Hit] Semantic hit on Keyword (sim: %.4f): %s\n", bestStage1Sim, bestStage1Rec.Keyword)
+		if len(bestStage1Rec.Matrix.Entries) > 0 {
+			targetLeafID := bestStage1Rec.Matrix.Entries[len(bestStage1Rec.Matrix.Entries)-1].EndID
+			return e.backtrackWithinTree(ctx, bestStage1Rec, targetLeafID)
 		}
 	}
 
 	// =========================================================================
-	// Stage 2: Fallback - Reverse deep search across intermediate nodes
+	// Stage 2: Fallback - Microscopic reverse deep search across intermediate nodes
 	// =========================================================================
-	// Strictly confined to the [0, limit) active memory window
+	// Strictly confined to the [0, limit) active window, traversing reasoning steps in reverse
+	var bestStage2Rec *Record
+	var bestTargetNodeID int = -1
+	var bestStage2Sim float32 = -1.0
+
 	for i := limit - 1; i >= 0; i-- {
 		rec := &e.Records[i]
 		entries := rec.Matrix.Entries
 
-		// Traverse all directed edges of the current tree in reverse order
 		for j := len(entries) - 1; j >= 0; j-- {
 			select {
 			case <-ctx.Done():
@@ -244,29 +277,43 @@ func (e *Engine) Query(ctx context.Context, topK int, keyword string) (*QueryRes
 			}
 
 			entry := entries[j]
-			pText, cText := "", ""
-			if len(entry.RawData) > 0 {
-				pText = entry.RawData[0]
-			}
-			if len(entry.RawData) > 1 {
-				cText = entry.RawData[1]
+
+			// 1. Evaluate child node text (RawData[1])
+			if len(entry.RawData) > 1 && entry.RawData[1] != "" {
+				cVec, err := e.getOrFetchVector(ctx, entry.RawData[1], embedFn)
+				if err == nil {
+					sim := cosineSimilarity(queryVec, cVec)
+					if sim > bestStage2Sim {
+						bestStage2Sim = sim
+						bestStage2Rec = rec
+						bestTargetNodeID = entry.EndID
+					}
+				}
 			}
 
-			// 1. Check child node text (must match full clause)
-			if cText != "" && matchFullClause(cText, cleanInput) {
-				// Hit EndID; trigger isolated backtracking within current tree
-				return e.backtrackWithinTree(ctx, rec, entry.EndID)
-			}
-
-			// 2. Check parent node text (must match full clause)
-			if pText != "" && matchFullClause(pText, cleanInput) {
-				// Hit StartID; trigger isolated backtracking within current tree
-				return e.backtrackWithinTree(ctx, rec, entry.StartID)
+			// 2. Evaluate parent node text (RawData[0])
+			if len(entry.RawData) > 0 && entry.RawData[0] != "" {
+				pVec, err := e.getOrFetchVector(ctx, entry.RawData[0], embedFn)
+				if err == nil {
+					sim := cosineSimilarity(queryVec, pVec)
+					if sim > bestStage2Sim {
+						bestStage2Sim = sim
+						bestStage2Rec = rec
+						bestTargetNodeID = entry.StartID
+					}
+				}
 			}
 		}
 	}
 
-	return nil, errors.New("no full-clause match found in active 15% memory")
+	// If an intermediate step is hit, backtrack from that specific pivot node to the local root
+	if bestStage2Rec != nil && bestStage2Sim >= stage2Threshold {
+		logDebug("[DEBUG Stage 2 Hit] Semantic hit on intermediate node (NodeID: %d, sim: %.4f)\n", bestTargetNodeID, bestStage2Sim)
+		return e.backtrackWithinTree(ctx, bestStage2Rec, bestTargetNodeID)
+	}
+	logDebug("[DEBUG Miss] Below similarity thresholds: Stage1 max: %.4f (threshold %.2f), Stage2 max: %.4f (threshold %.2f)\n",
+		bestStage1Sim, stage1Threshold, bestStage2Sim, stage2Threshold)
+	return nil, fmt.Errorf("no semantic match found in active 15%% memory (stage1 max: %.4f, stage2 max: %.4f)", bestStage1Sim, bestStage2Sim)
 }
 
 // backtrackWithinTree enforces strict tree-scoped isolation:
