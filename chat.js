@@ -853,14 +853,12 @@ function createNotebookBar() {
                         <span>${SUMMARY_HTML}</span>
                         <div>
                             <div class="font-medium">With Summary</div>
-                            <div class="text-[9px] text-gray-400">Keep core context</div>
                         </div>
                     </button>
                     <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-[#66800B]/10 text-gray-700 dark:text-[#CECDC3] flex items-center gap-2 transition-colors">
                         <span>${SANDBOX_HTML}</span>
                         <div>
                             <div class="font-medium">Isolated Sandbox</div>
-                            <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
                         </div>
                     </button>
                 </div>
