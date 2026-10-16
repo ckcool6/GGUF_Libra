@@ -346,7 +346,7 @@ img.emoji {
 
 @keyframes flash-bubble {
     0% {
-        background-color: rgba(250, 204, 21, 0.4);
+        background-color: rgba(218, 112, 44, 0.2);
     }
 
     100% {
@@ -354,13 +354,14 @@ img.emoji {
     }
 }
 
+
 .dark-mode-active .target-flash {
-    animation: flash-bubble-dark 1.5s ease-out;
+    animation: flash-bubble-dark 1.2s ease-out;
 }
 
 @keyframes flash-bubble-dark {
     0% {
-        background-color: rgba(250, 204, 21, 0.2);
+        background-color: rgba(208, 162, 21, 0.18);
     }
 
     100% {

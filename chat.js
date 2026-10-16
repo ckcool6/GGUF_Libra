@@ -231,11 +231,11 @@ function showModalDialog(message, isAlert = false) {
         if (isAlert) {
             cancelBtn.classList.add("hidden");
             okBtn.innerText = "Got it";
-            okBtn.className = "px-4 py-2 text-xs font-medium bg-[#0b57d0] hover:bg-blue-600 text-white rounded-xl shadow-xs transition-colors";
+            okBtn.className = "px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#205EA6] hover:bg-[#1B4B82] dark:bg-[#205EA6]/80 dark:hover:bg-[#205EA6] active:scale-[0.98] rounded-xl transition-all shadow-xs";
         } else {
             cancelBtn.classList.remove("hidden");
             okBtn.innerText = "Confirm";
-            okBtn.className = "px-4 py-2 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors";
+            okBtn.className = "px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#AF3029] hover:bg-[#871F1B] dark:bg-[#AF3029]/80 dark:hover:bg-[#AF3029] active:scale-[0.98] rounded-xl transition-all shadow-xs";
         }
 
         modal.classList.remove("hidden");
@@ -598,10 +598,14 @@ async function send() {
             }
 
             const errorHtml = `
-                <div class="flex justify-start mb-4">
-                    <div class="p-4 rounded-2xl bg-red-50 text-red-600 border border-red-200 text-sm shadow-sm max-w-[90%]">
-                            <div class="font-bold mb-1 flex items-center gap-1.5">${displayTitle}</div>
-                        <div>${displayMsg}</div>
+                <div class="flex justify-start mb-6 message-row">
+                    <div class="p-4 rounded-2xl bg-[#FFFCF0] dark:bg-[#1C1B1A] border border-[#F2D6D3] dark:border-[#AF3029]/30 text-sm shadow-xs max-w-[90%] transition-colors">
+                        <div class="font-bold mb-1.5 flex items-center gap-2 text-[#AF3029] dark:text-[#D14D41]">
+                            ${displayTitle}
+                        </div>
+                        <div class="text-[#6F6E69] dark:text-[#B7B5AC] font-mono text-xs leading-relaxed">
+                            ${displayMsg}
+                        </div>
                     </div>
                 </div>`;
 
@@ -1733,16 +1737,14 @@ async function checkLlamaConnection() {
         if (res.ok) {
             const data = await res.json();
             if (data.status === "ok") {
-                statusDot.className =
-                    "w-2.5 h-2.5 rounded-full bg-emerald-500 transition-colors duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
+                statusDot.className = "w-2 h-2 rounded-full bg-[#66800B] dark:bg-[#879A39] transition-colors duration-300";
                 statusDot.title = "Connected to llama.cpp successfully";
                 return;
             }
         }
         throw new Error("Service status abnormal");
     } catch (err) {
-        statusDot.className =
-            "w-2.5 h-2.5 rounded-full bg-rose-500 transition-colors duration-300 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse";
+        statusDot.className = "w-2 h-2 rounded-full bg-[#AF3029] dark:bg-[#D14D41] transition-colors duration-300 animate-pulse";
         statusDot.title = "Unable to connect to llama.cpp. Please check backend server status.";
     }
 }
@@ -1782,9 +1784,9 @@ async function get_ctx_usage() {
             tokenDisplay.innerText = `${currentCtx} tokens / ${maxCtx} tokens (${percentage}%)`;
 
             if (percentage > 85) {
-                tokenDisplay.classList.add("text-rose-500");
+                tokenDisplay.classList.add("text-[#AF3029]", "dark:text-[#D14D41]");
             } else {
-                tokenDisplay.classList.remove("text-rose-500");
+                tokenDisplay.classList.remove("text-[#AF3029]", "dark:text-[#D14D41]", "text-rose-500");
             }
         }
     } catch (err) {
