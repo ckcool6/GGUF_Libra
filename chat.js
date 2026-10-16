@@ -835,15 +835,15 @@ function createNotebookBar() {
         "notebook-bar relative flex items-center justify-start my-3 transition-opacity duration-200";
 
     notebookBar.innerHTML = `
-        <div class="inline-flex items-center gap-2 text-xs font-['JetBrains_Mono']">
+        <div class="inline-flex items-center gap-1.5 text-xs font-['JetBrains_Mono'] whitespace-nowrap">
 
-            <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-rose-600 dark:hover:text-[#D14D41] hover:border-rose-300 dark:hover:border-[#D14D41]/30 hover:bg-rose-50/60 dark:hover:bg-[#AF3029]/10 shadow-xs active:scale-[0.98] transition-all">
+            <button class="switch-btn flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-rose-600 dark:hover:text-[#D14D41] hover:border-rose-300 dark:hover:border-[#D14D41]/30 hover:bg-rose-50/60 dark:hover:bg-[#AF3029]/10 shadow-xs active:scale-[0.98] transition-all">
                 <span>${SWITCH_MAIN_HTML}</span>
                 <span>Switch to main</span>
             </button>
 
             <div class="relative inline-block">
-                <button class="fork-side-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-emerald-600 dark:hover:text-[#879A39] hover:border-emerald-300 dark:hover:border-[#879A39]/30 hover:bg-emerald-50/60 dark:hover:bg-[#66800B]/10 shadow-xs active:scale-[0.98] transition-all">
+                <button class="fork-side-btn flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-emerald-600 dark:hover:text-[#879A39] hover:border-emerald-300 dark:hover:border-[#879A39]/30 hover:bg-emerald-50/60 dark:hover:bg-[#66800B]/10 shadow-xs active:scale-[0.98] transition-all">
                     <span>${SIDE_BRANCH_HTML}</span>
                     <span>Side Chat</span>
                 </button>
@@ -866,22 +866,22 @@ function createNotebookBar() {
                 </div>
             </div>
 
-            <button class="summary-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-amber-600 dark:hover:text-[#D0A215] hover:border-amber-300 dark:hover:border-[#D0A215]/30 hover:bg-amber-50/60 dark:hover:bg-[#AD8301]/10 shadow-xs active:scale-[0.98] transition-all">
+            <button class="summary-btn flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-amber-600 dark:hover:text-[#D0A215] hover:border-amber-300 dark:hover:border-[#D0A215]/30 hover:bg-amber-50/60 dark:hover:bg-[#AD8301]/10 shadow-xs active:scale-[0.98] transition-all">
                 <span>${SUMMARY_HTML}</span>
                 <span>Summary</span>
             </button>
 
-            <button class="merge-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-purple-600 dark:hover:text-[#CE5D97] hover:border-purple-300 dark:hover:border-[#CE5D97]/30 hover:bg-purple-50/60 dark:hover:bg-[#8E4399]/10 shadow-xs active:scale-[0.98] transition-all">
+            <button class="merge-btn flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-purple-600 dark:hover:text-[#CE5D97] hover:border-purple-300 dark:hover:border-[#CE5D97]/30 hover:bg-purple-50/60 dark:hover:bg-[#8E4399]/10 shadow-xs active:scale-[0.98] transition-all">
                 <span>${MERGE_ICON_HTML}</span>
                 <span>Merge</span>
             </button>
 
-            <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-blue-600 dark:hover:text-[#4385BE] hover:border-blue-300 dark:hover:border-[#4385BE]/30 hover:bg-blue-50/60 dark:hover:bg-[#205EA6]/10 shadow-xs active:scale-[0.98] transition-all">
+            <button class="archive-btn flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-blue-600 dark:hover:text-[#4385BE] hover:border-blue-300 dark:hover:border-[#4385BE]/30 hover:bg-blue-50/60 dark:hover:bg-[#205EA6]/10 shadow-xs active:scale-[0.98] transition-all">
                 <span>${CHECKPOINT_MAIN_HTML}</span>
                 <span>Checkpoint Main</span>
             </button>
         </div>
-        `;
+    `;
 
     // Archive event
     const archiveBtn = notebookBar.querySelector(".archive-btn");
@@ -949,7 +949,7 @@ function createNotebookBar() {
             if (!existingSummary) {
                 const loadingNotice = document.createElement("div");
                 loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
-                loadingNotice.innerText = "Generating summary...";
+                loadingNotice.innerText = "processing...";
                 chatBox.appendChild(loadingNotice);
                 chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -997,21 +997,22 @@ function createNotebookBar() {
             if (res.ok) {
                 updateBranchIndicator("side");
 
-                // 4. CRITICAL: Reload history to render the yellow summary box into the chat flow
                 if (typeof loadHistory === "function") {
                     await loadHistory();
                 }
 
-                // 5. Append side branch switch notification
-                const notice = document.createElement("div");
-                notice.className =
-                    "flex items-center justify-center gap-1.5 text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
-                notice.innerHTML = withSummary
-                    ? `<span>${SIDE_BRANCH_HTML}</span> Switched to side branch (Inherited summary)`
-                    : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
+                setTimeout(() => {
+                    const notice = document.createElement("div");
+                    notice.className =
+                        "flex items-center justify-center gap-1.5 text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
+                    notice.innerHTML = withSummary
+                        ? `<span>${SIDE_BRANCH_HTML}</span> Switched to side branch (Inherited summary)`
+                        : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
 
-                chatBox.appendChild(notice);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                    chatBox.appendChild(notice);
+
+                    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
+                }, 60);
             }
         } catch (e) {
             console.error("Fork Side failed:", e);
@@ -1094,7 +1095,7 @@ function createNotebookBar() {
                     <!-- Save button injected here -->
                 </div>
             </div>
-            <div class="summary-content markdown-body text-xs opacity-90">Generating summary...</div>
+            <div class="summary-content markdown-body text-xs opacity-90">processing...</div>
         `;
 
             if (notebookBar.parentElement) {
@@ -1111,7 +1112,7 @@ function createNotebookBar() {
             const customKey = localStorage.getItem("custom_api_key") || "";
 
             try {
-                btn.innerHTML = `<span class="text-amber-500 animate-spin">${LOADING_HTML}</span> Summarizing...`;
+                btn.innerHTML = `<span class="text-amber-500 animate-spin">${LOADING_HTML}</span> waiting...`;
 
                 const res = await fetch("/api/generate-abstract", {
                     method: "POST",
