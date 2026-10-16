@@ -351,31 +351,60 @@ func (chain *chatChain) dialogChainContentOrDefault() []Message {
 	return chain.DialogContent.ChatHistory
 }
 
-// Dynamically erase llama.cpp KV cache for a specified slot
-func eraseLlamaSlot(customURL string, slotID int) {
-	apiURL := fmt.Sprintf("http://127.0.0.1:8021/slots/%d?action=erase", slotID)
+// Helper: Discard and close response body to reuse connections
+func drainAndClose(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+}
 
+// Helper: Dispatch an erase action for a specific slot ID
+func eraseSingleSlot(baseURL string, slotID int) {
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/slots/%d?action=erase", baseURL, slotID), nil)
+	if err != nil {
+		return
+	}
+	resp, err := httpTimeoutClient.Do(req)
+	if err != nil {
+		return
+	}
+	drainAndClose(resp)
+}
+
+// Dynamically query and erase llama.cpp KV cache across all available slots
+func eraseAllLlamaSlots(customURL string) {
+	baseURL := "http://127.0.0.1:8021"
 	if customURL != "" {
 		if parsedURL, err := url.Parse(customURL); err == nil && parsedURL.Host != "" {
-			apiURL = fmt.Sprintf("%s://%s/slots/%d?action=erase", parsedURL.Scheme, parsedURL.Host, slotID)
+			baseURL = fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 		}
 	}
 
 	go func() {
-		req, err := http.NewRequest("POST", apiURL, nil)
-		if err != nil {
+		// Retrieve all active slot states
+		resp, err := httpTimeoutClient.Get(baseURL + "/slots")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			// Fallback: attempt to erase default slot 0 if /slots endpoint is unreachable
+			eraseSingleSlot(baseURL, 0)
+			return
+		}
+		defer drainAndClose(resp)
+
+		var slots []struct {
+			ID int `json:"id"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&slots); err != nil || len(slots) == 0 {
+			// Fallback: attempt to erase default slot 0 if decode fails or empty
+			eraseSingleSlot(baseURL, 0)
 			return
 		}
 
-		// Dispatch asynchronous cleanup request using globally shared httpTimeoutClient
-		resp, err := httpTimeoutClient.Do(req)
-		if err != nil {
-			return
+		// Iterate through and erase each active slot
+		for _, s := range slots {
+			eraseSingleSlot(baseURL, s.ID)
 		}
-
-		// Ensure response body is drained and closed so the client can reuse TCP connections
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
 	}()
 }
 
@@ -391,7 +420,7 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Dynamically erase llama.cpp slot 0 cache
 	customURL := r.URL.Query().Get("custom_url")
-	eraseLlamaSlot(customURL, 0)
+	eraseAllLlamaSlots(customURL)
 
 	// Clean up chromem-go in-memory collections and disk .gob files
 	if err := ClearVectorDB(); err != nil {
