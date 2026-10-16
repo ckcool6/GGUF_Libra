@@ -346,7 +346,8 @@ img.emoji {
 
 @keyframes flash-bubble {
     0% {
-        background-color: rgba(218, 112, 44, 0.2);
+        background-color: rgba(59, 130, 246, 0.18);
+
     }
 
     100% {

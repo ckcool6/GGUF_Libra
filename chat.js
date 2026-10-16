@@ -13,8 +13,9 @@ import "highlight.js/styles/atom-one-light.min.css";
 
 //=====================================icons===================================================
 const SEND_ICON_HTML = `
-<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"></path>
+<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"></line>
+    <polyline points="5 12 12 5 19 12"></polyline>
 </svg>`;
 
 const SIDE_BRANCH_HTML = `
@@ -834,54 +835,53 @@ function createNotebookBar() {
         "notebook-bar relative flex items-center justify-start my-3 transition-opacity duration-200";
 
     notebookBar.innerHTML = `
-    <div class="inline-flex items-center gap-2 text-xs font-['JetBrains_Mono']">
+        <div class="inline-flex items-center gap-2 text-xs font-['JetBrains_Mono']">
 
-        
-        <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-500/50 hover:bg-rose-50/60 dark:hover:bg-rose-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>${SWITCH_MAIN_HTML}</span>
-            <span>Switch to main</span>
-        </button>
-
-        <div class="relative inline-block">
-            <button class="fork-side-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:bg-emerald-50/60 dark:hover:bg-emerald-500/10 shadow-xs active:scale-[0.98] transition-all">
-                <span>${SIDE_BRANCH_HTML}</span>
-                <span>Side Chat</span>
+            <button class="switch-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-rose-600 dark:hover:text-[#D14D41] hover:border-rose-300 dark:hover:border-[#D14D41]/30 hover:bg-rose-50/60 dark:hover:bg-[#AF3029]/10 shadow-xs active:scale-[0.98] transition-all">
+                <span>${SWITCH_MAIN_HTML}</span>
+                <span>Switch to main</span>
             </button>
-            
-            <div class="fork-options-popover hidden absolute bottom-full mb-2 left-0 w-52 bg-white dark:bg-[#202124] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
-                <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                    <span>${SUMMARY_HTML}</span>
-                    <div>
-                        <div class="font-medium">With Summary</div>
-                        <div class="text-[9px] text-gray-400">Keep core context</div>
-                    </div>
+
+            <div class="relative inline-block">
+                <button class="fork-side-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-emerald-600 dark:hover:text-[#879A39] hover:border-emerald-300 dark:hover:border-[#879A39]/30 hover:bg-emerald-50/60 dark:hover:bg-[#66800B]/10 shadow-xs active:scale-[0.98] transition-all">
+                    <span>${SIDE_BRANCH_HTML}</span>
+                    <span>Side Chat</span>
                 </button>
-                <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-700 dark:text-gray-200 flex items-center gap-2 transition-colors">
-                    <span>${SANDBOX_HTML}</span>
-                    <div>
-                        <div class="font-medium">Isolated Sandbox</div>
-                        <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
-                    </div>
-                </button>
+                
+                <div class="fork-options-popover hidden absolute bottom-full mb-2 left-0 w-52 bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] rounded-xl shadow-lg p-1.5 z-30 flex flex-col gap-1 text-[11px] animate-fade-in">
+                    <button class="fork-with-summary text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-[#66800B]/10 text-gray-700 dark:text-[#CECDC3] flex items-center gap-2 transition-colors">
+                        <span>${SUMMARY_HTML}</span>
+                        <div>
+                            <div class="font-medium">With Summary</div>
+                            <div class="text-[9px] text-gray-400">Keep core context</div>
+                        </div>
+                    </button>
+                    <button class="fork-clean text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-[#66800B]/10 text-gray-700 dark:text-[#CECDC3] flex items-center gap-2 transition-colors">
+                        <span>${SANDBOX_HTML}</span>
+                        <div>
+                            <div class="font-medium">Isolated Sandbox</div>
+                            <div class="text-[9px] text-gray-400">Clean slate, zero pollution</div>
+                        </div>
+                    </button>
+                </div>
             </div>
+
+            <button class="summary-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-amber-600 dark:hover:text-[#D0A215] hover:border-amber-300 dark:hover:border-[#D0A215]/30 hover:bg-amber-50/60 dark:hover:bg-[#AD8301]/10 shadow-xs active:scale-[0.98] transition-all">
+                <span>${SUMMARY_HTML}</span>
+                <span>Summary</span>
+            </button>
+
+            <button class="merge-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-purple-600 dark:hover:text-[#CE5D97] hover:border-purple-300 dark:hover:border-[#CE5D97]/30 hover:bg-purple-50/60 dark:hover:bg-[#8E4399]/10 shadow-xs active:scale-[0.98] transition-all">
+                <span>${MERGE_ICON_HTML}</span>
+                <span>Merge</span>
+            </button>
+
+            <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-[#282726] text-gray-700 dark:text-[#CECDC3] hover:text-blue-600 dark:hover:text-[#4385BE] hover:border-blue-300 dark:hover:border-[#4385BE]/30 hover:bg-blue-50/60 dark:hover:bg-[#205EA6]/10 shadow-xs active:scale-[0.98] transition-all">
+                <span>${CHECKPOINT_MAIN_HTML}</span>
+                <span>Checkpoint Main</span>
+            </button>
         </div>
-
-        <button class="summary-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-500/50 hover:bg-amber-50/60 dark:hover:bg-amber-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>${SUMMARY_HTML}</span>
-            <span>Summary</span>
-        </button>
-
-        <button class="merge-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:border-purple-300 dark:hover:border-purple-500/50 hover:bg-purple-50/60 dark:hover:bg-purple-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>${MERGE_ICON_HTML}</span>
-            <span>Merge</span>
-        </button>
-
-        <button class="archive-btn flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#202124] border border-gray-200/90 dark:border-gray-700/80 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50/60 dark:hover:bg-blue-500/10 shadow-xs active:scale-[0.98] transition-all">
-            <span>${CHECKPOINT_MAIN_HTML}</span>
-            <span>Checkpoint Main</span>
-        </button>
-    </div>
-    `;
+        `;
 
     // Archive event
     const archiveBtn = notebookBar.querySelector(".archive-btn");

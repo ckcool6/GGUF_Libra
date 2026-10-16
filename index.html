@@ -194,25 +194,26 @@
             <div
                 class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-gray-800">
                 <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors shadow-xs"></span>
-                <span id="token-usage" class="text-[11px] font-['JetBrains_Mono'] text-gray-400 dark:text-gray-500">-- /
-                    --
-                    (0%)</span>
+                <span id="token-usage" class="text-[11px] font-['JetBrains_Mono'] text-gray-400 dark:text-gray-500">--
+                    /-- (0%)</span>
             </div>
         </div>
+
         <div class="flex items-center gap-2">
             <select id="prompt-select"
-                class="bg-transparent border border-gray-200 dark:border-gray-700 rounded-xl px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors dark:bg-[#1e1f20]">
+                class="bg-transparent border border-gray-200 dark:border-[#282726] rounded-xl px-2 py-1 text-xs text-gray-700 dark:text-[#CECDC3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-[#282726] cursor-pointer transition-colors dark:bg-[#1C1B1A]">
             </select>
+
             <button id="search-toggle-btn"
-                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-600 dark:text-gray-400"
-                title="Search dialogue">
+                class="p-2 rounded-full text-gray-600 dark:text-[#878580] hover:bg-black/5 dark:hover:bg-white/5 dark:hover:text-[#CECDC3] transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
                 </svg>
             </button>
+
             <button id="settings-btn"
-                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-600 dark:text-gray-400">
+                class="p-2 rounded-full text-gray-600 dark:text-[#878580] hover:bg-black/5 dark:hover:bg-white/5 dark:hover:text-[#CECDC3] transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
@@ -220,22 +221,25 @@
                 </svg>
             </button>
 
-            <button id="download-btn" class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500">
+            <button id="download-btn"
+                class="p-2 rounded-full text-gray-500 dark:text-[#878580] hover:bg-black/5 dark:hover:bg-white/5 dark:hover:text-[#CECDC3] transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
             </button>
-            <button id="theme-btn" class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500">
+
+            <button id="theme-btn"
+                class="p-2 rounded-full text-gray-500 dark:text-[#878580] hover:bg-black/5 dark:hover:bg-white/5 dark:hover:text-[#CECDC3] transition-colors">
                 <svg id="mode-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z">
                     </path>
                 </svg>
             </button>
+
             <button id="new-chat-btn"
-                class="p-2 hover:bg-red-50 dark:hover:bg-[#AF3029]/20 rounded-full text-gray-500 dark:text-gray-400 hover:text-[#AF3029] dark:hover:text-[#D14D41] transition-colors"
-                title="New chat">
+                class="p-2 rounded-full text-gray-500 dark:text-[#878580] hover:bg-red-50 dark:hover:bg-[#AF3029]/15 hover:text-[#AF3029] dark:hover:text-[#D14D41] transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
@@ -292,10 +296,10 @@
             </div>
 
             <div
-                class="flex items-end rounded-2xl bg-white dark:bg-[#1e1f20] border border-gray-200 dark:border-gray-700/80 px-3 py-2 transition-all duration-200 focus-within:border-gray-400 dark:focus-within:border-gray-500 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                class="flex items-end rounded-2xl bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] px-3 py-2 transition-all duration-200 focus-within:border-gray-400 dark:focus-within:border-[#343331] shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none">
 
                 <label for="doc-input" id="upload-doc-btn"
-                    class="p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center justify-center shrink-0"
+                    class="p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-400 dark:text-[#878580] hover:text-gray-600 dark:hover:text-[#CECDC3] flex items-center justify-center shrink-0"
                     title="Import knowledge base document">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -306,7 +310,7 @@
                 </label>
 
                 <label for="image-input"
-                    class="p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center justify-center shrink-0">
+                    class="p-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors text-gray-400 dark:text-[#878580] hover:text-gray-600 dark:hover:text-[#CECDC3] flex items-center justify-center shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
@@ -316,18 +320,19 @@
                 </label>
 
                 <textarea id="user-input" rows="1" placeholder="Type a message..."
-                    class="flex-1 bg-transparent border-none focus:outline-none text-sm py-1 px-3 resize-none leading-relaxed text-gray-800 dark:text-gray-200 placeholder-gray-400"></textarea>
+                    class="flex-1 bg-transparent border-none focus:outline-none text-sm py-1 px-3 resize-none leading-relaxed text-gray-800 dark:text-[#CECDC3] placeholder-gray-400 dark:placeholder-[#6F6E69] caret-[#CECDC3]"></textarea>
 
                 <button id="send-btn"
-                    class="ml-1 p-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-gray-900 rounded-xl shrink-0 active:scale-95 transition-all flex items-center justify-center shadow-xs">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18">
-                        </path>
+                    class="ml-1 p-2 bg-[#282726]/85 text-[#FFFCF0] hover:bg-[#282726] dark:bg-[#CECDC3] dark:text-[#100F0F] dark:hover:bg-[#E6E4D9] rounded-xl shrink-0 active:scale-95 transition-all flex items-center justify-center shadow-xs">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
                     </svg>
                 </button>
             </div>
 
-            <p class="mt-2 text-xs text-gray-400 dark:text-gray-400 text-center tracking-wide">
+            <p class="mt-2 text-xs text-gray-400 dark:text-[#6F6E69] text-center tracking-wide">
                 AI responses may not always be accurate. Please verify important information.
             </p>
         </div>
@@ -335,7 +340,7 @@
 
     <div class="fixed right-6 bottom-24 z-40">
         <button id="open-parser-btn"
-            class="w-12 h-12 rounded-full bg-white dark:bg-[#1e1f20] border border-gray-200/90 dark:border-gray-700/80 shadow-lg hover:shadow-xl hover:border-emerald-500/50 dark:hover:border-emerald-400/50 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-all duration-200 active:scale-90 group"
+            class="w-12 h-12 rounded-full bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-gray-700/80 shadow-lg hover:shadow-xl hover:border-emerald-500/50 dark:hover:border-emerald-400/50 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-all duration-200 active:scale-90 group"
             title="Open Topology Parser Console">
 
             <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none"
