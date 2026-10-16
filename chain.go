@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // enum
@@ -70,6 +71,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 		return "", fmt.Errorf("no chat history available")
 	}
 
+	startTime := time.Now()
 	// Construct prompt specifically for summarization
 	var promptMessages []LlamaMessage
 	promptMessages = append(promptMessages, LlamaMessage{
@@ -116,6 +118,9 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	if customUrl != "" {
 		apiURL = customUrl
 	}
+
+	logPrintf("%s [Abstract] Generating summary for %d message(s) via %s...\n",
+		tagInfo, len(chain.DialogContent.ChatHistory), apiURL)
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -172,6 +177,12 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 		}
 
 		chain.DialogAbstract = abstract
+
+		previewLen := min(80, len(abstract))
+		preview := strings.ReplaceAll(abstract[:previewLen], "\n", " ")
+		logPrintf("%s [Abstract] Generated in %.2fs (%d chars): \"%s...\"\n",
+			tagOK, time.Since(startTime).Seconds(), len(abstract), preview)
+
 		return abstract, nil
 	}
 
@@ -308,12 +319,14 @@ func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
 	// Retrieve side branch summary (requires generate-abstract to be triggered beforehand)
 	summary := currentNode.DialogAbstract
 	if summary == "" {
+		logPrintf("%s [Merge] Rejected: side branch summary has not been generated yet\n", tagWarn)
 		return nil, fmt.Errorf("side branch summary has not been generated yet, please generate summary before merging")
 	}
 
 	// Trace back to identify which main branch fork point this side branch originated from
 	forkNode := root.BackToMainForkedNode(currentNode)
 	if forkNode == nil {
+		logPrintf("%s [Merge] Rejected: failed to locate fork origin of this side branch\n", tagWarn)
 		return nil, fmt.Errorf("failed to locate fork origin of this side branch")
 	}
 

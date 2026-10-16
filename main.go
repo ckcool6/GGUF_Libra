@@ -221,8 +221,11 @@ func main() {
 
 	// Fork a side branch handler
 	http.HandleFunc("/api/fork-side", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
 		// Validation: A summary must exist prior to forking, otherwise reject
 		if currentChain == nil || currentChain.DialogAbstract == "" {
+			logPrintf("%s [Fork] Action rejected (412): a summary is required on current node prior to forking\n", tagWarn)
 			w.WriteHeader(http.StatusPreconditionFailed) // 412
 			json.NewEncoder(w).Encode(map[string]string{
 				"error": "A summary and archive are required on the main branch before forking.",
@@ -241,13 +244,20 @@ func main() {
 			}
 		}
 
-		mu.Lock()
 		if currentChain != nil {
+			parentAbstract := currentChain.DialogAbstract
+
 			// Create side branch child node and point currentChain to the new branch
 			currentChain = currentChain.AppendSideBranchNode(withSummary)
 			rootChain.SaveChainToFile("chain_history.json")
+			previewLen := min(60, len(parentAbstract))
+			preview := strings.ReplaceAll(parentAbstract[:previewLen], "\n", " ")
+			logPrintf("%s [Fork] Side branch successfully created & activated (Green Node)!\n", tagOK)
+			logPrintf("  - Inherited Summary : %v (\"%s...\")\n", withSummary, preview)
+			logPrintf("  - Vector Isolation  : Vector DB cleared to isolate side exploration\n")
+			logPrintf("  - Active Pointer    : Moved to new green side branch (chain_history.json saved)\n")
 		}
-		mu.Unlock()
+
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -278,6 +288,13 @@ func main() {
 
 		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
+		// log
+		previewLen := min(60, len(newNode.DialogAbstract))
+		preview := strings.ReplaceAll(newNode.DialogAbstract[:previewLen], "\n", " ")
+		logPrintf("%s [Merge] Side branch successfully merged & grafted into main branch tail!\n", tagOK)
+		logPrintf("  - Merged Abstract: \"%s...\"\n", preview)
+		logPrintf("  - Topology Action: Side branch archived to HistoryArchives and pruned from fork node\n")
+		logPrintf("  - Active Pointer  : Pointed to new convergence main node (chain_history.json saved)\n")
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -380,6 +397,14 @@ func main() {
 
 		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
+		// log
+		tailPreview := "(empty / new chapter)"
+		if currentChain.DialogAbstract != "" {
+			pLen := min(60, len(currentChain.DialogAbstract))
+			tailPreview = strings.ReplaceAll(currentChain.DialogAbstract[:pLen], "\n", " ") + "..."
+		}
+		logPrintf("%s [Switch] Successfully switched from side branch to main branch tail!\n", tagOK)
+		logPrintf("  - Active Main Tail Node: \"%s\"\n", tailPreview)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -438,11 +463,17 @@ func main() {
 
 		// Core operation: spawn a new main branch node
 		// This automatically creates newNode and injects the summary as a system message
+		oldAbstract := currentChain.DialogAbstract
 		newNode := currentChain.AppendMainBranchNode()
 
 		// Update pointer and persist state
 		currentChain = newNode
 		rootChain.SaveChainToFile("chain_history.json")
+
+		previewLen := min(60, len(oldAbstract))
+		preview := strings.ReplaceAll(oldAbstract[:previewLen], "\n", " ")
+		logPrintf("%s [Archive] Main branch archived successfully! Started new chapter (chain_history.json updated)\n", tagOK)
+		logPrintf("  - Inherited Summary: \"%s...\"\n", preview)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
