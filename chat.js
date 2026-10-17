@@ -359,7 +359,7 @@ async function loadHistory() {
     try {
         const res = await fetch("/api/history", { headers: getHeaders() });
 
-        const currentBranch = res.headers.get("X-Current-Branch");
+        const currentBranch = res.headers.get("X-Current-Branch") || "main";
         if (currentBranch) {
             updateBranchIndicator(currentBranch);
         }
@@ -368,6 +368,11 @@ async function loadHistory() {
 
         if (Array.isArray(historyList) && historyList.length > 0) {
             chatBox.innerHTML = "";
+            // Reset tracker array to avoid stale DOM references
+            SideTracker.bubbles = [];
+
+            // Check if the current active view is inside a side branch lineage
+            const isCurrentInSide = currentBranch.toLowerCase().includes("side");
 
             let lastAiWrapperCol = null;
 
@@ -377,8 +382,13 @@ async function loadHistory() {
                     ? formatUserText(m.content)
                     : safeMarkdownParse(m.content);
 
-                const isSideMessage = Boolean(m.branch && m.branch.toLowerCase().includes("side"));
+                const isSideMsg = Boolean(m.branch && m.branch.toLowerCase().includes("side"));
 
+                // Key Rule:
+                // 1. While inside a side branch (including nested forks like side#1 -> side#2),
+                //    all messages are considered active — never discarded.
+                // 2. Only when viewed from the main branch are abandoned side messages treated as discarded.
+                const isDiscarded = !isCurrentInSide && isSideMsg;
 
                 if (isUser) {
                     let userBubbleInner = "";
@@ -390,16 +400,22 @@ async function loadHistory() {
                     }
 
                     const html = `
-                        <div class="message-row flex justify-start items-start gap-3 mb-8 ${isSideMessage ? 'is-discarded' : ''}">
+                        <div class="message-row flex justify-start items-start gap-3 mb-8 ${isDiscarded ? 'is-discarded' : ''}">
                             ${getUserAvatarHtml()}
                             <div class="user-bubble p-4 rounded-2xl max-w-[85%]">
                                 ${userBubbleInner}
                             </div>
                         </div>`;
                     chatBox.insertAdjacentHTML("beforeend", html);
+
+                    // Track active side bubbles so "Switch to main" can discard them all at once
+                    if (isCurrentInSide && isSideMsg) {
+                        SideTracker.bubbles.push(chatBox.lastElementChild);
+                    }
                 } else {
                     const wrapper = document.createElement("div");
-                    wrapper.className = `message-row flex justify-start items-start gap-3 mb-8 ${isSideMessage ? 'is-discarded' : ''}`; wrapper.innerHTML = `
+                    wrapper.className = `message-row flex justify-start items-start gap-3 mb-8 ${isDiscarded ? 'is-discarded' : ''}`;
+                    wrapper.innerHTML = `
                          ${getAiAvatarHtml()}
                         <div class="flex flex-col max-w-[90%] w-full">
                             <div class="ai-bubble p-4 rounded-2xl markdown-body">
@@ -409,7 +425,6 @@ async function loadHistory() {
 
                     // Check if archived branches exist
                     if (m.archives && m.archives.length > 0) {
-                        // Create archive entry button
                         const archiveEntry = document.createElement("div");
                         archiveEntry.className = "mt-2 px-2";
                         archiveEntry.innerHTML = `
@@ -419,7 +434,6 @@ async function loadHistory() {
                             </button>
                         `;
 
-                        // Bind click event to open modal
                         archiveEntry.querySelector("button").onclick = () =>
                             showArchiveModal(m.archives);
 
@@ -440,7 +454,6 @@ async function loadHistory() {
                             </div>
                             <div class="summary-content markdown-body text-xs opacity-90">${m.abstract}</div>
                         `;
-                        // Insert summary box below AI bubble and above notebook bar
                         wrapper
                             .querySelector(".flex-col")
                             .appendChild(summaryBox);
@@ -448,13 +461,20 @@ async function loadHistory() {
 
                     lastAiWrapperCol = wrapper.querySelector(".flex-col");
                     chatBox.appendChild(wrapper);
+
+                    // Track active side bubbles for unified discard action
+                    if (isCurrentInSide && isSideMsg) {
+                        SideTracker.bubbles.push(wrapper);
+                    }
                 }
             });
+
             if (lastAiWrapperCol) {
                 const notebookBar = createNotebookBar();
                 lastAiWrapperCol.appendChild(notebookBar);
             }
-            // Code highlighting and emoji parsing
+
+            // Code block syntax highlighting & emoji parsing
             chatBox
                 .querySelectorAll(".ai-bubble pre code")
                 .forEach((el) => hljs.highlightElement(el));
