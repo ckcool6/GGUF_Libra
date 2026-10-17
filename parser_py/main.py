@@ -39,8 +39,26 @@ class AppTUI(cmd.Cmd):
     )
 
     def do_status(self, arg):
-        """Check the running status: status"""
-        print(f"{self.TAG_OK} Console application is running normally.")
+            """Check running status and inspect chain_history.json file size: status"""
+            print(f"{self.TAG_OK} Console application is running normally.")
+            
+            json_path = parser.PARENT_DIR / "chain_history.json"
+            print(f"  {self.GRAY}Target File   :{self.RESET} {self.CYAN}{json_path.resolve()}{self.RESET}")
+
+            if not json_path.exists():
+                print(f"  {self.GRAY}Disk Status   :{self.RESET} {self.YELLOW}Not created on disk yet{self.RESET} (in-memory / pending flush)")
+                return
+
+            file_size = json_path.stat().st_size
+            size_kb = round(file_size / 1024, 2)
+            size_mb = round(file_size / (1024 * 1024), 2)
+
+            if file_size >= 1024 * 1024:
+                size_str = f"{self.YELLOW}{size_mb} MB{self.RESET} ({self.YELLOW}{file_size:,}{self.RESET} bytes)"
+            else:
+                size_str = f"{self.YELLOW}{size_kb} KB{self.RESET} ({self.YELLOW}{file_size:,}{self.RESET} bytes)"
+
+            print(f"  {self.GRAY}File Size     :{self.RESET} {size_str}")
 
     def do_save(self, arg):
         """Execute the save logic directly: save"""
