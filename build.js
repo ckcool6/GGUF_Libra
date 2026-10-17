@@ -96,7 +96,7 @@ Release package structure:
 release/
 ├── ${EXE_NAME}
 ├── data.bin               (empty placeholder)
-├── system_prompt.json
+├── system_prompt.yaml
 ├── chain_history.json
 ├── dist/                  (bundled frontend assets)
 └── parser_py/
