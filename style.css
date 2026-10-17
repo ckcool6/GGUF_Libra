@@ -382,3 +382,71 @@ img.emoji {
 .dark-mode-active #page-search-list::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.1);
 }
+
+/* ========================================================================== */
+/* DISCARDED / SIDE BRANCH VISUAL STYLES                                      */
+/* ========================================================================== */
+
+#chat-box .message-row.is-discarded .user-bubble,
+#chat-box .message-row.is-discarded .ai-bubble,
+#chat-box .message-row.is-discarded .ai-bubble * {
+    color: #9ca3af !important;
+    text-decoration: line-through !important;
+    text-decoration-style: solid !important;
+    text-decoration-color: #9ca3af !important;
+    text-decoration-thickness: 1.5px !important;
+}
+
+#chat-box .message-row.is-discarded .user-bubble,
+#chat-box .message-row.is-discarded .ai-bubble {
+    border-style: dashed !important;
+    border-color: #d1d5db !important;
+}
+
+#chat-box .message-row.is-discarded .summary-box {
+    border-color: #d1d5db !important;
+    /* 褪去原本的橙黄色，变成灰色虚线框 */
+    background-color: transparent !important;
+    /* 褪去原本的黄色背景 */
+}
+
+#chat-box .message-row.is-discarded .summary-box,
+#chat-box .message-row.is-discarded .summary-box *,
+#chat-box .message-row.is-discarded .summary-box textarea {
+    color: #9ca3af !important;
+    text-decoration: line-through !important;
+    text-decoration-style: solid !important;
+    text-decoration-color: #9ca3af !important;
+}
+
+#chat-box .message-row.is-discarded .summary-box #summary-actions {
+    display: none !important;
+}
+
+.dark-mode-active #chat-box .message-row.is-discarded .user-bubble,
+.dark-mode-active #chat-box .message-row.is-discarded .ai-bubble,
+.dark-mode-active #chat-box .message-row.is-discarded .ai-bubble *,
+.dark-mode-active #chat-box .message-row.is-discarded .summary-box,
+.dark-mode-active #chat-box .message-row.is-discarded .summary-box *,
+.dark-mode-active #chat-box .message-row.is-discarded .summary-box textarea {
+    color: #6F6E69 !important;
+    text-decoration-color: #6F6E69 !important;
+}
+
+.dark-mode-active #chat-box .message-row.is-discarded .user-bubble,
+.dark-mode-active #chat-box .message-row.is-discarded .ai-bubble,
+.dark-mode-active #chat-box .message-row.is-discarded .summary-box {
+    border-color: #44403c !important;
+    background-color: transparent !important;
+}
+
+#chat-box .message-row.is-discarded .user-avatar-node,
+#chat-box .message-row.is-discarded .ai-avatar-node,
+#chat-box .message-row.is-discarded img.emoji {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+#chat-box .message-row.is-discarded .notebook-bar {
+    display: none !important;
+}

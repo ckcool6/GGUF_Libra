@@ -377,6 +377,9 @@ async function loadHistory() {
                     ? formatUserText(m.content)
                     : safeMarkdownParse(m.content);
 
+                const isSideMessage = Boolean(m.branch && m.branch.toLowerCase().includes("side"));
+
+
                 if (isUser) {
                     let userBubbleInner = "";
                     if (m.image) {
@@ -387,7 +390,7 @@ async function loadHistory() {
                     }
 
                     const html = `
-                        <div class="message-row flex justify-start items-start gap-3 mb-8">
+                        <div class="message-row flex justify-start items-start gap-3 mb-8 ${isSideMessage ? 'is-discarded' : ''}">
                             ${getUserAvatarHtml()}
                             <div class="user-bubble p-4 rounded-2xl max-w-[85%]">
                                 ${userBubbleInner}
@@ -396,8 +399,7 @@ async function loadHistory() {
                     chatBox.insertAdjacentHTML("beforeend", html);
                 } else {
                     const wrapper = document.createElement("div");
-                    wrapper.className = "message-row flex justify-start items-start gap-3 mb-8";
-                    wrapper.innerHTML = `
+                    wrapper.className = `message-row flex justify-start items-start gap-3 mb-8 ${isSideMessage ? 'is-discarded' : ''}`; wrapper.innerHTML = `
                          ${getAiAvatarHtml()}
                         <div class="flex flex-col max-w-[90%] w-full">
                             <div class="ai-bubble p-4 rounded-2xl markdown-body">
@@ -541,6 +543,8 @@ async function send() {
     userBubbleHtml += `</div></div>`;
 
     chatBox.insertAdjacentHTML("beforeend", userBubbleHtml);
+    SideTracker.track(chatBox.lastElementChild);
+
     loading.classList.remove("hidden");
 
     // Scroll handling
@@ -668,6 +672,8 @@ const streamChunkHandlers = {
             chatBox.insertAdjacentHTML("beforeend", html);
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
+            SideTracker.track(chatBox.lastElementChild);
+
         }
     },
 };
@@ -1225,7 +1231,11 @@ function createNotebookBar() {
 
             if (res.ok) {
                 updateBranchIndicator("main");
-                await loadHistory();
+                SideTracker.discard();
+
+                switchBtn.innerHTML = `<span class="text-rose-500 font-bold">✓</span> Discarded`;
+                switchBtn.disabled = true;
+
                 setTimeout(() => {
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }, 50);
@@ -1288,6 +1298,7 @@ async function handleMergeAction(btn) {
         // Merge succeeded, refresh view
         btn.innerHTML = `<span class="text-purple-500">✓</span> Done`;
         updateBranchIndicator("main");
+        SideTracker.commit();
 
         // Small delay to allow user to see "Done" before reload
         setTimeout(() => {
@@ -2055,3 +2066,33 @@ function getAiAvatarHtml() {
         : DEFAULT_AI_ICON;
     return `<div class="ai-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden">${inner}</div>`;
 }
+
+// ==================== SIDE bubble track ====================
+const SideTracker = {
+    bubbles: [],
+
+    isSide() {
+        const indicator = document.getElementById("branch-indicator");
+        return indicator && indicator.innerText.toLowerCase().includes("side");
+    },
+
+    track(bubbleEl) {
+        if (bubbleEl && this.isSide()) {
+            this.bubbles.push(bubbleEl);
+        }
+    },
+
+    discard() {
+        this.bubbles.forEach((row) => {
+            if (row && row.classList) {
+                row.classList.add("is-discarded");
+                row.querySelectorAll(".notebook-bar").forEach(bar => bar.remove());
+            }
+        });
+        this.bubbles = [];
+    },
+
+    commit() {
+        this.bubbles = [];
+    }
+};
