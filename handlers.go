@@ -101,12 +101,11 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			// Case 1: No new tree matched, check if current branch has anchored memory
 			// ==========================================
 			if localChain.ActiveThoughtChain != "" {
-				// Reusing previous thought map
-				thoughtChainSnippet = localChain.ActiveThoughtChain
-				logPrintf("%s [Chain of Thought] No new tree triggered; successfully reusing anchored historical thought map!\n", tagInfo)
-			} else {
-				logPrintf("%s [Chain of Thought] No external tree triggered; retaining existing context\n", tagInfo)
+				// Current query didn't match a new tree; invalidate/clear previous thought chain to avoid stale context pollution
+				thoughtChainSnippet = ""
+				localChain.ActiveThoughtChain = ""
 			}
+			logPrintf("%s [Chain of Thought] No external tree triggered; retaining natural context\n", tagInfo)
 		} else {
 			// ==========================================
 			// Case 2: New tree matched! Log details and anchor to current branch
@@ -134,10 +133,10 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 				firstStep := qRes.EdgePath[0]
 				lastStep := qRes.EdgePath[len(qRes.EdgePath)-1]
 				logPrintf("  - Initial Step : [%d] %s... -> [%d] %s...\n",
-					firstStep.ParentID, firstStep.ParentText[:min(20, len(firstStep.ParentText))],
-					firstStep.ChildID, firstStep.ChildText[:min(20, len(firstStep.ChildText))])
+					firstStep.ParentID, truncateRunes(firstStep.ParentText, 20),
+					firstStep.ChildID, truncateRunes(firstStep.ChildText, 20))
 				logPrintf("  - Terminal Step: [%d] -> [%d] %s...\n",
-					lastStep.ParentID, lastStep.ChildID, lastStep.ChildText[:min(30, len(lastStep.ChildText))])
+					lastStep.ParentID, lastStep.ChildID, truncateRunes(lastStep.ChildText, 30))
 			}
 			logPrintln("=========================================================================")
 		}
@@ -156,7 +155,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Vector DB reference documents
 	if vErr == nil && len(matchedDocs) > 0 {
-		promptPrefix.WriteString("[Reference Code / Documents]:\n")
+		promptPrefix.WriteString("[Reference Context]:\n")
 		promptPrefix.WriteString(strings.Join(matchedDocs, "\n---\n"))
 		promptPrefix.WriteString("\n\n")
 	}
@@ -752,4 +751,13 @@ func editLatestAiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// helper
+func truncateRunes(s string, maxLen int) string {
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s
+	}
+	return string(r[:maxLen])
 }

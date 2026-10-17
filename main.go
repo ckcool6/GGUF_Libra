@@ -233,8 +233,6 @@ func main() {
 			return
 		}
 
-		ClearVectorDB() // Prevent side branch from being affected by the vector knowledge base
-
 		// Inherit summary by default
 		withSummary := true
 		if r.Method == http.MethodPost {
@@ -364,7 +362,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{
 			"abstract": abstract,
 		})
-		ClearVectorDB() // Clear vector database so model only relies on the summary
+
 	})
 
 	http.HandleFunc("/api/switch-side-to-main", func(w http.ResponseWriter, r *http.Request) {

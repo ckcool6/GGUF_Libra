@@ -35,7 +35,7 @@ type chatChain struct {
 	BranchColor  NodeColor
 	IsForkedNode bool
 
-	ActiveThoughtChain string `json:"ActiveThoughtChain,omitempty"`
+	ActiveThoughtChain string `json:"ActiveThoughtChain"`
 }
 
 // init
