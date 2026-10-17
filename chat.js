@@ -423,6 +423,11 @@ async function loadHistory() {
                             </div>
                         </div>`;
 
+                    const aiBubbleEl = wrapper.querySelector(".ai-bubble");
+                    if (aiBubbleEl) {
+                        aiBubbleEl.dataset.raw = m.content;
+                    }
+
                     // Check if archived branches exist
                     if (m.archives && m.archives.length > 0) {
                         const archiveEntry = document.createElement("div");
@@ -827,6 +832,7 @@ function finalizeAiBubble(ctx) {
 
     // Final complete safe Markdown parsing for the last frame
     ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
+    ctx.aiBubbleDiv.dataset.raw = ctx.fullText;
 
     // Highlight code blocks and parse emojis
     ctx.aiBubbleDiv
@@ -2192,3 +2198,80 @@ const SideTracker = {
         this.bubbles = [];
     }
 };
+
+
+// ==================== EDIT LATEST AI MESSAGE ====================
+const editLatestAiBtn = document.getElementById("edit-latest-ai-btn");
+const editAiModal = document.getElementById("edit-ai-modal");
+const editAiTextarea = document.getElementById("edit-ai-textarea");
+const cancelEditAiBtn = document.getElementById("cancel-edit-ai-btn");
+const saveEditAiBtn = document.getElementById("save-edit-ai-btn");
+
+let targetAiBubble = null;
+
+if (editLatestAiBtn) {
+    editLatestAiBtn.addEventListener("click", () => {
+
+        const allAiBubbles = Array.from(document.querySelectorAll("#chat-box .ai-bubble")).filter(
+            el => !el.closest(".message-row.is-discarded")
+        );
+
+        if (allAiBubbles.length === 0) {
+            alert("No editable AI response found.");
+            return;
+        }
+
+        targetAiBubble = allAiBubbles[allAiBubbles.length - 1];
+
+        editAiTextarea.value = targetAiBubble.dataset.raw !== undefined ? targetAiBubble.dataset.raw : targetAiBubble.innerText.trim();
+        editAiModal.classList.remove("hidden");
+        editAiTextarea.focus();
+    });
+}
+
+if (cancelEditAiBtn) {
+    cancelEditAiBtn.addEventListener("click", () => {
+        editAiModal.classList.add("hidden");
+        targetAiBubble = null;
+    });
+}
+
+if (saveEditAiBtn) {
+    saveEditAiBtn.addEventListener("click", async () => {
+        if (!targetAiBubble) return;
+
+        const newContent = editAiTextarea.value.trim();
+        const origBtnText = saveEditAiBtn.innerText;
+        saveEditAiBtn.innerText = "Saving...";
+        saveEditAiBtn.disabled = true;
+
+        try {
+            const res = await fetch("/api/edit-latest-ai", {
+                method: "POST",
+                headers: getHeaders(),
+                body: JSON.stringify({ content: newContent }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "Failed to update latest AI message");
+            }
+
+            targetAiBubble.dataset.raw = newContent;
+            targetAiBubble.innerHTML = safeMarkdownParse(newContent);
+
+            targetAiBubble.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
+            attachCodeCopyButtons(targetAiBubble);
+            twemoji.parse(targetAiBubble, { folder: "svg", ext: ".svg" });
+
+            editAiModal.classList.add("hidden");
+            targetAiBubble = null;
+        } catch (err) {
+            console.error(err);
+            alert("Failed to save: " + err.message);
+        } finally {
+            saveEditAiBtn.innerText = origBtnText;
+            saveEditAiBtn.disabled = false;
+        }
+    });
+}

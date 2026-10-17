@@ -62,3 +62,7 @@ type LlamaMessage struct {
 type ForkSideRequest struct {
 	WithSummary bool `json:"with_summary"`
 }
+
+type editLatestAiReq struct {
+	Content string `json:"content"`
+}

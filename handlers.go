@@ -700,3 +700,56 @@ func uploadDocHandler(w http.ResponseWriter, r *http.Request) {
 		"message": fmt.Sprintf("Successfully chunked and indexed %d code/text snippet(s)", len(chunks)),
 	})
 }
+
+func editLatestAiHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req editLatestAiReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if currentChain == nil || currentChain.DialogContent == nil {
+		http.Error(w, "No active chain found", http.StatusBadRequest)
+		return
+	}
+
+	chatHist := currentChain.DialogContent.ChatHistory
+	found := false
+
+	for i := len(chatHist) - 1; i >= 0; i-- {
+		if chatHist[i].Role == "assistant" {
+			currentChain.DialogContent.ChatHistory[i].Content = req.Content
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "No AI response message found to edit", http.StatusNotFound)
+		return
+	}
+
+	sendHist := currentChain.DialogContent.SendHistory
+	for i := len(sendHist) - 1; i >= 0; i-- {
+		if sendHist[i].Role == "assistant" {
+			currentChain.DialogContent.SendHistory[i].Content = req.Content
+			break
+		}
+	}
+
+	if rootChain != nil {
+		rootChain.SaveChainToFile("chain_history.json")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}

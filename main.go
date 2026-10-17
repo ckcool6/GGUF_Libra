@@ -483,6 +483,7 @@ func main() {
 	})
 
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
+	http.HandleFunc("/api/edit-latest-ai", editLatestAiHandler)
 
 	// port configs
 	defaultPort := os.Getenv("PORT")

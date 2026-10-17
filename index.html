@@ -338,7 +338,17 @@
         </div>
     </footer>
 
-    <div class="fixed right-6 bottom-24 z-40">
+    <div class="fixed right-6 bottom-24 z-40 flex flex-col gap-5">
+        <button id="edit-latest-ai-btn"
+            class="w-12 h-12 rounded-full bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-gray-700/80 shadow-lg hover:shadow-xl hover:border-amber-500/50 dark:hover:border-amber-400/50 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 flex items-center justify-center transition-all duration-200 active:scale-90 group"
+            title="Edit Latest AI Response">
+            <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none"
+                stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+        </button>
+
         <button id="open-parser-btn"
             class="w-12 h-12 rounded-full bg-white dark:bg-[#1C1B1A] border border-gray-200/90 dark:border-gray-700/80 shadow-lg hover:shadow-xl hover:border-emerald-500/50 dark:hover:border-emerald-400/50 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-all duration-200 active:scale-90 group"
             title="Open Topology Parser Console">
@@ -349,6 +359,30 @@
                     d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
             </svg>
         </button>
+    </div>
+
+    <div id="edit-ai-modal"
+        class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div
+            class="bg-white dark:bg-[#1e1f20] w-full max-w-2xl p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-gray-800 flex flex-col gap-3 transition-colors">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <span class="text-amber-500">✏️</span> Edit Latest AI Bubble
+                </h3>
+            </div>
+            <textarea id="edit-ai-textarea"
+                class="w-full h-80 p-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-black/20 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-gray-800 dark:text-gray-200 resize-none font-mono leading-relaxed"></textarea>
+            <div class="flex justify-end gap-3 mt-1">
+                <button id="cancel-edit-ai-btn"
+                    class="px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400 transition-colors">
+                    Cancel
+                </button>
+                <button id="save-edit-ai-btn"
+                    class="px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#205EA6] hover:bg-[#1B4B82] dark:bg-[#205EA6]/85 dark:hover:bg-[#205EA6] active:scale-[0.98] rounded-xl transition-all shadow-xs">
+                    Overwrite & Save
+                </button>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="./chat.js"></script>
