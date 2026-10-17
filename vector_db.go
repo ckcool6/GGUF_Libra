@@ -299,10 +299,23 @@ func queryVectorDB(ctx context.Context, query string, topK int) ([]string, error
 		return nil, err
 	}
 
+	// =========================================================================
+	// Core addition: Similarity threshold filtering
+	// =========================================================================
+	// Set the minimum threshold (typically between 0.40 and 0.55 depending on your embedding model)
+	const minSimilarity float32 = 0.45
+
 	var matchedTexts []string
 	for _, res := range results {
-		matchedTexts = append(matchedTexts, res.Content)
+		// Log similarity score to calibrate the threshold during testing
+		logPrintf("[RAG Debug] Doc: %s | Similarity: %.4f (Threshold: %.2f)\n", res.ID, res.Similarity, minSimilarity)
+
+		// Only include documents that pass the relevance threshold
+		if res.Similarity >= minSimilarity {
+			matchedTexts = append(matchedTexts, res.Content)
+		}
 	}
+
 	return matchedTexts, nil
 }
 
