@@ -940,20 +940,23 @@ function createNotebookBar() {
         }
     });
 
-    // Bind Fork Side event (Enforces pipeline: Generate Summary -> Archive Main -> Fork Side)
+    // Bind Fork Side event (Pipeline: Generate Summary -> Review Modal -> Archive Main -> Fork Side)
     const doForkSide = async (withSummary) => {
         try {
             const histRes = await fetch("/api/history", { headers: getHeaders() });
             const currentBranch = histRes.headers.get("X-Current-Branch") || "main";
 
-            // Check if a valid summary box is already rendered on screen
-            const existingSummary = notebookBar.parentElement?.querySelector(".summary-box textarea")?.value?.trim();
+            // 1. Check if a summary already exists (supporting both editable textarea and historical rendered text)
+            const summaryBox = notebookBar.parentElement?.querySelector(".summary-box");
+            let existingSummary =
+                summaryBox?.querySelector("textarea")?.value?.trim() ||
+                summaryBox?.querySelector(".summary-content")?.textContent?.trim();
 
-            // 1. If no summary exists yet, generate it first
+            // 2. If no summary exists, generate it first and prompt user for review/edit
             if (!existingSummary) {
                 const loadingNotice = document.createElement("div");
                 loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
-                loadingNotice.innerText = "processing...";
+                loadingNotice.innerText = "Generating summary before branching...";
                 chatBox.appendChild(loadingNotice);
                 chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -975,9 +978,29 @@ function createNotebookBar() {
                     alert("Failed to generate summary; unable to fork side branch.");
                     return;
                 }
+
+                const data = await absRes.json();
+                const generatedAbstract = data.abstract || data.DialogAbstract || "";
+
+                // Open modal for review/edit
+                const editedAbstract = await showSummaryEditModal(generatedAbstract);
+
+                // If user cancelled, abort the fork operation safely
+                if (editedAbstract === null) {
+                    return;
+                }
+
+                // If the user modified the summary, persist changes back to the server
+                if (editedAbstract !== generatedAbstract) {
+                    await fetch("/api/edit-abstract", {
+                        method: "POST",
+                        headers: getHeaders(),
+                        body: JSON.stringify({ abstract: editedAbstract }),
+                    });
+                }
             }
 
-            // 2. Archive main branch (must main)
+            // 3. Archive main branch (required before branching off main)
             if (currentBranch === "main") {
                 const archRes = await fetch("/api/archive-main", {
                     method: "POST",
@@ -991,7 +1014,7 @@ function createNotebookBar() {
                 }
             }
 
-            // 3. Execute fork side branch
+            // 4. Fork side branch
             const res = await fetch("/api/fork-side", {
                 method: "POST",
                 headers: getHeaders(),
@@ -1014,7 +1037,6 @@ function createNotebookBar() {
                         : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
 
                     chatBox.appendChild(notice);
-
                     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
                 }, 60);
             }
@@ -1023,6 +1045,60 @@ function createNotebookBar() {
             alert("Failed to fork side branch, please try again.");
         }
     };
+
+    /**
+     * Display a review/edit modal dialog for the generated conversation summary.
+     * @param {string} initialSummary - Newly generated summary text.
+     * @returns {Promise<string|null>} - Resolves with the confirmed summary text, or null if cancelled.
+     */
+    function showSummaryEditModal(initialSummary) {
+        return new Promise((resolve) => {
+            const modal = document.createElement("div");
+            modal.className = "fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in";
+            modal.innerHTML = `
+            <div class="bg-white dark:bg-[#1e1f20] w-full max-w-lg p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-gray-800 flex flex-col gap-3 transition-colors">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <span class="text-amber-500">${SUMMARY_HTML}</span> Review & Edit Summary
+                    </h3>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    A summary was generated for the main branch. You can modify it before archiving and branching:
+                </p>
+                <textarea class="w-full h-44 p-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-black/20 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-gray-800 dark:text-gray-200 resize-none font-sans leading-relaxed"></textarea>
+                <div class="flex justify-end gap-3 mt-1">
+                    <button class="modal-cancel px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400 transition-colors">
+                        Cancel
+                    </button>
+                    <button class="modal-confirm px-4 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-600/90 dark:hover:bg-amber-600 active:scale-[0.98] rounded-xl transition-all shadow-xs">
+                        Confirm & Continue
+                    </button>
+                </div>
+            </div>
+        `;
+
+            document.body.appendChild(modal);
+
+            const textarea = modal.querySelector("textarea");
+            textarea.value = initialSummary;
+            textarea.focus();
+
+            const cleanup = () => {
+                modal.remove();
+            };
+
+            modal.querySelector(".modal-cancel").onclick = () => {
+                cleanup();
+                resolve(null); // Cancelled by user
+            };
+
+            modal.querySelector(".modal-confirm").onclick = () => {
+                const finalVal = textarea.value.trim();
+                cleanup();
+                resolve(finalVal); // Confirmed with content
+            };
+        });
+    }
 
     const forkBtn = notebookBar.querySelector(".fork-side-btn");
     const popover = notebookBar.querySelector(".fork-options-popover");
