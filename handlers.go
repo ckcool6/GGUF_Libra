@@ -83,7 +83,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	} else if len(matchedDocs) == 0 {
 		logPrintf("%s \033[38;2;230;130;50mMissed\033[0m No relevant snippets matched\n", tagInfo)
 	} else {
-		logPrintf("%s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
+		logPrintf("%s Retrieval successful, \033[1;34mmatched\033[0m %d snippet(s)\n", tagOK, len(matchedDocs))
 		logPrintf("%s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
 	}
 	logPrintln("=========================================================================")
@@ -94,6 +94,8 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	var thoughtChainSnippet string
 
 	if queryEngine != nil {
+		logPrintln("====================== Chain DB Debug Info ==============================")
+
 		// Query active top 15% memory pool (pass 0 to let dynamic retention take over)
 		qRes, qErr := queryEngine.QuerySemantic(ctx, body.Message, 0, llamaEmbeddingFunc)
 
@@ -139,10 +141,10 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 				logPrintf("  - Terminal Step: [%d] -> [%d] %s...\n",
 					lastStep.ParentID, lastStep.ChildID, truncateRunes(lastStep.ChildText, 30))
 			}
-			logPrintln("=========================================================================")
 		}
+
+		logPrintln("=========================================================================")
 	}
-	logPrintln("=========================================================================")
 
 	// =========================================================================
 	// Hybrid context augmentation (chain-of-thought + reference docs + user query)

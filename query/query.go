@@ -73,6 +73,15 @@ type Engine struct {
 
 // NewEngine initializes and loads data from a binary file
 func NewEngine(binPath string) (*Engine, error) {
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		f, createErr := os.Create(binPath)
+		if createErr != nil {
+			return nil, fmt.Errorf("failed to create default %s: %w", binPath, createErr)
+		}
+		f.Close()
+		logDebug("\033[1;36m[INFO]\033[0m %s not found, created an empty one automatically\n", binPath)
+	}
+
 	file, err := os.Open(binPath)
 	if err != nil {
 		return nil, err
