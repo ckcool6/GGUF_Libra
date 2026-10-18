@@ -313,7 +313,7 @@ func (e *Engine) QuerySemantic(
 	}
 	logDebug("[DEBUG Miss] Below similarity thresholds: Stage1 max: %.4f (threshold %.2f), Stage2 max: %.4f (threshold %.2f)\n",
 		bestStage1Sim, stage1Threshold, bestStage2Sim, stage2Threshold)
-	return nil, fmt.Errorf("no semantic match found in active 15%% memory (stage1 max: %.4f, stage2 max: %.4f)", bestStage1Sim, bestStage2Sim)
+	return nil, fmt.Errorf("\033[38;2;230;130;50mMissed\033[0m (stage1 max: %.4f, stage2 max: %.4f)", bestStage1Sim, bestStage2Sim)
 }
 
 // backtrackWithinTree enforces strict tree-scoped isolation:

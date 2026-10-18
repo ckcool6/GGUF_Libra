@@ -77,14 +77,14 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	matchedDocs, vErr := queryVectorDB(ctx, body.Message, 3)
 
 	logPrintln("====================== RAG Vector Debug Info ============================")
-	logPrintf("1. User query: %s\n", body.Message)
+	logPrintf("User query: %s\n", body.Message)
 	if vErr != nil {
-		logPrintf("2. %s Retrieval missed: %v\n", tagWarn, vErr)
+		logPrintf("%s Retrieval error: %v\n", tagWarn, vErr)
+	} else if len(matchedDocs) == 0 {
+		logPrintf("%s \033[38;2;230;130;50mMissed\033[0m No relevant snippets matched\n", tagInfo)
 	} else {
-		logPrintf("2. %s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
-		if len(matchedDocs) > 0 {
-			logPrintf("3. %s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
-		}
+		logPrintf("%s Retrieval successful, matched %d snippet(s)\n", tagOK, len(matchedDocs))
+		logPrintf("%s Preview of first matched snippet:\n%s\n", tagInfo, matchedDocs[0])
 	}
 	logPrintln("=========================================================================")
 
@@ -106,7 +106,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 				thoughtChainSnippet = ""
 				localChain.ActiveThoughtChain = ""
 			}
-			logPrintf("%s [Chain of Thought] No external tree triggered; retaining natural context\n", tagInfo)
+			logPrintf("%s [Chain of Thought] %v; retaining natural context\n", tagInfo, qErr)
 		} else {
 			// ==========================================
 			// Case 2: New tree matched! Log details and anchor to current branch
