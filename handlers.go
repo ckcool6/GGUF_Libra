@@ -114,8 +114,9 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			// Case 2: New tree matched! Log details and anchor to current branch
 			// ==========================================
 			logPrintf("========= %s Matched & Anchored New Thought Tree (data.bin) ========\n", tagMatch)
+			logPrintf("%s Matched chain activated (LogicT: \033[1;35m%.4f\033[0m)\n", tagOK, qRes.Record.LogicT)
 			logPrintf("  - Matched Tree UUID : %d\n", qRes.Record.UUID)
-			logPrintf("  - Tree Logic T      : %.4f\n", qRes.Record.LogicT)
+			logPrintf("  - Tree Date/Time    : %s\n", qRes.Record.Date)
 			logPrintf("  - Matched Keyword   : [%s]\n", qRes.Record.Keyword)
 			logPrintf("  - Derivation Chain  : %v (%d reasoning steps)\n", qRes.NodePath, len(qRes.EdgePath))
 
