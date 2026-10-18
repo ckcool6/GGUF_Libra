@@ -65,6 +65,7 @@ run('npm run build');
 
 // 2. Compile Go binary into release directory
 const outBinaryPath = path.join(RELEASE_DIR, EXE_NAME);
+run('go mod download');
 run(`go build -x -o "${outBinaryPath}"`);
 
 // 3. Archive frontend distribution and configurations
@@ -83,11 +84,14 @@ console.log(`${TAG.ok} Created empty data.bin placeholder in release directory`)
 // 4. Compile Python parser into standalone executable
 console.log(`\n${TAG.info} Compiling Python parser to standalone executable...`);
 const targetParserPy = path.join(RELEASE_DIR, 'parser_py');
+const parserPyDir = path.join(__dirname, 'parser_py');
+
+run('uv sync', parserPyDir);
 
 // Output parser.exe directly into release/parser_py
 run(
     `uv run pyinstaller --onefile --console --clean --icon=NONE --distpath "${targetParserPy}" --name parser main.py`,
-    path.join(__dirname, 'parser_py')
+    parserPyDir
 );
 
 console.log(`\n${c.bold}================ Build Completed Successfully ================${c.reset}`);
