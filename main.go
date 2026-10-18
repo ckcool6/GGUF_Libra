@@ -141,6 +141,21 @@ func getCurrentBranchName(chain *chatChain) string {
 	return fmt.Sprintf("side#%d", depth)
 }
 
+// reloadQueryEngine reload data.bin
+func reloadQueryEngine() {
+	newEngine, err := query.NewEngine("data.bin")
+	if err != nil {
+		logPrintf("%s Failed to reload data.bin on new chat: %v\n", tagError, err)
+		return
+	}
+
+	mu.Lock()
+	queryEngine = newEngine
+	mu.Unlock()
+
+	logPrintf("%s data.bin reloaded successfully on new chat! Total dialogue trees: %d\n", tagOK, len(newEngine.Records))
+}
+
 func main() {
 
 	var err error

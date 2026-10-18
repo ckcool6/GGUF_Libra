@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"gguf-libra/query"
 	"io"
 	"net/http"
 	"net/url"
@@ -426,6 +427,15 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 		logPrintf("%s Failed to clean up vector database/gob files: %v\n", tagWarn, err)
 	} else {
 		logPrintf("%s Successfully reset chromem-go vector database and cleared persisted .gob files!\n", tagOK)
+	}
+
+	if newEngine, err := query.NewEngine("data.bin"); err != nil {
+		logPrintf("%s Failed to reload data.bin on new chat: %v\n", tagError, err)
+	} else {
+		mu.Lock()
+		queryEngine = newEngine
+		mu.Unlock()
+		logPrintf("%s data.bin reloaded successfully on new chat! Total dialogue trees: %d\n", tagOK, len(newEngine.Records))
 	}
 
 	w.WriteHeader(http.StatusOK)
