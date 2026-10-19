@@ -13,6 +13,8 @@ The model does not need to remember everything. Recalling trivial, insignificant
 - **YAML System Prompts**: Supports `system_prompts.yaml` for defining prompts, removing the need for complex JSON-style character cards.
 - **Local & Private**: No cloud database or telemetry. Chat history is stored strictly on your local machine (`chain_history.json`) for topological recall, and can also be exported as `.txt` files.
 - **PWA Support**: Can be installed as a Progressive Web App.
+- **Latex Support**: Full support for rendering inline and block mathematical formulas.
+- **Tree-sitter Code Parser Support**:  The vector database chunks source files by syntactic AST structures rather than arbitrary line cuts. Currently supports Go, Python, C/C++, and JavaScript.
 - **No Accounts / Logins**: This is a local client for `llama-server`, so no login system is needed.
 - **No Frontend Frameworks**: Built with pure HTML, CSS, and Vanilla JavaScript (no React or Vue).
 - **No Backend Frameworks**: Uses only Go's standard `net/http` package.
@@ -132,15 +134,25 @@ You can build and run it manually on Linux using the steps below:
 We model the conversation tree as a **discrete heat diffusion system** over an undirected graph:
 
 1. **Diffusion Step (Heat Equation)**:
-   $$u_i(t+1) = u_i(t) + dt \cdot \sum_{j \in \text{Neighbor}(i)} (u_j(t) - u_i(t))$$
-   *Matrix form:* $u_{t+1} = u_t - dt \cdot (L \cdot u_t)$
+<p align="center">
+  <img src="https://latex.codecogs.com/svg.image?u_i(t%2B1)%20=%20u_i(t)%20%2B%20dt%20\cdot%20\sum_{j%20\in%20\text{Neighbor}(i)}%20(u_j(t)%20-%20u_i(t))" />
+</p>
+
+*Matrix form:* $u_{t+1} = u_t - dt \cdot (L \cdot u_t)$
 
 2. **Decay of the Slowest Mode**:
-   $$\|u_{t+1}\| \approx \|u_t\| \cdot (1 - \lambda_2 \cdot dt)$$
-   *Where $\lambda_2$ is the algebraic connectivity (second smallest eigenvalue of the Laplacian matrix $L$).*
+<p align="center">
+  <img src="https://latex.codecogs.com/svg.image?\|u_{t%2B1}\|\approx%20\|u_t\|\cdot%20(1%20-%20\lambda_2%20\cdot%20dt)" />
+</p>
 
-3. **Characteristic Relaxation Time**:
-   $$\text{logic\_t} = \frac{1}{\lambda_2}$$
+*Where $\lambda_2$ is the algebraic connectivity.*
+
+3. **Characteristic Relaxation Time (`logic_t`)**:
+<p align="center">
+  <img src="https://latex.codecogs.com/svg.image?\tau%20=%20\frac{1}{\lambda_2}" />
+</p>
+
+
 
 ### Physical Intuition:
 - **Trivial small-talk**: Represents a shallow graph with no topological bottlenecks ($\lambda_2$ is large). Information diffuses to equilibrium almost instantaneously, yielding a low $\text{logic\_t}$ (pruned as forgotten).
