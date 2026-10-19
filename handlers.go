@@ -122,12 +122,35 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 			// Assemble chain-of-thought prompt snippet
 			var sb strings.Builder
-			sb.WriteString("[Relevant historical reasoning context (for evolutionary logic reference only)]:\n")
+			sb.WriteString("[VERIFIED HISTORICAL PROGRESSION]:\n")
+			sb.WriteString("The timeline below records how the current topic originally unfolded with the user.\n")
+			sb.WriteString("INSTRUCTION: Recount this full progression naturally within your response, explaining the context from the beginning up to the current topic. Do not use bullet points, numbered lists, subheadings, or step labels:\n")
+
+			stepIdx := 1
+			const maxStepLen = 60
+
 			for i, step := range qRes.EdgePath {
-				sb.WriteString(fmt.Sprintf("  - Step %d: Based on [%s] -> Derived [%s]\n", i+1, step.ParentText, step.ChildText))
+				pText := strings.TrimSpace(step.ParentText)
+				cText := strings.TrimSpace(step.ChildText)
+
+				if pText == cText || cText == "" {
+					logPrintf("\033[93m[WARN]\033[0m Skipped step (Edge %d: Node %d -> Node %d), reason: pText==cText (%v), cText is empty (%v)\n",
+						i+1, step.ParentID, step.ChildID, pText == cText, cText == "")
+					continue
+				}
+
+				cleanPText := strings.ReplaceAll(pText, "\n", " ")
+				cleanCText := strings.ReplaceAll(cText, "\n", " ")
+				pTrunc := truncateRunes(cleanPText, maxStepLen)
+				cTrunc := truncateRunes(cleanCText, maxStepLen)
+
+				sb.WriteString(fmt.Sprintf("  - [%s] -> [%s]\n", pTrunc, cTrunc))
+				stepIdx++
 			}
+
 			sb.WriteString("\n")
 			thoughtChainSnippet = sb.String()
+			logPrintf("%s Full reasoning context:\n%s", tagInfo, thoughtChainSnippet)
 
 			// Core action: persist assembled thought chain to current branch for multi-turn conversations
 			localChain.ActiveThoughtChain = thoughtChainSnippet
@@ -165,7 +188,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if promptPrefix.Len() > 0 {
-		promptPrefix.WriteString("If the reference content above is relevant to the user's question, incorporate it into your answer; otherwise, ignore it:\n\n")
+		promptPrefix.WriteString("Respond to the user's message strictly based on the context and reasoning history provided above:\n\n")
 	}
 
 	// =========================================================================
