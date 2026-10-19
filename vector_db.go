@@ -35,7 +35,7 @@ type contextKey string
 const embeddingURLKey contextKey = "embedding_url"
 
 func getEmbeddingsURL(customURL string) string {
-	defaultURL := "http://127.0.0.1:8021/v1/embeddings"
+	defaultURL := "http://127.0.0.1:8022/v1/embeddings"
 	if strings.TrimSpace(customURL) == "" {
 		return defaultURL
 	}
