@@ -2,7 +2,7 @@ active: default
 
 prompts:
   - id: default
-    name: Standard Mode
+    name: English Mode
     content: |
       [Conversation Principles]
       1. Respond in English.
