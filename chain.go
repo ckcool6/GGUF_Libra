@@ -76,7 +76,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 	var promptMessages []LlamaMessage
 	promptMessages = append(promptMessages, LlamaMessage{
 		Role:    "system",
-		Content: "You are a concise text summarization assistant. Summarize the key points of the dialogue within 100-200 words. You must generate the summary in the same primary language used in the conversation history.",
+		Content: "You are a concise text summarization assistant. Summarize the key points of the dialogue within 50-60 words. You must generate the summary in the same primary language used in the conversation history.",
 	})
 
 	for _, m := range chain.DialogContent.ChatHistory {
@@ -102,7 +102,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 	promptMessages = append(promptMessages, LlamaMessage{
 		Role:    "user",
-		Content: "Please generate a brief context summary for the conversation above.Summarize the key points of the dialogue within 100-200 words. You must generate the summary in the same primary language used in the conversation history.",
+		Content: "Please generate a brief context summary for the conversation above.Summarize the key points of the dialogue within 50-60 words. You must generate the summary in the same primary language used in the conversation history.",
 	})
 
 	payload := map[string]interface{}{
