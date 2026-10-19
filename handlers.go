@@ -121,14 +121,9 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 			logPrintf("  - Derivation Chain  : %v (%d reasoning steps)\n", qRes.NodePath, len(qRes.EdgePath))
 
 			// Assemble chain-of-thought prompt snippet
-			var sb strings.Builder
-			sb.WriteString("[VERIFIED HISTORICAL PROGRESSION]:\n")
-			sb.WriteString("The timeline below records how the current topic originally unfolded with the user.\n")
-			sb.WriteString("INSTRUCTION: Recount this full progression naturally within your response, explaining the context from the beginning up to the current topic. Do not use bullet points, numbered lists, subheadings, or step labels:\n")
-
-			stepIdx := 1
 			const maxStepLen = 60
 
+			var rawNodes []string
 			for i, step := range qRes.EdgePath {
 				pText := strings.TrimSpace(step.ParentText)
 				cText := strings.TrimSpace(step.ChildText)
@@ -139,18 +134,32 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				cleanPText := strings.ReplaceAll(pText, "\n", " ")
-				cleanCText := strings.ReplaceAll(cText, "\n", " ")
-				pTrunc := truncateRunes(cleanPText, maxStepLen)
-				cTrunc := truncateRunes(cleanCText, maxStepLen)
-
-				sb.WriteString(fmt.Sprintf("  - [%s] -> [%s]\n", pTrunc, cTrunc))
-				stepIdx++
+				if len(rawNodes) == 0 {
+					rawNodes = append(rawNodes, strings.ReplaceAll(pText, "\n", " "))
+				}
+				rawNodes = append(rawNodes, strings.ReplaceAll(cText, "\n", " "))
 			}
 
-			sb.WriteString("\n")
-			thoughtChainSnippet = sb.String()
-			logPrintf("%s Full reasoning context:\n%s", tagInfo, thoughtChainSnippet)
+			var nodeSnippets []string
+			for idx, text := range rawNodes {
+				t := truncateRunes(text, maxStepLen)
+				if len([]rune(text)) > maxStepLen && !strings.HasSuffix(t, "...") {
+					t += "..."
+				}
+				nodeSnippets = append(nodeSnippets, fmt.Sprintf("%d. [%s]", idx+1, t))
+			}
+
+			stepsContent := strings.Join(nodeSnippets, " -> ")
+
+			logPrintf("%s Pure reasoning steps:\n  %s\n", tagInfo, stepsContent)
+
+			thoughtChainSnippet = fmt.Sprintf(
+				"[VERIFIED HISTORICAL PROGRESSION]:\n"+
+					"The timeline below records how the current topic originally unfolded with the user.\n"+
+					"INSTRUCTION: Recount this full progression naturally within your response, explaining the context from the beginning up to the current topic. Do not use bullet points, numbered lists, subheadings, or step labels:\n"+
+					"  %s\n",
+				stepsContent,
+			)
 
 			// Core action: persist assembled thought chain to current branch for multi-turn conversations
 			localChain.ActiveThoughtChain = thoughtChainSnippet
