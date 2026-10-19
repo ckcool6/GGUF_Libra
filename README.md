@@ -154,9 +154,11 @@ We model the conversation tree as a **discrete heat diffusion system** over an u
 
 
 
-### Physical Intuition:
-- **Trivial small-talk**: Represents a shallow graph with no topological bottlenecks ($\lambda_2$ is large). Information diffuses to equilibrium almost instantaneously, yielding a low $\text{logic\_t}$ (pruned as forgotten).
-- **Deep reasoning chains**: Possess tight structural bottlenecks and elongated paths ($\lambda_2 \to 0$). Information takes a long time to dissipate, yielding a high $\text{logic\_t}$ (anchored as high-priority memory).
+<h3>Physical Intuition:</h3>
+<ul>
+  <li><b>Trivial small-talk</b>: Represents a shallow graph with no topological bottlenecks (<i>&lambda;</i><sub>2</sub> is large). Information diffuses to equilibrium almost instantaneously, yielding a low <i>&tau;</i> (pruned as forgotten).</li>
+  <li><b>Deep reasoning chains</b>: Possess tight structural bottlenecks and elongated paths (<i>&lambda;</i><sub>2</sub> &rarr; 0). Information takes a long time to dissipate, yielding a high <i>&tau;</i> (anchored as high-priority memory).</li>
+</ul>
 
 For the full numerical implementation, see `parser_py/parser.py`.
 
