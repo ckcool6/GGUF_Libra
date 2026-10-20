@@ -1,5 +1,9 @@
 # GGUF Libra
 
+## Screenshot
+<img src=".github/assets/ui.png" alt="ui"/>
+<img src=".github/assets/log.png" alt="log"/>
+
 ## What is this
 A local LLM chat client focused on role-play and chat, based on `llama-server` (llama.cpp). It reshapes how the model recalls past context through a custom algorithm, allowing the model to remember key information while also forgetting trivial details.
 
@@ -79,9 +83,6 @@ Click the **Settings** button in the top-right corner, set the following URLs, a
 
 *(Optional: Run `gguf-libra.exe -port 0` to assign a random available port. Default is 8099.)*
 
-
-## Screenshot
-(Add your screenshots here)
 
 ## How to Build (windows)
 ### 1.Prerequisites
