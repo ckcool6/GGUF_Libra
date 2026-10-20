@@ -28,7 +28,7 @@ The model does not need to remember everything. Recalling trivial, insignificant
 Start two `llama-server` instances on ports `8021` (chat model) and `8022` (embedding model).
 The following example uses `gemma-4-12B` and `embeddinggemma-300M`:
 
-First, create the directory `D:\llama_cpp\models` and download the GGUF files for `gemma-4-12b` and `embedding-gemma-300m` and place them inside. Then, run the following two scripts:
+First, make sure llama.cpp is installed in `D:\llama_cpp`. Then, create the directory `D:\llama_cpp\models` and download the GGUF files for `gemma-4-12b` and `embedding-gemma-300m` into it. Finally, run the following two scripts:
 
 ### Script 1: gemma-4-12b (Main Model)
 
