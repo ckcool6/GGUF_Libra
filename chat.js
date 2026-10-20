@@ -393,7 +393,7 @@ async function loadHistory() {
                 if (isUser) {
                     let userBubbleInner = "";
                     if (m.image) {
-                        userBubbleInner += `<img src="data:image/jpeg;base64,${m.image}" class="max-w-full rounded-lg mb-2 border border-black/5 dark:border-white/5 shadow-sm">`;
+                        userBubbleInner += `<img src="data:image/jpeg;base64,${m.image}" class="max-w-64 max-h-48 w-auto h-auto object-cover rounded-lg mb-2 shadow-xs border border-black/5 dark:border-white/5 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all">`;
                     }
                     if (m.content) {
                         userBubbleInner += `<div>${content}</div>`;
@@ -557,7 +557,7 @@ async function send() {
     let userBubbleHtml = `<div class="message-row flex justify-start items-start gap-3 mb-8">${getUserAvatarHtml()}<div class="user-bubble p-4 rounded-2xl max-w-[85%]">`;
     // Insert image node if present
     if (imageToSend) {
-        userBubbleHtml += `<img src="${imageToSend}" class="max-w-full rounded-lg mb-2 shadow-sm border border-black/5 dark:border-white/5">`;
+        userBubbleHtml += `<img src="${imageToSend}" class="max-w-64 max-h-48 w-auto h-auto object-cover rounded-lg mb-2 shadow-xs border border-black/5 dark:border-white/5 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all">`;
     }
 
     // Insert text content if present
@@ -2272,6 +2272,31 @@ if (saveEditAiBtn) {
         } finally {
             saveEditAiBtn.innerText = origBtnText;
             saveEditAiBtn.disabled = false;
+        }
+    });
+}
+
+// ==================== image view ====================
+const imageViewerModal = document.getElementById("image-viewer-modal");
+const imageViewerImg = document.getElementById("image-viewer-img");
+
+if (imageViewerModal && imageViewerImg) {
+    chatBox.addEventListener("click", (e) => {
+        if (e.target.tagName === "IMG" && !e.target.classList.contains("emoji")) {
+            imageViewerImg.src = e.target.src;
+            imageViewerModal.classList.remove("hidden");
+        }
+    });
+
+    imageViewerModal.addEventListener("click", () => {
+        imageViewerModal.classList.add("hidden");
+        imageViewerImg.src = "";
+    });
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !imageViewerModal.classList.contains("hidden")) {
+            imageViewerModal.classList.add("hidden");
+            imageViewerImg.src = "";
         }
     });
 }
