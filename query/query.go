@@ -224,7 +224,7 @@ func (e *Engine) QuerySemantic(
 
 	// Semantic similarity acceptance thresholds
 	const stage1Threshold float32 = 0.70 // Stricter threshold for macroscopic topic match
-	const stage2Threshold float32 = 0.65 // Tolerant threshold for microscopic step match
+	const stage2Threshold float32 = 0.67 // Tolerant threshold for microscopic step match
 
 	// =========================================================================
 	// Stage 1: Fast Path - Macroscopic semantic matching on terminal summaries
