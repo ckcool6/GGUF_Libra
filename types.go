@@ -13,8 +13,8 @@ type Message struct {
 	Archives [][]Message `json:"archives,omitempty"`
 	Abstract string      `json:"abstract,omitempty"`
 
-	Branch string `json:"branch,omitempty"` // "main" or "side"
-
+	Branch    string `json:"branch,omitempty"` // "main" or "side"
+	CreatedAt int64  `json:"created_at"`
 }
 
 type SystemPromptConfig struct {

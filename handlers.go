@@ -13,7 +13,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+	"time"
 )
 
 // Dynamically retrieve the current model's maximum n_ctx context limit
@@ -239,8 +241,9 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 	if streamSuccess || aiFullContent != "" {
 		localChain.DialogContent.ChatHistory = append(localChain.DialogContent.ChatHistory, Message{
-			Role:    "assistant",
-			Content: aiFullContent,
+			Role:      "assistant",
+			Content:   aiFullContent,
+			CreatedAt: time.Now().UnixMilli(),
 		})
 
 		mu.Lock()
@@ -261,9 +264,10 @@ func load_history(chain *chatChain, body *reqBody) {
 
 	// Message entry must include Image
 	chain.DialogContent.ChatHistory = append(chain.DialogContent.ChatHistory, Message{
-		Role:    "user",
-		Content: body.Message,
-		Image:   body.Image, // Base64 image must be preserved in history
+		Role:      "user",
+		Content:   body.Message,
+		Image:     body.Image, // Base64 image must be preserved in history
+		CreatedAt: time.Now().UnixMilli(),
 	})
 	chain.DialogContent.UserMsgIndex = len(chain.DialogContent.ChatHistory) - 1
 
@@ -356,6 +360,12 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	collectMessages(rootChain)
+	sort.SliceStable(history, func(i, j int) bool {
+		if history[i].CreatedAt == 0 || history[j].CreatedAt == 0 {
+			return false
+		}
+		return history[i].CreatedAt < history[j].CreatedAt
+	})
 	json.NewEncoder(w).Encode(history)
 }
 
