@@ -320,8 +320,6 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		collectMessages(node.DialogSide)
-
 		if node.DialogContent != nil && len(node.DialogContent.ChatHistory) > 0 {
 			branchType := getCurrentBranchName(node)
 			nodeMsgs := []Message{}
@@ -353,6 +351,7 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 			history = append(history, nodeMsgs...)
 		}
 
+		collectMessages(node.DialogSide)
 		collectMessages(node.DialogMain)
 	}
 
