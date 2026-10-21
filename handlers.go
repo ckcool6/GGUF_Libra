@@ -777,7 +777,11 @@ func editLatestAiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		http.Error(w, "No AI response message found to edit", http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "The latest conversation has been checkpointed (archived). Checkpointed responses cannot be edited.",
+		})
 		return
 	}
 

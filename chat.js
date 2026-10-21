@@ -2253,8 +2253,14 @@ if (saveEditAiBtn) {
             });
 
             if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || "Failed to update latest AI message");
+                let errorMsg = "";
+                try {
+                    const errData = await res.json();
+                    errorMsg = errData.error || errData.message;
+                } catch (_) {
+                    errorMsg = await res.text();
+                }
+                throw new Error(errorMsg || "Unable to edit response: This message is locked or has been archived.");
             }
 
             targetAiBubble.dataset.raw = newContent;
@@ -2268,7 +2274,10 @@ if (saveEditAiBtn) {
             targetAiBubble = null;
         } catch (err) {
             console.error(err);
-            alert("Failed to save: " + err.message);
+            editAiModal.classList.add("hidden");
+            targetAiBubble = null;
+
+            alert("Cannot save edit:\n" + err.message.trim());
         } finally {
             saveEditAiBtn.innerText = origBtnText;
             saveEditAiBtn.disabled = false;
