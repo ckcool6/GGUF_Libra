@@ -11,6 +11,9 @@ from scipy.sparse import csr_matrix, diags
 from scipy.sparse.linalg import eigsh
 import random
 import sys
+from chain_filter import is_relative_duplicate, is_meaningless_content
+from typing import List, Tuple, Optional
+
 
 if getattr(sys, 'frozen', False):
     CURRENT_DIR = Path(sys.executable).resolve().parent
@@ -166,63 +169,80 @@ def build_entry(rawdata: List[ChatChain]) -> Tuple[List[Entry], int]:
     return all_entries, total_nodes
 
 
+def collect_valid_children(node: Optional[ChatChain], parent_text: str) -> List[ChatChain]:
+    """
+    Recursively bypasses any number of consecutive junk/duplicate nodes.
+    Returns ONLY clean, legitimate child nodes ready for stack processing.
+    """
+    if not node:
+        return []
+
+    child_text = node.DialogAbstract or ""
+
+    # Check for near-duplicate or meaningless content (low entropy / high symbol noise)
+    if is_relative_duplicate(parent_text, child_text, threshold=0.95) or is_meaningless_content(child_text):
+        clean_descendants = []
+        clean_descendants.extend(collect_valid_children(node.DialogSide, parent_text))
+        clean_descendants.extend(collect_valid_children(node.DialogMain, parent_text))
+        return clean_descendants
+    else:
+        return [node]
+
+
 def extract_by_stack(root_node: ChatChain, start_global_id: int = 0) -> Tuple[List[Entry], int]:
     """
-    Adjacency extraction: decomposes conversation tree into parent-child directed edges.
+    Adjacency extraction with root sanitization and multi-level topological collapse.
+    Guarantees that both the root and all traversal stack items are verified clean nodes.
     """
     if not root_node:
         return [], 0
 
+    # ------------------------------------------------------------------
+    # Step 0: Root Node Sanitization
+    # If the root itself is spam/junk, drill down to locate the first genuine root.
+    # ------------------------------------------------------------------
+    valid_roots = collect_valid_children(root_node, "")
+    if not valid_roots:
+        # Entire tree consists exclusively of spam/junk nodes
+        return [], 0
+
+    # Anchor to the first penetrated legitimate root
+    real_root = valid_roots[0]
+
     entries: List[Entry] = []
-    
     global_id = start_global_id
     
-    # Stack items: (current_node, assigned_node_id)
-    stack = [(root_node, global_id)]
+    # Initialize stack strictly with the verified clean root
+    stack = [(real_root, global_id)]
     
-    # Root node occupies 1 ID, increment global_id
     global_id += 1 
     nodes_processed = 1
     
     while stack:
         current_node, current_id = stack.pop()
+        parent_abstract = current_node.DialogAbstract or ""
         
-        # Extract parent text (source content for the edge)
-        parent_abstract = current_node.DialogAbstract if current_node.DialogAbstract else ""
-        
-        # Handle side branch (Side)
-        if current_node.DialogSide:
-            side_id = global_id  # Assign new ID to side node
+        # Pre-stack sanitization: gather only clean descendants across branches
+        valid_children: List[ChatChain] = []
+        for raw_branch in (current_node.DialogSide, current_node.DialogMain):
+            valid_children.extend(collect_valid_children(raw_branch, parent_abstract))
+
+        # Graph construction: iterate over verified nodes
+        for child_node in valid_children:
+            child_abstract = child_node.DialogAbstract or ""
+            child_id = global_id
             global_id += 1
             nodes_processed += 1
             
-            side_abstract = current_node.DialogSide.DialogAbstract if current_node.DialogSide.DialogAbstract else ""
-            
-            # Create edge entry from Parent -> Side
+            # Construct directed edge connecting verified parent to verified child
             entries.append(Entry(
                 start_id=current_id,
-                end_id=side_id,
-                raw_data=(parent_abstract, side_abstract)  # Bundle parent and child text together
+                end_id=child_id,
+                raw_data=(parent_abstract, child_abstract)
             ))
-            # Push side branch to stack to continue traversal
-            stack.append((current_node.DialogSide, side_id))
             
-        # Handle main branch (Main)
-        if current_node.DialogMain:
-            main_id = global_id  # Assign new ID to main node
-            global_id += 1
-            nodes_processed += 1
-            
-            main_abstract = current_node.DialogMain.DialogAbstract if current_node.DialogMain.DialogAbstract else ""
-            
-            # Create edge entry from Parent -> Main
-            entries.append(Entry(
-                start_id=current_id,
-                end_id=main_id,
-                raw_data=(parent_abstract, main_abstract)  # Bundle parent and child text together
-            ))
-            # Push main branch to stack to continue traversal
-            stack.append((current_node.DialogMain, main_id))
+            # Push verified clean node onto stack for further branch traversal
+            stack.append((child_node, child_id))
 
     return entries, nodes_processed
 
