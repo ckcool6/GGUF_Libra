@@ -150,22 +150,6 @@ async function initPromptSelect() {
 
                 if (!switchRes.ok) throw new Error("Failed to switch prompt");
 
-                // Retrieve local custom_url and clear backend chat history
-                const customUrl = localStorage.getItem("custom_api_url") || "";
-                await fetch(
-                    `/api/new-chat?custom_url=${encodeURIComponent(customUrl)}`,
-                );
-                updateBranchIndicator("main");
-
-                // Reset frontend UI
-                chatBox.innerHTML = `
-                    <div class="message-row flex justify-start items-start gap-3 mb-8">
-                        ${getAiAvatarHtml()}
-                        <div class="ai-bubble p-4 rounded-2xl max-w-[85%] markdown-body">
-                            Hello!
-                        </div>
-                    </div>`;
-
                 // Refresh context memory calculation
                 get_ctx_usage();
             } catch (err) {
