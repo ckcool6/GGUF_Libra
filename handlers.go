@@ -308,7 +308,12 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock()
 
 	w.Header().Set("X-Current-Branch", getCurrentBranchName(currentChain))
-	w.Header().Set("Access-Control-Expose-Headers", "X-Current-Branch")
+	currentPromptID := config.Active
+	if currentChain != nil && currentChain.PromptID != "" {
+		currentPromptID = currentChain.PromptID
+	}
+	w.Header().Set("X-Current-Prompt", currentPromptID)
+	w.Header().Set("Access-Control-Expose-Headers", "X-Current-Branch, X-Current-Prompt")
 
 	if rootChain == nil {
 		json.NewEncoder(w).Encode([]Message{})
@@ -456,6 +461,8 @@ func apiNewChatHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	// Initialize a clean tree root node in memory
 	rootChain = NewChatChain()
+	rootChain.PromptID = config.Active
+
 	currentChain = rootChain
 
 	// Overwrite chain_history.json with this new empty tree
@@ -697,6 +704,11 @@ func apiSwitchPromptHandler(w http.ResponseWriter, r *http.Request) {
 		logPrintf("%s loading YAML error: %v\n", tagWarn, err)
 	}
 	success := setActivePrompt(body.ID)
+
+	if success && currentChain != nil {
+		currentChain.PromptID = body.ID
+	}
+
 	mu.Unlock()
 
 	if !success {

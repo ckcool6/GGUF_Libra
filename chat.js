@@ -348,6 +348,12 @@ async function loadHistory() {
             updateBranchIndicator(currentBranch);
         }
 
+        const currentPrompt = res.headers.get("X-Current-Prompt");
+        const promptSelect = document.getElementById("prompt-select");
+        if (currentPrompt && promptSelect) {
+            promptSelect.value = currentPrompt;
+        }
+
         const historyList = await res.json();
 
         if (Array.isArray(historyList) && historyList.length > 0) {
@@ -1318,6 +1324,7 @@ function createNotebookBar() {
             if (res.ok) {
                 updateBranchIndicator("main");
                 SideTracker.discard();
+                await loadHistory();
 
                 switchBtn.innerHTML = `<span class="text-rose-500 font-bold">✓</span> Discarded`;
                 switchBtn.disabled = true;

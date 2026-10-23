@@ -36,6 +36,7 @@ type chatChain struct {
 	IsForkedNode bool
 
 	ActiveThoughtChain string `json:"ActiveThoughtChain"`
+	PromptID           string `json:"prompt_id"`
 }
 
 // init
@@ -199,6 +200,7 @@ func (chain *chatChain) AppendMainBranchNode() *chatChain {
 	chain.DialogMain = newNode
 	newNode.BranchColor = chain.BranchColor
 	newNode.DialogAbstract = chain.DialogAbstract
+	newNode.PromptID = chain.PromptID
 
 	if chain.DialogAbstract != "" {
 		newNode.DialogContent.ChatHistory = append(newNode.DialogContent.ChatHistory, Message{
@@ -220,6 +222,7 @@ func (chain *chatChain) AppendSideBranchNode(withSummary bool) *chatChain {
 	chain.DialogSide = newNode
 	newNode.IsForkedNode = true
 	newNode.BranchColor = GreenNode
+	newNode.PromptID = chain.PromptID
 
 	// Inject previous context summary only if requested and available
 	if withSummary && chain.DialogAbstract != "" {
@@ -343,6 +346,7 @@ func (root *chatChain) Merge(currentNode *chatChain) (*chatChain, error) {
 	mergedNode.BranchColor = YellowNode // Return to main branch
 	mergedNode.IsForkedNode = false     // Convergence node
 	mergedNode.DialogAbstract = summary // Transfer side branch summary to main dialog
+	mergedNode.PromptID = mainTail.PromptID
 
 	// Assemble merge message
 	mergeMsg := Message{

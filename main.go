@@ -259,9 +259,11 @@ func main() {
 
 		if currentChain != nil {
 			parentAbstract := currentChain.DialogAbstract
-
+			parentPrompt := currentChain.PromptID
 			// Create side branch child node and point currentChain to the new branch
 			currentChain = currentChain.AppendSideBranchNode(withSummary)
+			currentChain.PromptID = parentPrompt
+
 			rootChain.SaveChainToFile("chain_history.json")
 			previewLen := min(60, len(parentAbstract))
 			preview := strings.ReplaceAll(parentAbstract[:previewLen], "\n", " ")
@@ -299,6 +301,9 @@ func main() {
 		// Crucial step: point the user's active pointer back to the newly merged main line node
 		currentChain = newNode
 
+		if currentChain != nil && currentChain.PromptID != "" {
+			setActivePrompt(currentChain.PromptID)
+		}
 		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
 		// log
@@ -406,6 +411,10 @@ func main() {
 				mainTail = mainTail.DialogMain
 			}
 			currentChain = mainTail
+		}
+
+		if currentChain != nil && currentChain.PromptID != "" {
+			setActivePrompt(currentChain.PromptID)
 		}
 
 		// Persist state to file
