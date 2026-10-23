@@ -680,12 +680,21 @@ func apiGetPromptsHandler(w http.ResponseWriter, r *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	currentActiveID := config.Active
+	if currentChain != nil && currentChain.PromptID != "" {
+		currentActiveID = currentChain.PromptID
+	}
+
 	if err := loadSystemPrompt("system_prompt.yaml"); err != nil {
 		logPrintf("%s loading YAML error: %v\n", tagWarn, err)
 	}
 
+	if currentActiveID != "" {
+		setActivePrompt(currentActiveID)
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"active":  config.Active,
+		"active":  currentActiveID,
 		"prompts": config.Prompts,
 	})
 }

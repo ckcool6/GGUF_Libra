@@ -99,66 +99,114 @@ function scrollToBottomIfNear() {
     }
 }
 
-// Initialize prompt selector dropdown
+// Initialize prompt selector dropdown 
 async function initPromptSelect() {
-    const select = document.getElementById("prompt-select");
-    if (!select) return;
+    const triggerBtn = document.getElementById("prompt-select-btn");
+    const menuEl = document.getElementById("prompt-select-menu");
+    const labelEl = document.getElementById("prompt-select-label");
+    const arrowEl = triggerBtn?.querySelector("svg");
+
+    if (!triggerBtn || !menuEl) return;
 
     try {
         const res = await fetch("/api/prompts", { headers: getHeaders() });
-
         if (!res.ok) throw new Error(`HTTP status error: ${res.status}`);
 
         const data = await res.json();
+        const prompts = data.prompts || [];
+        const activeId = data.active || "";
 
-        select.innerHTML = "";
-        if (data.prompts && data.prompts.length > 0) {
-            data.prompts.forEach((p) => {
-                const opt = document.createElement("option");
-                opt.value = p.id;
-                opt.innerText = p.name;
-                if (p.id === data.active) opt.selected = true;
-                select.appendChild(opt);
+        menuEl.innerHTML = "";
+
+        if (prompts.length > 0) {
+            const currentPrompt = prompts.find(p => p.id === activeId) || prompts[0];
+            if (labelEl && currentPrompt) {
+                labelEl.innerText = currentPrompt.name;
+                triggerBtn.dataset.value = currentPrompt.id;
+            }
+
+            prompts.forEach((p) => {
+                const isSelected = p.id === (currentPrompt ? currentPrompt.id : activeId);
+                const optEl = document.createElement("div");
+                optEl.className = `custom-header-option px-3 py-1.5 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${isSelected ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}`;
+                optEl.dataset.value = p.id;
+                optEl.innerHTML = `
+                    <span>${p.name}</span>
+                    <span class="check-icon text-[11px] ${isSelected ? '' : 'hidden'}">✓</span>
+                `;
+
+                optEl.onclick = async (e) => {
+                    e.stopPropagation();
+                    const newId = p.id;
+                    if (triggerBtn.dataset.value === newId) {
+                        menuEl.classList.add("hidden");
+                        if (arrowEl) arrowEl.style.transform = "";
+                        return;
+                    }
+
+                    if (chatAbortController) {
+                        chatAbortController.abort();
+                        chatAbortController = null;
+                    }
+
+                    loading.classList.add("hidden");
+                    sendBtn.classList.remove("is-loading");
+                    sendBtn.innerHTML = SEND_ICON_HTML;
+
+                    try {
+                        const switchRes = await fetch("/api/switch-prompt", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: newId }),
+                        });
+
+                        if (!switchRes.ok) throw new Error("Failed to switch prompt");
+
+                        labelEl.innerText = p.name;
+                        triggerBtn.dataset.value = newId;
+
+                        menuEl.querySelectorAll(".custom-header-option").forEach(item => {
+                            item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                            item.classList.add("text-gray-700", "dark:text-[#CECDC3]");
+                            item.querySelector(".check-icon")?.classList.add("hidden");
+                        });
+                        optEl.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                        optEl.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
+                        optEl.querySelector(".check-icon")?.classList.remove("hidden");
+
+                        get_ctx_usage();
+                    } catch (err) {
+                        console.error("Failed to switch prompt:", err);
+                    } finally {
+                        menuEl.classList.add("hidden");
+                        if (arrowEl) arrowEl.style.transform = "";
+                    }
+                };
+
+                menuEl.appendChild(optEl);
             });
-            select.disabled = false; // Enable select dropdown
+
+            triggerBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isHidden = menuEl.classList.toggle("hidden");
+                if (arrowEl) arrowEl.style.transform = isHidden ? "" : "rotate(180deg)";
+            };
+
+            document.addEventListener("click", () => {
+                if (!menuEl.classList.contains("hidden")) {
+                    menuEl.classList.add("hidden");
+                    if (arrowEl) arrowEl.style.transform = "";
+                }
+            });
+
         } else {
-            showPromptError(select, "No prompts available");
+            labelEl.innerText = "No Prompts";
+            triggerBtn.disabled = true;
         }
-
-        // Listen for prompt change
-        select.onchange = async (e) => {
-            const newId = e.target.value;
-
-            // If currently generating a response, abort the request
-            if (chatAbortController) {
-                chatAbortController.abort();
-                chatAbortController = null;
-            }
-
-            // Reset button and loading states
-            loading.classList.add("hidden");
-            sendBtn.classList.remove("is-loading");
-            sendBtn.innerHTML = SEND_ICON_HTML;
-
-            try {
-                // Notify backend to switch prompt
-                const switchRes = await fetch("/api/switch-prompt", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: newId }),
-                });
-
-                if (!switchRes.ok) throw new Error("Failed to switch prompt");
-
-                // Refresh context memory calculation
-                get_ctx_usage();
-            } catch (err) {
-                console.error("Failed to switch prompt or clear chat:", err);
-            }
-        };
     } catch (e) {
         console.error("Failed to load prompt list:", e);
-        showPromptError(select, "Service disconnected");
+        if (labelEl) labelEl.innerText = "Disconnected";
+        triggerBtn.disabled = true;
     }
 }
 
@@ -303,8 +351,9 @@ marked.setOptions({
     gfm: true,
 });
 
-window.onload = () => {
-    initPromptSelect();
+window.onload = async () => {
+    await initPromptSelect();
+
     const savedTheme = localStorage.getItem("theme");
 
     if (
@@ -319,7 +368,7 @@ window.onload = () => {
         updateModeIcon(false);
     }
 
-    loadHistory();
+    await loadHistory();
 
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -349,9 +398,28 @@ async function loadHistory() {
         }
 
         const currentPrompt = res.headers.get("X-Current-Prompt");
-        const promptSelect = document.getElementById("prompt-select");
-        if (currentPrompt && promptSelect) {
-            promptSelect.value = currentPrompt;
+        if (currentPrompt) {
+            const triggerBtn = document.getElementById("prompt-select-btn");
+            const labelEl = document.getElementById("prompt-select-label");
+            const menuEl = document.getElementById("prompt-select-menu");
+
+            if (triggerBtn && labelEl && menuEl) {
+                triggerBtn.dataset.value = currentPrompt;
+
+                menuEl.querySelectorAll(".custom-header-option").forEach(item => {
+                    const isMatch = item.dataset.value === currentPrompt;
+                    if (isMatch) {
+                        labelEl.innerText = item.querySelector("span").innerText;
+                        item.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                        item.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
+                        item.querySelector(".check-icon")?.classList.remove("hidden");
+                    } else {
+                        item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                        item.classList.add("text-gray-700", "dark:text-[#CECDC3]");
+                        item.querySelector(".check-icon")?.classList.add("hidden");
+                    }
+                });
+            }
         }
 
         const historyList = await res.json();
@@ -968,6 +1036,9 @@ function createNotebookBar() {
                 summaryBox?.querySelector("textarea")?.value?.trim() ||
                 summaryBox?.querySelector(".summary-content")?.textContent?.trim();
 
+            let modalResult = null;
+
+
             // 2. If no summary exists, generate it first and prompt user for review/edit
             if (!existingSummary) {
                 const loadingNotice = document.createElement("div");
@@ -998,22 +1069,26 @@ function createNotebookBar() {
                 const data = await absRes.json();
                 const generatedAbstract = data.abstract || data.DialogAbstract || "";
 
-                // Open modal for review/edit
-                const editedAbstract = await showSummaryEditModal(generatedAbstract);
+                //  Open unified modal (review/edit summary + select persona) 
+                modalResult = await showForkModal({
+                    initialSummary: generatedAbstract,
+                    needSummaryEdit: true
+                });
 
-                // If user cancelled, abort the fork operation safely
-                if (editedAbstract === null) {
-                    return;
-                }
+                if (!modalResult) return; // Abort if cancelled by user
 
-                // If the user modified the summary, persist changes back to the server
-                if (editedAbstract !== generatedAbstract) {
+                // Persist modified summary to backend if edited
+                if (modalResult.finalSummary !== generatedAbstract) {
                     await fetch("/api/edit-abstract", {
                         method: "POST",
                         headers: getHeaders(),
-                        body: JSON.stringify({ abstract: editedAbstract }),
+                        body: JSON.stringify({ abstract: modalResult.finalSummary }),
                     });
                 }
+            } else {
+                // Summary already exists; prompt for persona selection only 
+                modalResult = await showForkModal({ needSummaryEdit: false });
+                if (!modalResult) return;
             }
 
             // 3. Archive main branch (required before branching off main)
@@ -1038,6 +1113,14 @@ function createNotebookBar() {
             });
 
             if (res.ok) {
+                if (modalResult && modalResult.finalPromptId) {
+                    await fetch("/api/switch-prompt", {
+                        method: "POST",
+                        headers: getHeaders(),
+                        body: JSON.stringify({ id: modalResult.finalPromptId }),
+                    });
+                }
+
                 updateBranchIndicator("side");
 
                 if (typeof loadHistory === "function") {
@@ -1062,56 +1145,129 @@ function createNotebookBar() {
         }
     };
 
+
     /**
-     * Display a review/edit modal dialog for the generated conversation summary.
-     * @param {string} initialSummary - Newly generated summary text.
-     * @returns {Promise<string|null>} - Resolves with the confirmed summary text, or null if cancelled.
+     * Unified fork modal dialog (Flexoki Dark Theme):
+     * - If needSummaryEdit is true, provides both summary review/editing and persona selection.
+     * - If needSummaryEdit is false, provides persona selection only.
      */
-    function showSummaryEditModal(initialSummary) {
+    async function showForkModal({ initialSummary = "", needSummaryEdit = false }) {
+        const res = await fetch("/api/prompts", { headers: getHeaders() });
+        const data = res.ok ? await res.json() : { prompts: [], active: "" };
+        const prompts = data.prompts || [];
+        const activeId = data.active || (prompts[0]?.id || "");
+
+        let selectedPromptId = activeId;
+        const currentPromptObj = prompts.find(p => p.id === activeId) || prompts[0];
+
         return new Promise((resolve) => {
             const modal = document.createElement("div");
-            modal.className = "fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in";
-            modal.innerHTML = `
-            <div class="bg-white dark:bg-[#1e1f20] w-full max-w-lg p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-gray-800 flex flex-col gap-3 transition-colors">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <span class="text-amber-500">${SUMMARY_HTML}</span> Review & Edit Summary
-                    </h3>
+            modal.className = "fixed inset-0 z-[75] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in";
+
+            const summarySectionHtml = needSummaryEdit ? `
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-mono text-[#878580]">Review & Edit Summary:</label>
+                    <textarea id="modal-fork-summary-text" class="w-full h-32 p-3 text-xs rounded-xl border border-gray-200 dark:border-[#282726] bg-gray-50/50 dark:bg-[#100F0F] focus:outline-none focus:ring-1 focus:ring-[#879A39] text-gray-800 dark:text-[#CECDC3] resize-none font-sans leading-relaxed"></textarea>
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    A summary was generated for the main branch. You can modify it before archiving and branching:
-                </p>
-                <textarea class="w-full h-44 p-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-black/20 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-gray-800 dark:text-gray-200 resize-none font-sans leading-relaxed"></textarea>
-                <div class="flex justify-end gap-3 mt-1">
-                    <button class="modal-cancel px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400 transition-colors">
+            ` : ``;
+
+            const customOptionsHtml = prompts.map(p => `
+                <div class="custom-option px-3 py-2 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${p.id === activeId ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}" data-value="${p.id}">
+                    <span>${p.name}</span>
+                    <span class="check-icon text-[11px] ${p.id === activeId ? '' : 'hidden'}">✓</span>
+                </div>
+            `).join("");
+
+            modal.innerHTML = `
+            <div class="bg-white dark:bg-[#1C1B1A] w-full max-w-md p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-[#282726] flex flex-col gap-4 transition-colors font-sans select-none">
+                <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-[#CECDC3]">
+                    <span class="text-emerald-600 dark:text-[#879A39]">${SIDE_BRANCH_HTML}</span>
+                    <span>Fork to Side Branch</span>
+                </div>
+
+                ${summarySectionHtml}
+
+                <div class="flex flex-col gap-1.5 relative">
+                    <label class="text-[11px] font-mono text-gray-500 dark:text-[#878580]">Select Persona for Side Branch:</label>
+                    
+                    <button type="button" id="custom-select-trigger" class="w-full flex items-center justify-between bg-gray-50 dark:bg-[#100F0F] border border-gray-200 dark:border-[#282726] rounded-xl px-3 py-2 text-xs text-gray-800 dark:text-[#CECDC3] focus:outline-none focus:ring-1 focus:ring-[#879A39] cursor-pointer">
+                        <span id="custom-select-label">${currentPromptObj ? currentPromptObj.name : 'Select Persona'}</span>
+                        <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+
+                    <div id="custom-select-menu" class="hidden absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] rounded-xl shadow-xl p-1 z-30 flex flex-col gap-0.5 max-h-48 overflow-y-auto animate-fade-in">
+                        ${customOptionsHtml}
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-2">
+                    <button class="modal-cancel px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-[#878580] transition-colors">
                         Cancel
                     </button>
-                    <button class="modal-confirm px-4 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-600/90 dark:hover:bg-amber-600 active:scale-[0.98] rounded-xl transition-all shadow-xs">
-                        Confirm & Continue
+                    <button class="modal-confirm px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#66800B] hover:bg-[#526609] dark:bg-[#879A39] dark:text-[#100F0F] dark:hover:bg-[#97AC44] active:scale-[0.98] rounded-xl transition-all shadow-xs font-medium">
+                        Confirm & Fork
                     </button>
                 </div>
             </div>
-        `;
+            `;
 
             document.body.appendChild(modal);
 
-            const textarea = modal.querySelector("textarea");
-            textarea.value = initialSummary;
-            textarea.focus();
+            const summaryTextarea = modal.querySelector("#modal-fork-summary-text");
+            if (summaryTextarea) summaryTextarea.value = initialSummary;
 
-            const cleanup = () => {
-                modal.remove();
+            const triggerBtn = modal.querySelector("#custom-select-trigger");
+            const menuEl = modal.querySelector("#custom-select-menu");
+            const labelEl = modal.querySelector("#custom-select-label");
+            const arrowEl = triggerBtn.querySelector("svg");
+
+            triggerBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isHidden = menuEl.classList.toggle("hidden");
+                arrowEl.style.transform = isHidden ? "" : "rotate(180deg)";
             };
+
+            modal.querySelectorAll(".custom-option").forEach(opt => {
+                opt.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedPromptId = opt.dataset.value;
+                    labelEl.innerText = opt.querySelector("span").innerText;
+
+                    modal.querySelectorAll(".custom-option").forEach(item => {
+                        item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                        item.classList.add("text-gray-700", "dark:text-[#CECDC3]");
+                        item.querySelector(".check-icon")?.classList.add("hidden");
+                    });
+
+                    opt.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                    opt.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
+                    opt.querySelector(".check-icon")?.classList.remove("hidden");
+
+                    menuEl.classList.add("hidden");
+                    arrowEl.style.transform = "";
+                };
+            });
+
+            modal.onclick = (e) => {
+                if (!triggerBtn.contains(e.target) && !menuEl.contains(e.target)) {
+                    menuEl.classList.add("hidden");
+                    arrowEl.style.transform = "";
+                }
+            };
+
+            const cleanup = () => modal.remove();
 
             modal.querySelector(".modal-cancel").onclick = () => {
                 cleanup();
-                resolve(null); // Cancelled by user
+                resolve(null);
             };
 
             modal.querySelector(".modal-confirm").onclick = () => {
-                const finalVal = textarea.value.trim();
+                const finalSummary = summaryTextarea ? summaryTextarea.value.trim() : null;
                 cleanup();
-                resolve(finalVal); // Confirmed with content
+                resolve({ finalSummary, finalPromptId: selectedPromptId });
             };
         });
     }
@@ -2300,3 +2456,4 @@ if (imageViewerModal && imageViewerImg) {
         }
     });
 }
+

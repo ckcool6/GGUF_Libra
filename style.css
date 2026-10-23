@@ -23,6 +23,7 @@
     --bg-header: #100F0F;
     --text-main: #CECDC3;
     --border-color: #282726;
+    color-scheme: dark;
 }
 
 /* ========================================================================== */
@@ -210,6 +211,18 @@ header button {
 
 header button:hover {
     transform: scale(1.05);
+}
+
+.dark-mode-active select,
+.dark-mode-active select option,
+.dark select option {
+    background-color: #1C1B1A !important;
+    color: #CECDC3 !important;
+}
+
+select option {
+    background-color: #ffffff;
+    color: #1f1f1f;
 }
 
 /* ========================================================================== */

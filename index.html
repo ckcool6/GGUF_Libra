@@ -200,9 +200,20 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <select id="prompt-select"
-                class="bg-transparent border border-gray-200 dark:border-[#282726] rounded-xl px-2 py-1 text-xs text-gray-700 dark:text-[#CECDC3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-[#282726] cursor-pointer transition-colors dark:bg-[#1C1B1A]">
-            </select>
+            <div class="relative inline-block text-left" id="prompt-dropdown-wrapper">
+                <button type="button" id="prompt-select-btn"
+                    class="flex items-center gap-1.5 bg-transparent border border-gray-200 dark:border-[#282726] rounded-xl px-2.5 py-1 text-xs text-gray-700 dark:text-[#CECDC3] hover:border-gray-300 dark:hover:border-[#343331] focus:outline-none cursor-pointer transition-colors dark:bg-[#1C1B1A]">
+                    <span id="prompt-select-label">Prompt</span>
+                    <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+
+                <div id="prompt-select-menu"
+                    class="hidden absolute right-0 mt-1.5 w-48 bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-fade-in max-h-60 overflow-y-auto">
+                </div>
+            </div>
 
             <button id="search-toggle-btn"
                 class="p-2 rounded-full text-gray-600 dark:text-[#878580] hover:bg-black/5 dark:hover:bg-white/5 dark:hover:text-[#CECDC3] transition-colors">
