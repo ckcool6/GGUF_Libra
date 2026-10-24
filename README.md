@@ -96,40 +96,23 @@ Click the **Settings** button in the top-right corner, set the following URLs, a
 node build.js
 ```
 
-## How to Build on Linux (Experimental / Manual)
-
-The project theoretically supports Linux. However, `build.js` is currently tailored for Windows environments (using PyInstaller to create `.exe` binaries) and has not been extensively tested on Linux. 
-
-You can build and run it manually on Linux using the steps below:
+## How to Build on Linux 
 
 ### 1. Prerequisites
 - Go 1.22.2
 - Node.js v26.3.1
 - uv 0.12.22
 
-### 2. Build Steps
+### 2. Run
+```bash
+  npm install vite
 
-1. In the project root directory, build the frontend and backend:
-   ```bash
-   npm run build
-   go build
-   ```
-2. Set up the Python environment for the memory parser:
-   ```bash
-   cd parser_py
-   uv sync
-   ```
+  cd GGUF-Libra
+
+  make
+```
    
-> [!NOTE]
-> **Linux Runtime Differences**  
-> On Windows, the build script compiles the parser into `parser.exe`, and the Web UI provides an **"Open Parser"** button to launch it with one click. This UI button is currently unavailable on Linux.  
-> 
-> To process and update memories, manually run the parser from the `parser_py` directory:
-> ```bash
-> uv run main.py
-> ```
-
-
+   
 ## Theoretical Foundation: Why `logic_t`?
 
 We model the conversation tree as a **discrete heat diffusion system** over an undirected graph:
