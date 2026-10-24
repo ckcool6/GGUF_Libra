@@ -10,6 +10,10 @@ import hljs from "highlight.js";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/atom-one-light.min.css";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
+
 
 //=====================================icons===================================================
 const SEND_ICON_HTML = `
@@ -2220,31 +2224,193 @@ if (docInput) {
     });
 }
 
-// open parser
+// open parser btn
+// ==================== XTERM PARSER CONSOLE ====================
+let term = null;
+let fitAddon = null;
+let termWs = null;
 
-if (openParserBtn) {
-    openParserBtn.addEventListener("click", async () => {
-        try {
-            openParserBtn.classList.add("opacity-50", "pointer-events-none");
+let currentLine = "";
+let cmdHistory = [];
+let historyIndex = -1;
 
-            const res = await fetch("/api/open-parser", {
-                method: "POST",
-                headers: getHeaders()
-            });
+const terminalModal = document.getElementById("terminal-modal");
+const terminalContainer = document.getElementById("terminal-container");
+const closeTerminalBtn = document.getElementById("close-terminal-btn");
+const clearTermBtn = document.getElementById("clear-term-btn");
 
-            if (!res.ok) {
-                throw new Error("Failed to trigger parser");
+function initTerminal() {
+    if (term) return;
+
+    term = new Terminal({
+        fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
+        fontSize: 13,
+        lineHeight: 1.2,
+        cursorBlink: true,
+        convertEol: true,
+        theme: {
+            background: "#100F0F",
+            foreground: "#CECDC3",
+            cursor: "#879A39",
+            selectionBackground: "#282726",
+            black: "#100F0F",
+            red: "#AF3029",
+            green: "#879A39",
+            yellow: "#D0A215",
+            blue: "#205EA6",
+            magenta: "#CE5D97",
+            cyan: "#24837B",
+            white: "#CECDC3",
+        },
+    });
+
+    fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(terminalContainer);
+
+    term.onData((data) => {
+        if (!termWs || termWs.readyState !== WebSocket.OPEN) return;
+
+        if (data === "\r") {
+            term.write("\r\n");
+            if (currentLine.trim().length > 0) {
+                cmdHistory.push(currentLine);
+                historyIndex = cmdHistory.length;
             }
-        } catch (e) {
-            console.error("Failed to launch parser:", e);
-            alert("Could not launch parser.exe. Please ensure it exists in parser_py/");
-        } finally {
-            setTimeout(() => {
-                openParserBtn.classList.remove("opacity-50", "pointer-events-none");
-            }, 800);
+            termWs.send(currentLine + "\n");
+            currentLine = "";
+            return;
+        }
+
+        if (data === "\x7f" || data === "\b") {
+            if (currentLine.length > 0) {
+                currentLine = currentLine.slice(0, -1);
+                term.write("\b \b");
+            }
+            return;
+        }
+
+        if (data === "\x03") {
+            term.write("^C\r\n");
+            currentLine = "";
+            termWs.send("\x03");
+            return;
+        }
+
+        if (data === "\x1b[A") {
+            if (cmdHistory.length > 0 && historyIndex > 0) {
+                while (currentLine.length > 0) {
+                    term.write("\b \b");
+                    currentLine = currentLine.slice(0, -1);
+                }
+                historyIndex--;
+                currentLine = cmdHistory[historyIndex];
+                term.write(currentLine);
+            }
+            return;
+        }
+
+        if (data === "\x1b[B") {
+            if (historyIndex < cmdHistory.length) {
+                while (currentLine.length > 0) {
+                    term.write("\b \b");
+                    currentLine = currentLine.slice(0, -1);
+                }
+                historyIndex++;
+                if (historyIndex < cmdHistory.length) {
+                    currentLine = cmdHistory[historyIndex];
+                    term.write(currentLine);
+                } else {
+                    currentLine = "";
+                }
+            }
+            return;
+        }
+
+        if (data.startsWith("\x1b")) {
+            return;
+        }
+
+        currentLine += data;
+        term.write(data);
+    });
+
+    window.addEventListener("resize", () => {
+        if (terminalModal && !terminalModal.classList.contains("hidden") && fitAddon) {
+            fitAddon.fit();
         }
     });
 }
+
+function openParserTerminal() {
+    initTerminal();
+    terminalModal.classList.remove("hidden");
+
+    currentLine = "";
+
+    setTimeout(() => {
+        if (fitAddon) fitAddon.fit();
+        if (term) term.focus();
+    }, 60);
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/parser`;
+
+    term.writeln("\x1b[36mConnecting to memory injector console...\x1b[0m");
+
+    termWs = new WebSocket(wsUrl);
+    termWs.binaryType = "arraybuffer";
+
+    termWs.onopen = () => {
+        term.writeln("\x1b[32m[Connected to memory injector session]\x1b[0m\r\n");
+    };
+
+    termWs.onmessage = (event) => {
+        const text =
+            event.data instanceof ArrayBuffer
+                ? new TextDecoder().decode(event.data)
+                : event.data;
+        term.write(text);
+    };
+
+    termWs.onerror = () => {
+        term.writeln("\r\n\x1b[31m[WebSocket Connection Error]\x1b[0m");
+    };
+
+    termWs.onclose = () => {
+        term.writeln("\r\n\x1b[90m[Session disconnected]\x1b[0m");
+    };
+}
+
+function closeParserTerminal() {
+    if (terminalModal) terminalModal.classList.add("hidden");
+    if (termWs) {
+        termWs.close();
+        termWs = null;
+    }
+    currentLine = "";
+}
+
+if (openParserBtn) {
+    openParserBtn.addEventListener("click", openParserTerminal);
+}
+
+if (closeTerminalBtn) {
+    closeTerminalBtn.addEventListener("click", closeParserTerminal);
+}
+
+if (clearTermBtn) {
+    clearTermBtn.addEventListener("click", () => {
+        if (term) term.clear();
+        currentLine = "";
+    });
+}
+
+window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && terminalModal && !terminalModal.classList.contains("hidden")) {
+        closeParserTerminal();
+    }
+});
 
 // copy btn
 const COPY_ICON_SVG = `<svg class="w-3.5 h-3.5 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`;

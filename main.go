@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -156,6 +158,161 @@ func reloadQueryEngine() {
 	logPrintf("%s data.bin reloaded successfully on new chat! Total dialogue trees: %d\n", tagOK, len(newEngine.Records))
 }
 
+// open parser helps
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+func sendWsError(conn *websocket.Conn, format string, a ...any) {
+	msg := fmt.Appendf(nil, "\r\n\x1b[31m"+format+"\x1b[0m\r\n", a...)
+	_ = conn.WriteMessage(websocket.TextMessage, msg)
+}
+
+func resolveParserCmd() (*exec.Cmd, error) {
+	binName := "parser"
+	if runtime.GOOS == "windows" {
+		binName = "parser.exe"
+	}
+
+	candidates := []string{
+		filepath.Join("parser_py", binName),
+		binName,
+	}
+
+	for _, path := range candidates {
+		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
+			if runtime.GOOS != "windows" {
+				_ = os.Chmod(path, 0755)
+			}
+			return exec.Command(path), nil
+		}
+	}
+
+	pyScriptCandidates := []string{
+		filepath.Join("parser_py", "main.py"),
+		"main.py",
+	}
+
+	var targetPyScript string
+	for _, p := range pyScriptCandidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			targetPyScript = p
+			break
+		}
+	}
+
+	if targetPyScript != "" {
+		pyExecs := []string{"python3", "python"}
+		if runtime.GOOS == "windows" {
+			pyExecs = []string{"python", "python3"}
+		}
+
+		for _, py := range pyExecs {
+			if _, err := exec.LookPath(py); err == nil {
+				return exec.Command(py, targetPyScript), nil
+			}
+		}
+		return nil, fmt.Errorf("found %s but no python interpreter found in PATH", targetPyScript)
+	}
+
+	return nil, fmt.Errorf("neither binary (%s) nor parser.py found", binName)
+}
+
+func initParserTerminalHandler() {
+	http.HandleFunc("/ws/parser", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			logPrintf("%s WebSocket upgrade error: %v\n", tagError, err)
+			return
+		}
+		defer conn.Close()
+
+		cmd, err := resolveParserCmd()
+		if err != nil {
+			sendWsError(conn, "[Error] %v", err)
+			return
+		}
+
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			sendWsError(conn, "[Error] Stdin pipe failed: %v", err)
+			return
+		}
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			sendWsError(conn, "[Error] Stdout pipe failed: %v", err)
+			return
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			sendWsError(conn, "[Error] Stderr pipe failed: %v", err)
+			return
+		}
+
+		logPrintf("%s [Parser] Spawning process: %s (OS: %s)\n", tagInfo, cmd.String(), runtime.GOOS)
+
+		if err := cmd.Start(); err != nil {
+			sendWsError(conn, "[Error] Failed to start process: %v", err)
+			return
+		}
+
+		defer func() {
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+				logPrintf("%s [Parser] Process terminated (PID: %d)\n", tagInfo, cmd.Process.Pid)
+			}
+		}()
+
+		done := make(chan struct{})
+
+		// Stdout -> WebSocket
+		go func() {
+			buf := make([]byte, 1024)
+			for {
+				n, err := stdout.Read(buf)
+				if n > 0 {
+					_ = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				}
+				if err != nil {
+					break
+				}
+			}
+			close(done)
+		}()
+
+		// Stderr -> WebSocket
+		go func() {
+			buf := make([]byte, 1024)
+			for {
+				n, err := stderr.Read(buf)
+				if n > 0 {
+					_ = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				}
+				if err != nil {
+					break
+				}
+			}
+		}()
+
+		// WebSocket -> Stdin
+		go func() {
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				_, _ = stdin.Write(msg)
+			}
+		}()
+
+		<-done
+		_ = cmd.Wait()
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\n\x1b[33m[Process exited]\x1b[0m\r\n"))
+	})
+}
+
 func main() {
 
 	var err error
@@ -172,34 +329,7 @@ func main() {
 	config_init()
 	initRAG()
 
-	// open parser.exe
-	http.HandleFunc("/api/open-parser", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		go func() {
-			parserPath := filepath.Join("parser_py", "parser.exe")
-			if _, err := os.Stat(parserPath); os.IsNotExist(err) {
-				parserPath = "parser.exe"
-			}
-
-			var cmd *exec.Cmd
-			if runtime.GOOS == "windows" {
-				cmd = exec.Command("cmd", "/c", "start", "GGUF Libra - Graph Parser Console", parserPath)
-			} else {
-				cmd = exec.Command(parserPath)
-			}
-
-			if err := cmd.Start(); err != nil {
-				logPrintf("%s Failed to start parser: %v\n", tagError, err)
-			}
-		}()
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
+	initParserTerminalHandler()
 
 	// Host static assets from the dist directory
 	http.Handle("/", http.FileServer(http.Dir("dist")))
