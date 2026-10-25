@@ -211,12 +211,12 @@ async function initPromptSelect() {
                         const currentName = labelEl.innerText;
                         const targetName = p.name;
                         const shouldFork = await showConfirm(
-                            `Current branch is dedicated to [${currentName}]. To chat with [${targetName}], a new Side Chat will be forked. Proceed?`
+                            `Current branch is dedicated to [${currentName}]. To chat with [${targetName}], a new *Isolated* Side Chat will be forked. Proceed?`
                         );
 
                         if (shouldFork) {
-                            // Automatically fork to a side branch with the selected persona
-                            await doForkSide(true, newId);
+                            // Automatically fork to a isolated side branch with the selected persona
+                            await doForkSide(false, newId);
                         }
                         return;
                     }
