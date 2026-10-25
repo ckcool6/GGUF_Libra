@@ -475,3 +475,44 @@ img.emoji {
 #chat-box .message-row.is-discarded .notebook-bar {
     display: none !important;
 }
+
+/* ========================================================================== */
+/* PROMPT SELECT MENU SCROLLBAR                         */
+/* ========================================================================== */
+
+#prompt-select-menu {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+#prompt-select-menu::-webkit-scrollbar {
+    width: 4px;
+}
+
+#prompt-select-menu::-webkit-scrollbar-track,
+#prompt-select-menu::-webkit-scrollbar-button {
+    display: none;
+    background: transparent;
+}
+
+#prompt-select-menu::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+}
+
+#prompt-select-menu::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode-active #prompt-select-menu {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.dark-mode-active #prompt-select-menu::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode-active #prompt-select-menu::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}

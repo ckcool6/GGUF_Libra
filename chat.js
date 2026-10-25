@@ -121,8 +121,8 @@ async function initPromptSelect() {
         const activeId = data.active || "";
 
         menuEl.innerHTML = "";
-        menuEl.classList.remove("w-48");
-        menuEl.classList.add("w-56");
+        menuEl.classList.remove("w-48", "w-56");
+        menuEl.classList.add("w-64");
 
         if (prompts.length > 0) {
             const currentPrompt = prompts.find(p => p.id === activeId) || prompts[0];
@@ -135,26 +135,26 @@ async function initPromptSelect() {
             prompts.forEach((p) => {
                 const isSelected = p.id === (currentPrompt ? currentPrompt.id : activeId);
                 const optEl = document.createElement("div");
-                optEl.className = `custom-header-option px-2.5 py-1.5 text-xs rounded-xl cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${isSelected ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}`;
-                optEl.dataset.value = p.id;
-
+                optEl.className = `custom-header-option px-3 py-2.5 text-sm rounded-xl cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${isSelected ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}`; optEl.dataset.value = p.id;
                 const avatarSrc = getPromptAvatar(p.id);
                 const avatarInner = avatarSrc
                     ? `<img src="${avatarSrc}" class="w-full h-full object-cover avatar-img">`
                     : `<span class="default-icon text-[11px]">✨</span>`;
 
                 optEl.innerHTML = `
-                    <div class="flex items-center gap-2 min-w-0">
-                        <div class="prompt-avatar-wrapper relative group/avatar w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700/80 overflow-hidden shrink-0 flex items-center justify-center bg-gray-100 dark:bg-white/5" title="Click to upload/change avatar for this prompt">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="prompt-avatar-wrapper relative group/avatar w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700/80 overflow-hidden shrink-0 flex items-center justify-center bg-gray-100 dark:bg-white/5" title="Click to upload/change avatar for this prompt">
                             <div class="avatar-display w-full h-full flex items-center justify-center">${avatarInner}</div>
-                            <div class="absolute inset-0 bg-black/50 text-white text-[9px] flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                                📷
+                            <div class="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                </svg>
                             </div>
                             <input type="file" accept="image/*" class="prompt-avatar-file-input hidden">
                         </div>
-                        <span class="truncate">${p.name}</span>
+                        <span class="truncate font-medium">${p.name}</span>
                     </div>
-                    <span class="check-icon text-[11px] shrink-0 ml-1.5 ${isSelected ? '' : 'hidden'}">✓</span>
+                    <span class="check-icon text-xs shrink-0 ml-2 ${isSelected ? '' : 'hidden'}">✓</span>
                 `;
 
                 const avatarWrapper = optEl.querySelector(".prompt-avatar-wrapper");
