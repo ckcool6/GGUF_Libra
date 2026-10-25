@@ -331,10 +331,17 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 
 		if node.DialogContent != nil && len(node.DialogContent.ChatHistory) > 0 {
 			branchType := getCurrentBranchName(node)
+
+			nodePrompt := node.PromptID
+			if nodePrompt == "" {
+				nodePrompt = config.Active
+			}
+
 			nodeMsgs := []Message{}
 			for _, msg := range node.DialogContent.ChatHistory {
 				if msg.Role != "system" {
 					msg.Branch = branchType
+					msg.PromptID = nodePrompt
 					nodeMsgs = append(nodeMsgs, msg)
 				}
 			}

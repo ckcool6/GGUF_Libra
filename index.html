@@ -114,40 +114,24 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Avatar
-                        Settings</label>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">User Avatar</label>
                     <div
-                        class="grid grid-cols-2 gap-4 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800">
-                        <!-- user profile -->
-                        <div class="flex flex-col items-center gap-2">
-                            <span class="text-xs text-gray-500 font-medium">User Avatar</span>
-                            <div
-                                class="relative group w-14 h-14 rounded-full border-2 border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer shadow-xs">
-                                <img id="setting-user-preview" class="w-full h-full object-cover">
-                                <label for="upload-user-avatar"
-                                    class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] cursor-pointer">
-                                    Change
-                                </label>
-                                <input type="file" id="upload-user-avatar" accept="image/*" class="hidden">
-                            </div>
-                            <button id="reset-user-avatar" type="button"
-                                class="text-[11px] text-gray-400 hover:text-rose-500 transition-colors">Reset</button>
+                        class="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-gray-800">
+                        <div
+                            class="relative group w-14 h-14 rounded-full border-2 border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer shrink-0 shadow-xs">
+                            <img id="setting-user-preview" class="w-full h-full object-cover">
+                            <label for="upload-user-avatar"
+                                class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] cursor-pointer">
+                                Change
+                            </label>
+                            <input type="file" id="upload-user-avatar" accept="image/*" class="hidden">
                         </div>
-
-                        <!-- AI icon -->
-                        <div class="flex flex-col items-center gap-2">
-                            <span class="text-xs text-gray-500 font-medium">AI Avatar</span>
-                            <div
-                                class="relative group w-14 h-14 rounded-full border-2 border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer shadow-xs">
-                                <img id="setting-ai-preview" class="w-full h-full object-cover">
-                                <label for="upload-ai-avatar"
-                                    class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] cursor-pointer">
-                                    Change
-                                </label>
-                                <input type="file" id="upload-ai-avatar" accept="image/*" class="hidden">
-                            </div>
-                            <button id="reset-ai-avatar" type="button"
-                                class="text-[11px] text-gray-400 hover:text-rose-500 transition-colors">Reset</button>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-xs text-gray-600 dark:text-gray-300 font-medium">Profile Picture</span>
+                            <button id="reset-user-avatar" type="button"
+                                class="text-left text-[11px] text-gray-400 hover:text-rose-500 transition-colors">
+                                Reset to default
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -202,7 +186,11 @@
         <div class="flex items-center gap-2">
             <div class="relative inline-block text-left" id="prompt-dropdown-wrapper">
                 <button type="button" id="prompt-select-btn"
-                    class="flex items-center gap-1.5 bg-transparent border border-gray-200 dark:border-[#282726] rounded-xl px-2.5 py-1 text-xs text-gray-700 dark:text-[#CECDC3] hover:border-gray-300 dark:hover:border-[#343331] focus:outline-none cursor-pointer transition-colors dark:bg-[#1C1B1A]">
+                    class="flex items-center gap-2 bg-transparent border border-gray-200 dark:border-[#282726] rounded-xl px-2.5 py-1 text-xs text-gray-700 dark:text-[#CECDC3] hover:border-gray-300 dark:hover:border-[#343331] focus:outline-none cursor-pointer transition-colors dark:bg-[#1C1B1A]">
+                    <div id="prompt-select-avatar-preview"
+                        class="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-white/10 shrink-0">
+                        <span class="text-[10px]">✨</span>
+                    </div>
                     <span id="prompt-select-label">Prompt</span>
                     <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none"
                         stroke="currentColor" viewBox="0 0 24 24">

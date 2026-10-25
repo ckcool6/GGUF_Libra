@@ -121,23 +121,75 @@ async function initPromptSelect() {
         const activeId = data.active || "";
 
         menuEl.innerHTML = "";
+        menuEl.classList.remove("w-48");
+        menuEl.classList.add("w-56");
 
         if (prompts.length > 0) {
             const currentPrompt = prompts.find(p => p.id === activeId) || prompts[0];
             if (labelEl && currentPrompt) {
                 labelEl.innerText = currentPrompt.name;
                 triggerBtn.dataset.value = currentPrompt.id;
+                updatePromptSelectBtnAvatar(currentPrompt.id);
             }
 
             prompts.forEach((p) => {
                 const isSelected = p.id === (currentPrompt ? currentPrompt.id : activeId);
                 const optEl = document.createElement("div");
-                optEl.className = `custom-header-option px-3 py-1.5 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${isSelected ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}`;
+                optEl.className = `custom-header-option px-2.5 py-1.5 text-xs rounded-xl cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${isSelected ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}`;
                 optEl.dataset.value = p.id;
+
+                const avatarSrc = getPromptAvatar(p.id);
+                const avatarInner = avatarSrc
+                    ? `<img src="${avatarSrc}" class="w-full h-full object-cover avatar-img">`
+                    : `<span class="default-icon text-[11px]">✨</span>`;
+
                 optEl.innerHTML = `
-                    <span>${p.name}</span>
-                    <span class="check-icon text-[11px] ${isSelected ? '' : 'hidden'}">✓</span>
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="prompt-avatar-wrapper relative group/avatar w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700/80 overflow-hidden shrink-0 flex items-center justify-center bg-gray-100 dark:bg-white/5" title="Click to upload/change avatar for this prompt">
+                            <div class="avatar-display w-full h-full flex items-center justify-center">${avatarInner}</div>
+                            <div class="absolute inset-0 bg-black/50 text-white text-[9px] flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                                📷
+                            </div>
+                            <input type="file" accept="image/*" class="prompt-avatar-file-input hidden">
+                        </div>
+                        <span class="truncate">${p.name}</span>
+                    </div>
+                    <span class="check-icon text-[11px] shrink-0 ml-1.5 ${isSelected ? '' : 'hidden'}">✓</span>
                 `;
+
+                const avatarWrapper = optEl.querySelector(".prompt-avatar-wrapper");
+                const fileInput = optEl.querySelector(".prompt-avatar-file-input");
+                fileInput.onclick = (e) => e.stopPropagation();
+
+                avatarWrapper.onclick = (e) => {
+                    e.stopPropagation();
+                    fileInput.click();
+                };
+
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        const compressed = await compressAvatar(file);
+                        savePromptAvatar(p.id, compressed);
+                        avatarWrapper.querySelector(".avatar-display").innerHTML = `<img src="${compressed}" class="w-full h-full object-cover avatar-img">`;
+                        document.querySelectorAll(`.ai-avatar-node[data-prompt-id="${p.id}"]`).forEach(node => {
+                            node.outerHTML = getAiAvatarHtml(p.id);
+                        });
+                        if (triggerBtn.dataset.value === p.id) {
+                            updatePromptSelectBtnAvatar(p.id);
+                            document.querySelectorAll(".ai-avatar-node").forEach(node => {
+                                node.outerHTML = getAiAvatarHtml(p.id);
+                            });
+                        }
+                    } catch (err) {
+                        console.error("Failed to upload prompt avatar:", err);
+                        alert("Failed to process image: " + err.message);
+
+                    } finally {
+                        fileInput.value = "";
+                    }
+                };
 
                 optEl.onclick = async (e) => {
                     e.stopPropagation();
@@ -148,6 +200,28 @@ async function initPromptSelect() {
                         return;
                     }
 
+                    // Check if the current session already has ongoing conversation history
+                    const hasUserMessages = document.querySelectorAll("#chat-box .user-bubble").length > 0;
+
+                    if (hasUserMessages) {
+                        // Enforce 1-Branch-1-Persona rule: intercept persona switch in active branches
+                        menuEl.classList.add("hidden");
+                        if (arrowEl) arrowEl.style.transform = "";
+
+                        const currentName = labelEl.innerText;
+                        const targetName = p.name;
+                        const shouldFork = await showConfirm(
+                            `Current branch is dedicated to [${currentName}]. To chat with [${targetName}], a new Side Chat will be forked. Proceed?`
+                        );
+
+                        if (shouldFork) {
+                            // Automatically fork to a side branch with the selected persona
+                            await doForkSide(true, newId);
+                        }
+                        return;
+                    }
+
+                    // Fresh chat (no messages yet): allow switching starting persona in place
                     if (chatAbortController) {
                         chatAbortController.abort();
                         chatAbortController = null;
@@ -168,6 +242,7 @@ async function initPromptSelect() {
 
                         labelEl.innerText = p.name;
                         triggerBtn.dataset.value = newId;
+                        updatePromptSelectBtnAvatar(newId);
 
                         menuEl.querySelectorAll(".custom-header-option").forEach(item => {
                             item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
@@ -177,6 +252,11 @@ async function initPromptSelect() {
                         optEl.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
                         optEl.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
                         optEl.querySelector(".check-icon")?.classList.remove("hidden");
+
+                        // Sync avatar on the initial greeting message
+                        document.querySelectorAll(".ai-avatar-node").forEach(node => {
+                            node.outerHTML = getAiAvatarHtml(newId);
+                        });
 
                         get_ctx_usage();
                     } catch (err) {
@@ -212,12 +292,6 @@ async function initPromptSelect() {
         if (labelEl) labelEl.innerText = "Disconnected";
         triggerBtn.disabled = true;
     }
-}
-
-// Helper function to display error/empty state in prompt select
-function showPromptError(select, message) {
-    select.innerHTML = `<option value="" disabled selected>[!] ${message}</option>`;
-    select.disabled = true;
 }
 
 // Get unified request headers
@@ -300,6 +374,70 @@ function showConfirm(message) {
 window.alert = function (message) {
     showModalDialog(message, true);
 };
+
+// prompt avatar
+function getPromptAvatar(promptId) {
+    if (!promptId) return "";
+    try {
+        const avatars = JSON.parse(localStorage.getItem("prompt_avatars") || "{}");
+        return avatars[promptId] || "";
+    } catch (_) {
+        return "";
+    }
+}
+
+function savePromptAvatar(promptId, base64) {
+    if (!promptId) return;
+    try {
+        const avatars = JSON.parse(localStorage.getItem("prompt_avatars") || "{}");
+        if (base64) {
+            avatars[promptId] = base64;
+        } else {
+            delete avatars[promptId];
+        }
+        localStorage.setItem("prompt_avatars", JSON.stringify(avatars));
+    } catch (e) {
+        console.error("Failed to save prompt avatar:", e);
+    }
+}
+
+function updatePromptSelectBtnAvatar(promptId) {
+    const previewEl = document.getElementById("prompt-select-avatar-preview");
+    if (!previewEl) return;
+    const avatar = getPromptAvatar(promptId);
+    if (avatar) {
+        previewEl.innerHTML = `<img src="${avatar}" class="w-full h-full object-cover">`;
+    } else {
+        previewEl.innerHTML = `<span class="text-[10px]">✨</span>`;
+    }
+}
+
+async function compressAvatar(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const size = 128;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+
+                const minSide = Math.min(img.width, img.height);
+                const sx = (img.width - minSide) / 2;
+                const sy = (img.height - minSide) / 2;
+                ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+
+                resolve(canvas.toDataURL("image/jpeg", 0.85));
+            };
+            img.onerror = () => reject(new Error("Image decode failed"));
+        };
+        reader.onerror = () => reject(new Error("File read failed"));
+    });
+}
 
 // ==================================== INIT & EXTENSIONS LOAD =============================
 // Custom marked extension to accurately intercept $$ and $
@@ -410,10 +548,12 @@ async function loadHistory() {
             if (triggerBtn && labelEl && menuEl) {
                 triggerBtn.dataset.value = currentPrompt;
 
+                updatePromptSelectBtnAvatar(currentPrompt);
+
                 menuEl.querySelectorAll(".custom-header-option").forEach(item => {
                     const isMatch = item.dataset.value === currentPrompt;
                     if (isMatch) {
-                        labelEl.innerText = item.querySelector("span").innerText;
+                        labelEl.innerText = item.querySelector("span.truncate") ? item.querySelector("span.truncate").innerText : item.innerText;
                         item.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
                         item.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
                         item.querySelector(".check-icon")?.classList.remove("hidden");
@@ -430,12 +570,9 @@ async function loadHistory() {
 
         if (Array.isArray(historyList) && historyList.length > 0) {
             chatBox.innerHTML = "";
-            // Reset tracker array to avoid stale DOM references
             SideTracker.bubbles = [];
 
-            // Check if the current active view is inside a side branch lineage
             const isCurrentInSide = currentBranch.toLowerCase().includes("side");
-
             let lastAiWrapperCol = null;
 
             historyList.forEach((m) => {
@@ -445,11 +582,6 @@ async function loadHistory() {
                     : safeMarkdownParse(m.content);
 
                 const isSideMsg = Boolean(m.branch && m.branch.toLowerCase().includes("side"));
-
-                // Key Rule:
-                // 1. While inside a side branch (including nested forks like side#1 -> side#2),
-                //    all messages are considered active — never discarded.
-                // 2. Only when viewed from the main branch are abandoned side messages treated as discarded.
                 const isDiscarded = !isCurrentInSide && isSideMsg;
 
                 if (isUser) {
@@ -470,15 +602,16 @@ async function loadHistory() {
                         </div>`;
                     chatBox.insertAdjacentHTML("beforeend", html);
 
-                    // Track active side bubbles so "Switch to main" can discard them all at once
                     if (isCurrentInSide && isSideMsg) {
                         SideTracker.bubbles.push(chatBox.lastElementChild);
                     }
                 } else {
+                    const aiAvatarHtml = getAiAvatarHtml(m.prompt_id || currentPrompt);
+
                     const wrapper = document.createElement("div");
                     wrapper.className = `message-row flex justify-start items-start gap-3 mb-8 ${isDiscarded ? 'is-discarded' : ''}`;
                     wrapper.innerHTML = `
-                         ${getAiAvatarHtml()}
+                         ${aiAvatarHtml}
                         <div class="flex flex-col max-w-[90%] w-full">
                             <div class="ai-bubble p-4 rounded-2xl markdown-body">
                                 ${content}
@@ -490,7 +623,6 @@ async function loadHistory() {
                         aiBubbleEl.dataset.raw = m.content;
                     }
 
-                    // Check if archived branches exist
                     if (m.archives && m.archives.length > 0) {
                         const archiveEntry = document.createElement("div");
                         archiveEntry.className = "mt-2 px-2";
@@ -500,19 +632,13 @@ async function loadHistory() {
                                 <span>View ${m.archives.length} merged branch(es) under this node</span>
                             </button>
                         `;
-
-                        archiveEntry.querySelector("button").onclick = () =>
-                            showArchiveModal(m.archives);
-
-                        wrapper
-                            .querySelector(".flex-col")
-                            .appendChild(archiveEntry);
+                        archiveEntry.querySelector("button").onclick = () => showArchiveModal(m.archives);
+                        wrapper.querySelector(".flex-col").appendChild(archiveEntry);
                     }
 
                     if (m.abstract) {
                         const summaryBox = document.createElement("div");
-                        summaryBox.className =
-                            "summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all";
+                        summaryBox.className = "summary-box w-full mt-3 p-3.5 border-2 border-dashed border-amber-400/80 dark:border-amber-500/70 bg-amber-50/40 dark:bg-amber-950/20 rounded-xl text-xs text-gray-700 dark:text-gray-200 font-sans shadow-sm transition-all";
                         summaryBox.innerHTML = `
                             <div class="flex items-center justify-between mb-1.5">
                                 <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-medium">
@@ -521,15 +647,12 @@ async function loadHistory() {
                             </div>
                             <div class="summary-content markdown-body text-xs opacity-90">${m.abstract}</div>
                         `;
-                        wrapper
-                            .querySelector(".flex-col")
-                            .appendChild(summaryBox);
+                        wrapper.querySelector(".flex-col").appendChild(summaryBox);
                     }
 
                     lastAiWrapperCol = wrapper.querySelector(".flex-col");
                     chatBox.appendChild(wrapper);
 
-                    // Track active side bubbles for unified discard action
                     if (isCurrentInSide && isSideMsg) {
                         SideTracker.bubbles.push(wrapper);
                     }
@@ -541,16 +664,11 @@ async function loadHistory() {
                 lastAiWrapperCol.appendChild(notebookBar);
             }
 
-            // Code block syntax highlighting & emoji parsing
-            chatBox
-                .querySelectorAll(".ai-bubble pre code")
-                .forEach((el) => hljs.highlightElement(el));
+            chatBox.querySelectorAll(".ai-bubble pre code").forEach((el) => hljs.highlightElement(el));
             attachCodeCopyButtons(chatBox);
-            chatBox
-                .querySelectorAll(".ai-bubble, .user-bubble")
-                .forEach((el) => {
-                    twemoji.parse(el, { folder: "svg", ext: ".svg" });
-                });
+            chatBox.querySelectorAll(".ai-bubble, .user-bubble").forEach((el) => {
+                twemoji.parse(el, { folder: "svg", ext: ".svg" });
+            });
         }
     } catch (e) {
         console.error("Failed to load chat history:", e);
@@ -922,6 +1040,293 @@ function finalizeAiBubble(ctx) {
     ctx.aiBubbleDiv.parentElement.appendChild(notebookBar);
 }
 
+// ==================== FORK SIDE CORE PIPELINE ====================
+// Module-level pipeline to fork a side branch, supporting an optional pre-selected persona
+async function doForkSide(withSummary, preferredPromptId = null) {
+    try {
+        const histRes = await fetch("/api/history", { headers: getHeaders() });
+        const currentBranch = histRes.headers.get("X-Current-Branch") || "main";
+
+        // 1. Check if a summary already exists on the latest active node
+        const lastNotebookBar = document.querySelector(".notebook-bar:last-of-type");
+        const summaryBox = lastNotebookBar?.parentElement?.querySelector(".summary-box");
+        let existingSummary =
+            summaryBox?.querySelector("textarea")?.value?.trim() ||
+            summaryBox?.querySelector(".summary-content")?.textContent?.trim();
+
+        let modalResult = null;
+
+        // 2. If no summary exists, generate one and prompt user for review
+        if (!existingSummary) {
+            const loadingNotice = document.createElement("div");
+            loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
+            loadingNotice.innerText = "Generating summary before branching...";
+            chatBox.appendChild(loadingNotice);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const customUrl = localStorage.getItem("custom_api_url") || "";
+            const customKey = localStorage.getItem("custom_api_key") || "";
+
+            const absRes = await fetch("/api/generate-abstract", {
+                method: "POST",
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    custom_url: customUrl,
+                    custom_key: customKey,
+                }),
+            });
+
+            loadingNotice.remove();
+
+            if (!absRes.ok) {
+                alert("Failed to generate summary; unable to fork side branch.");
+                return;
+            }
+
+            const data = await absRes.json();
+            const generatedAbstract = data.abstract || data.DialogAbstract || "";
+
+            modalResult = await showForkModal({
+                initialSummary: generatedAbstract,
+                needSummaryEdit: true,
+                defaultPromptId: preferredPromptId // Pre-select target persona if specified
+            });
+
+            if (!modalResult) return;
+
+            if (modalResult.finalSummary !== generatedAbstract) {
+                await fetch("/api/edit-abstract", {
+                    method: "POST",
+                    headers: getHeaders(),
+                    body: JSON.stringify({ abstract: modalResult.finalSummary }),
+                });
+            }
+        } else {
+            // If summary exists and target persona is already specified, bypass modal
+            if (preferredPromptId) {
+                modalResult = { finalPromptId: preferredPromptId };
+            } else {
+                modalResult = await showForkModal({
+                    needSummaryEdit: false,
+                    defaultPromptId: preferredPromptId
+                });
+                if (!modalResult) return;
+            }
+        }
+
+        // 3. Archive main branch if forking off from the main line
+        if (currentBranch === "main") {
+            const archRes = await fetch("/api/archive-main", {
+                method: "POST",
+                headers: getHeaders(),
+            });
+
+            if (!archRes.ok) {
+                const err = await archRes.json().catch(() => ({}));
+                alert(err.error || "Failed to archive main branch; unable to fork side branch.");
+                return;
+            }
+        }
+
+        // 4. Execute side branch fork
+        const res = await fetch("/api/fork-side", {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({ with_summary: withSummary }),
+        });
+
+        if (res.ok) {
+            const finalPid = modalResult?.finalPromptId || preferredPromptId;
+            if (finalPid) {
+                await fetch("/api/switch-prompt", {
+                    method: "POST",
+                    headers: getHeaders(),
+                    body: JSON.stringify({ id: finalPid }),
+                });
+            }
+
+            updateBranchIndicator("side");
+
+            if (typeof loadHistory === "function") {
+                await loadHistory();
+            }
+
+            setTimeout(() => {
+                const notice = document.createElement("div");
+                notice.className =
+                    "flex items-center justify-center gap-1.5 text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
+                notice.innerHTML = withSummary
+                    ? `<span>${SIDE_BRANCH_HTML}</span> Switched to side branch (Inherited summary)`
+                    : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
+
+                chatBox.appendChild(notice);
+                chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
+            }, 60);
+        }
+    } catch (e) {
+        console.error("Fork Side failed:", e);
+        alert("Failed to fork side branch, please try again.");
+    }
+}
+
+/**
+    * Unified fork modal dialog (Flexoki Dark Theme):
+    * - If needSummaryEdit is true, provides both summary review/editing and persona selection.
+    * - If needSummaryEdit is false, provides persona selection only.
+    */
+async function showForkModal({ initialSummary = "", needSummaryEdit = false, defaultPromptId = null }) {
+    const res = await fetch("/api/prompts", { headers: getHeaders() });
+    const data = res.ok ? await res.json() : { prompts: [], active: "" };
+    const prompts = data.prompts || [];
+
+    // Priority: explicitly specified default prompt -> backend active -> first available prompt
+    const activeId = defaultPromptId || data.active || (prompts[0]?.id || "");
+
+    let selectedPromptId = activeId;
+    const currentPromptObj = prompts.find(p => p.id === activeId) || prompts[0];
+
+    return new Promise((resolve) => {
+        const modal = document.createElement("div");
+        modal.className = "fixed inset-0 z-[75] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in";
+
+        const summarySectionHtml = needSummaryEdit ? `
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-mono text-[#878580]">Review & Edit Summary:</label>
+                    <textarea id="modal-fork-summary-text" class="w-full h-32 p-3 text-xs rounded-xl border border-gray-200 dark:border-[#282726] bg-gray-50/50 dark:bg-[#100F0F] focus:outline-none focus:ring-1 focus:ring-[#879A39] text-gray-800 dark:text-[#CECDC3] resize-none font-sans leading-relaxed"></textarea>
+                </div>
+            ` : ``;
+
+        const customOptionsHtml = prompts.map(p => {
+            const pAvatar = getPromptAvatar(p.id);
+            const pAvatarHtml = pAvatar
+                ? `<img src="${pAvatar}" class="w-full h-full object-cover">`
+                : `<span class="text-[10px]">✨</span>`;
+
+            return `
+                    <div class="custom-option px-3 py-2 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${p.id === activeId ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}" data-value="${p.id}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-5 h-5 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-gray-200 dark:bg-white/10">
+                                ${pAvatarHtml}
+                            </div>
+                            <span class="fork-prompt-name truncate">${p.name}</span>
+                        </div>
+                        <span class="check-icon text-[11px] ${p.id === activeId ? '' : 'hidden'}">✓</span>
+                    </div>
+                    `;
+        }).join("");
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-[#1C1B1A] w-full max-w-md p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-[#282726] flex flex-col gap-4 transition-colors font-sans select-none">
+                <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-[#CECDC3]">
+                    <span class="text-emerald-600 dark:text-[#879A39]">${SIDE_BRANCH_HTML}</span>
+                    <span>Fork to Side Branch</span>
+                </div>
+
+                ${summarySectionHtml}
+
+                <div class="flex flex-col gap-1.5 relative">
+                    <label class="text-[11px] font-mono text-gray-500 dark:text-[#878580]">Select Persona for Side Branch:</label>
+                    
+                    <button type="button" id="custom-select-trigger" class="w-full flex items-center justify-between bg-gray-50 dark:bg-[#100F0F] border border-gray-200 dark:border-[#282726] rounded-xl px-3 py-2 text-xs text-gray-800 dark:text-[#CECDC3] focus:outline-none focus:ring-1 focus:ring-[#879A39] cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <div id="modal-select-avatar-preview" class="w-5 h-5 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-gray-200 dark:bg-white/10">
+                                ${getPromptAvatar(selectedPromptId) ? `<img src="${getPromptAvatar(selectedPromptId)}" class="w-full h-full object-cover">` : `<span class="text-[10px]">✨</span>`}
+                            </div>
+                            <span id="custom-select-label">${currentPromptObj ? currentPromptObj.name : 'Select Persona'}</span>
+                        </div>
+                        <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+
+                    <div id="custom-select-menu" class="hidden absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] rounded-xl shadow-xl p-1 z-30 flex flex-col gap-0.5 max-h-48 overflow-y-auto animate-fade-in">
+                        ${customOptionsHtml}
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-2">
+                    <button class="modal-cancel px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-[#878580] transition-colors">
+                        Cancel
+                    </button>
+                    <button class="modal-confirm px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#66800B] hover:bg-[#526609] dark:bg-[#879A39] dark:text-[#100F0F] dark:hover:bg-[#97AC44] active:scale-[0.98] rounded-xl transition-all shadow-xs font-medium">
+                        Confirm & Fork
+                    </button>
+                </div>
+            </div>
+            `;
+
+        document.body.appendChild(modal);
+
+        const summaryTextarea = modal.querySelector("#modal-fork-summary-text");
+        if (summaryTextarea) summaryTextarea.value = initialSummary;
+
+        const triggerBtn = modal.querySelector("#custom-select-trigger");
+        const menuEl = modal.querySelector("#custom-select-menu");
+        const labelEl = modal.querySelector("#custom-select-label");
+        const arrowEl = triggerBtn.querySelector("svg");
+
+        triggerBtn.onclick = (e) => {
+            e.stopPropagation();
+            const isHidden = menuEl.classList.toggle("hidden");
+            arrowEl.style.transform = isHidden ? "" : "rotate(180deg)";
+        };
+
+        modal.querySelectorAll(".custom-option").forEach(opt => {
+            opt.onclick = (e) => {
+                e.stopPropagation();
+                selectedPromptId = opt.dataset.value;
+
+                const nameEl = opt.querySelector(".fork-prompt-name");
+                if (nameEl && labelEl) {
+                    labelEl.innerText = nameEl.innerText;
+                }
+
+                const modalAvatarEl = modal.querySelector("#modal-select-avatar-preview");
+                const newAv = getPromptAvatar(selectedPromptId);
+                if (modalAvatarEl) {
+                    modalAvatarEl.innerHTML = newAv
+                        ? `<img src="${newAv}" class="w-full h-full object-cover">`
+                        : `<span class="text-[10px]">✨</span>`;
+                }
+
+                modal.querySelectorAll(".custom-option").forEach(item => {
+                    item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                    item.classList.add("text-gray-700", "dark:text-[#CECDC3]");
+                    item.querySelector(".check-icon")?.classList.add("hidden");
+                });
+
+                opt.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
+                opt.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
+                opt.querySelector(".check-icon")?.classList.remove("hidden");
+
+                menuEl.classList.add("hidden");
+                arrowEl.style.transform = "";
+            };
+        });
+
+        modal.onclick = (e) => {
+            if (!triggerBtn.contains(e.target) && !menuEl.contains(e.target)) {
+                menuEl.classList.add("hidden");
+                arrowEl.style.transform = "";
+            }
+        };
+
+        const cleanup = () => modal.remove();
+
+        modal.querySelector(".modal-cancel").onclick = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        modal.querySelector(".modal-confirm").onclick = () => {
+            const finalSummary = summaryTextarea ? summaryTextarea.value.trim() : null;
+            cleanup();
+            resolve({ finalSummary, finalPromptId: selectedPromptId });
+        };
+    });
+}
+
+// ========================== create bar ==================================
 function createNotebookBar() {
     const notebookBar = document.createElement("div");
 
@@ -1027,254 +1432,6 @@ function createNotebookBar() {
             archiveBtn.disabled = false;
         }
     });
-
-    // Bind Fork Side event (Pipeline: Generate Summary -> Review Modal -> Archive Main -> Fork Side)
-    const doForkSide = async (withSummary) => {
-        try {
-            const histRes = await fetch("/api/history", { headers: getHeaders() });
-            const currentBranch = histRes.headers.get("X-Current-Branch") || "main";
-
-            // 1. Check if a summary already exists (supporting both editable textarea and historical rendered text)
-            const summaryBox = notebookBar.parentElement?.querySelector(".summary-box");
-            let existingSummary =
-                summaryBox?.querySelector("textarea")?.value?.trim() ||
-                summaryBox?.querySelector(".summary-content")?.textContent?.trim();
-
-            let modalResult = null;
-
-
-            // 2. If no summary exists, generate it first and prompt user for review/edit
-            if (!existingSummary) {
-                const loadingNotice = document.createElement("div");
-                loadingNotice.className = "text-center my-3 text-xs text-amber-600 dark:text-amber-400 font-mono py-1";
-                loadingNotice.innerText = "Generating summary before branching...";
-                chatBox.appendChild(loadingNotice);
-                chatBox.scrollTop = chatBox.scrollHeight;
-
-                const customUrl = localStorage.getItem("custom_api_url") || "";
-                const customKey = localStorage.getItem("custom_api_key") || "";
-
-                const absRes = await fetch("/api/generate-abstract", {
-                    method: "POST",
-                    headers: getHeaders(),
-                    body: JSON.stringify({
-                        custom_url: customUrl,
-                        custom_key: customKey,
-                    }),
-                });
-
-                loadingNotice.remove();
-
-                if (!absRes.ok) {
-                    alert("Failed to generate summary; unable to fork side branch.");
-                    return;
-                }
-
-                const data = await absRes.json();
-                const generatedAbstract = data.abstract || data.DialogAbstract || "";
-
-                //  Open unified modal (review/edit summary + select persona) 
-                modalResult = await showForkModal({
-                    initialSummary: generatedAbstract,
-                    needSummaryEdit: true
-                });
-
-                if (!modalResult) return; // Abort if cancelled by user
-
-                // Persist modified summary to backend if edited
-                if (modalResult.finalSummary !== generatedAbstract) {
-                    await fetch("/api/edit-abstract", {
-                        method: "POST",
-                        headers: getHeaders(),
-                        body: JSON.stringify({ abstract: modalResult.finalSummary }),
-                    });
-                }
-            } else {
-                // Summary already exists; prompt for persona selection only 
-                modalResult = await showForkModal({ needSummaryEdit: false });
-                if (!modalResult) return;
-            }
-
-            // 3. Archive main branch (required before branching off main)
-            if (currentBranch === "main") {
-                const archRes = await fetch("/api/archive-main", {
-                    method: "POST",
-                    headers: getHeaders(),
-                });
-
-                if (!archRes.ok) {
-                    const err = await archRes.json().catch(() => ({}));
-                    alert(err.error || "Failed to archive main branch; unable to fork side branch.");
-                    return;
-                }
-            }
-
-            // 4. Fork side branch
-            const res = await fetch("/api/fork-side", {
-                method: "POST",
-                headers: getHeaders(),
-                body: JSON.stringify({ with_summary: withSummary }),
-            });
-
-            if (res.ok) {
-                if (modalResult && modalResult.finalPromptId) {
-                    await fetch("/api/switch-prompt", {
-                        method: "POST",
-                        headers: getHeaders(),
-                        body: JSON.stringify({ id: modalResult.finalPromptId }),
-                    });
-                }
-
-                updateBranchIndicator("side");
-
-                if (typeof loadHistory === "function") {
-                    await loadHistory();
-                }
-
-                setTimeout(() => {
-                    const notice = document.createElement("div");
-                    notice.className =
-                        "flex items-center justify-center gap-1.5 text-center my-3 text-xs text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/40 py-1.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50";
-                    notice.innerHTML = withSummary
-                        ? `<span>${SIDE_BRANCH_HTML}</span> Switched to side branch (Inherited summary)`
-                        : `<span>${SANDBOX_HTML}</span> Switched to isolated side branch (Clean context)`;
-
-                    chatBox.appendChild(notice);
-                    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
-                }, 60);
-            }
-        } catch (e) {
-            console.error("Fork Side failed:", e);
-            alert("Failed to fork side branch, please try again.");
-        }
-    };
-
-
-    /**
-     * Unified fork modal dialog (Flexoki Dark Theme):
-     * - If needSummaryEdit is true, provides both summary review/editing and persona selection.
-     * - If needSummaryEdit is false, provides persona selection only.
-     */
-    async function showForkModal({ initialSummary = "", needSummaryEdit = false }) {
-        const res = await fetch("/api/prompts", { headers: getHeaders() });
-        const data = res.ok ? await res.json() : { prompts: [], active: "" };
-        const prompts = data.prompts || [];
-        const activeId = data.active || (prompts[0]?.id || "");
-
-        let selectedPromptId = activeId;
-        const currentPromptObj = prompts.find(p => p.id === activeId) || prompts[0];
-
-        return new Promise((resolve) => {
-            const modal = document.createElement("div");
-            modal.className = "fixed inset-0 z-[75] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in";
-
-            const summarySectionHtml = needSummaryEdit ? `
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] font-mono text-[#878580]">Review & Edit Summary:</label>
-                    <textarea id="modal-fork-summary-text" class="w-full h-32 p-3 text-xs rounded-xl border border-gray-200 dark:border-[#282726] bg-gray-50/50 dark:bg-[#100F0F] focus:outline-none focus:ring-1 focus:ring-[#879A39] text-gray-800 dark:text-[#CECDC3] resize-none font-sans leading-relaxed"></textarea>
-                </div>
-            ` : ``;
-
-            const customOptionsHtml = prompts.map(p => `
-                <div class="custom-option px-3 py-2 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-[#282726] ${p.id === activeId ? 'text-[#879A39] font-medium bg-[#879A39]/10' : 'text-gray-700 dark:text-[#CECDC3]'}" data-value="${p.id}">
-                    <span>${p.name}</span>
-                    <span class="check-icon text-[11px] ${p.id === activeId ? '' : 'hidden'}">✓</span>
-                </div>
-            `).join("");
-
-            modal.innerHTML = `
-            <div class="bg-white dark:bg-[#1C1B1A] w-full max-w-md p-6 rounded-2xl shadow-2xl mx-4 border border-gray-100 dark:border-[#282726] flex flex-col gap-4 transition-colors font-sans select-none">
-                <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-[#CECDC3]">
-                    <span class="text-emerald-600 dark:text-[#879A39]">${SIDE_BRANCH_HTML}</span>
-                    <span>Fork to Side Branch</span>
-                </div>
-
-                ${summarySectionHtml}
-
-                <div class="flex flex-col gap-1.5 relative">
-                    <label class="text-[11px] font-mono text-gray-500 dark:text-[#878580]">Select Persona for Side Branch:</label>
-                    
-                    <button type="button" id="custom-select-trigger" class="w-full flex items-center justify-between bg-gray-50 dark:bg-[#100F0F] border border-gray-200 dark:border-[#282726] rounded-xl px-3 py-2 text-xs text-gray-800 dark:text-[#CECDC3] focus:outline-none focus:ring-1 focus:ring-[#879A39] cursor-pointer">
-                        <span id="custom-select-label">${currentPromptObj ? currentPromptObj.name : 'Select Persona'}</span>
-                        <svg class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-
-                    <div id="custom-select-menu" class="hidden absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-[#1C1B1A] border border-gray-200 dark:border-[#282726] rounded-xl shadow-xl p-1 z-30 flex flex-col gap-0.5 max-h-48 overflow-y-auto animate-fade-in">
-                        ${customOptionsHtml}
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-3 mt-2">
-                    <button class="modal-cancel px-4 py-2 text-xs font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-[#878580] transition-colors">
-                        Cancel
-                    </button>
-                    <button class="modal-confirm px-4 py-2 text-xs font-medium text-[#FFFCF0] bg-[#66800B] hover:bg-[#526609] dark:bg-[#879A39] dark:text-[#100F0F] dark:hover:bg-[#97AC44] active:scale-[0.98] rounded-xl transition-all shadow-xs font-medium">
-                        Confirm & Fork
-                    </button>
-                </div>
-            </div>
-            `;
-
-            document.body.appendChild(modal);
-
-            const summaryTextarea = modal.querySelector("#modal-fork-summary-text");
-            if (summaryTextarea) summaryTextarea.value = initialSummary;
-
-            const triggerBtn = modal.querySelector("#custom-select-trigger");
-            const menuEl = modal.querySelector("#custom-select-menu");
-            const labelEl = modal.querySelector("#custom-select-label");
-            const arrowEl = triggerBtn.querySelector("svg");
-
-            triggerBtn.onclick = (e) => {
-                e.stopPropagation();
-                const isHidden = menuEl.classList.toggle("hidden");
-                arrowEl.style.transform = isHidden ? "" : "rotate(180deg)";
-            };
-
-            modal.querySelectorAll(".custom-option").forEach(opt => {
-                opt.onclick = (e) => {
-                    e.stopPropagation();
-                    selectedPromptId = opt.dataset.value;
-                    labelEl.innerText = opt.querySelector("span").innerText;
-
-                    modal.querySelectorAll(".custom-option").forEach(item => {
-                        item.classList.remove("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
-                        item.classList.add("text-gray-700", "dark:text-[#CECDC3]");
-                        item.querySelector(".check-icon")?.classList.add("hidden");
-                    });
-
-                    opt.classList.add("text-[#879A39]", "font-medium", "bg-[#879A39]/10");
-                    opt.classList.remove("text-gray-700", "dark:text-[#CECDC3]");
-                    opt.querySelector(".check-icon")?.classList.remove("hidden");
-
-                    menuEl.classList.add("hidden");
-                    arrowEl.style.transform = "";
-                };
-            });
-
-            modal.onclick = (e) => {
-                if (!triggerBtn.contains(e.target) && !menuEl.contains(e.target)) {
-                    menuEl.classList.add("hidden");
-                    arrowEl.style.transform = "";
-                }
-            };
-
-            const cleanup = () => modal.remove();
-
-            modal.querySelector(".modal-cancel").onclick = () => {
-                cleanup();
-                resolve(null);
-            };
-
-            modal.querySelector(".modal-confirm").onclick = () => {
-                const finalSummary = summaryTextarea ? summaryTextarea.value.trim() : null;
-                cleanup();
-                resolve({ finalSummary, finalPromptId: selectedPromptId });
-            };
-        });
-    }
 
     const forkBtn = notebookBar.querySelector(".fork-side-btn");
     const popover = notebookBar.querySelector(".fork-options-popover");
@@ -1848,6 +2005,7 @@ document.getElementById("download-btn").addEventListener("click", downloadChat);
 document.getElementById("theme-btn").addEventListener("click", toggleDarkMode);
 document.getElementById("new-chat-btn").addEventListener("click", newChat);
 
+
 // ========================= SETTINGS PAGE =========================================
 const modal = document.getElementById("settings-modal");
 const customUrlInput = document.getElementById("custom-url");
@@ -1855,48 +2013,15 @@ const customEmbeddingUrlInput = document.getElementById("custom-embedding-url");
 const customKeyInput = document.getElementById("custom-key");
 
 const userAvatarInput = document.getElementById("upload-user-avatar");
-const aiAvatarInput = document.getElementById("upload-ai-avatar");
 const userPreview = document.getElementById("setting-user-preview");
-const aiPreview = document.getElementById("setting-ai-preview");
 const resetUserBtn = document.getElementById("reset-user-avatar");
-const resetAiBtn = document.getElementById("reset-ai-avatar");
 
 let tempUserAvatar = null;
-let tempAiAvatar = null;
-
-async function compressAvatar(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (e) => {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                const size = 128;
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext("2d");
-                const minSide = Math.min(img.width, img.height);
-                const sx = (img.width - minSide) / 2;
-                const sy = (img.height - minSide) / 2;
-                ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-                resolve(canvas.toDataURL("image/jpeg", 0.85));
-            };
-            img.onerror = reject;
-        };
-        reader.onerror = reject;
-    });
-}
 
 function refreshAvatarPreviews() {
     const curUser = tempUserAvatar !== null ? tempUserAvatar : (localStorage.getItem("custom_user_avatar") || "");
-    const curAi = tempAiAvatar !== null ? tempAiAvatar : (localStorage.getItem("custom_ai_avatar") || "");
-
     const defaultUserSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%23666' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
-    const defaultAiSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%23666' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
     userPreview.src = curUser || defaultUserSvg;
-    aiPreview.src = curAi || defaultAiSvg;
 }
 
 document.getElementById("settings-btn").addEventListener("click", () => {
@@ -1907,7 +2032,6 @@ document.getElementById("settings-btn").addEventListener("click", () => {
     customKeyInput.value = localStorage.getItem("custom_api_key") || "";
 
     tempUserAvatar = null;
-    tempAiAvatar = null;
     refreshAvatarPreviews();
     modal.classList.remove("hidden");
 });
@@ -1920,20 +2044,8 @@ userAvatarInput.addEventListener("change", async (e) => {
     }
 });
 
-aiAvatarInput.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        tempAiAvatar = await compressAvatar(file);
-        refreshAvatarPreviews();
-    }
-});
-
 resetUserBtn.onclick = () => {
     tempUserAvatar = "";
-    refreshAvatarPreviews();
-};
-resetAiBtn.onclick = () => {
-    tempAiAvatar = "";
     refreshAvatarPreviews();
 };
 
@@ -1948,26 +2060,17 @@ document.getElementById("save-settings").addEventListener("click", () => {
         if (tempUserAvatar === "") localStorage.removeItem("custom_user_avatar");
         else localStorage.setItem("custom_user_avatar", tempUserAvatar);
     }
-    if (tempAiAvatar !== null) {
-        if (tempAiAvatar === "") localStorage.removeItem("custom_ai_avatar");
-        else localStorage.setItem("custom_ai_avatar", tempAiAvatar);
-    }
 
     document.querySelectorAll(".user-avatar-node").forEach(el => {
         el.outerHTML = getUserAvatarHtml();
     });
-    document.querySelectorAll(".ai-avatar-node").forEach(el => {
-        el.outerHTML = getAiAvatarHtml();
-    });
 
     modal.classList.add("hidden");
 });
-
 
 document.getElementById("close-settings").addEventListener("click", () => {
     modal.classList.add("hidden");
 });
-
 
 // ================================= INDICATOR LIGHT ==========================================
 const statusDot = document.getElementById("status-dot");
@@ -2474,12 +2577,15 @@ function getUserAvatarHtml() {
     return `<div class="user-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden">${inner}</div>`;
 }
 
-function getAiAvatarHtml() {
-    const custom = localStorage.getItem("custom_ai_avatar");
-    const inner = custom
-        ? `<img src="${custom}" class="w-full h-full object-cover">`
+function getAiAvatarHtml(specificPromptId = null) {
+    const promptId = specificPromptId || document.getElementById("prompt-select-btn")?.dataset?.value || "";
+    const promptAvatar = getPromptAvatar(promptId);
+
+    const inner = promptAvatar
+        ? `<img src="${promptAvatar}" class="w-full h-full object-cover">`
         : DEFAULT_AI_ICON;
-    return `<div class="ai-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden">${inner}</div>`;
+
+    return `<div class="ai-avatar-node w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700/80 flex items-center justify-center shrink-0 shadow-xs select-none overflow-hidden" data-prompt-id="${promptId}">${inner}</div>`;
 }
 
 // ==================== SIDE bubble track ====================
