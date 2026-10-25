@@ -1763,6 +1763,7 @@ async function extractErrorMessage(response) {
     return errorText;
 }
 
+
 /**
  * Display archived branch content modal
  * @param {Array} archives - Backend payload format: [[Msg1, Msg2], [MsgA, MsgB]]
@@ -1783,7 +1784,7 @@ function showArchiveModal(archives) {
         divider.className = "relative py-6 flex items-center justify-center";
         divider.innerHTML = `
             <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200 dark:border-gray-800"></div></div>
-            <span class="relative px-3 bg-gray-50 dark:bg-[#131415] text-[10px] text-gray-400 font-mono tracking-widest uppercase">Archived Branch #${index + 1}</span>
+            <span class="relative px-3 bg-gray-50 dark:bg-[#131415] text-[11px] text-emerald-600 dark:text-emerald-400 font-mono tracking-wider uppercase font-semibold">Archived Branch #${index + 1}</span>
         `;
         contentContainer.appendChild(divider);
 
@@ -1793,18 +1794,22 @@ function showArchiveModal(archives) {
             const msgDiv = document.createElement("div");
             msgDiv.className = `flex ${isUser ? "justify-end" : "justify-start"} mb-4`;
 
-            // Simplified bubble style distinct from main thread
+            const bubbleClasses = isUser
+                ? "bg-[#205EA6] text-[#FFFCF0] border-transparent"
+                : "bg-white dark:bg-[#1C1B1A] text-gray-800 dark:text-[#CECDC3] border-gray-200/80 dark:border-[#282726] markdown-body";
+
             msgDiv.innerHTML = `
-                <div class="p-3 rounded-xl max-w-[85%] text-sm shadow-sm border ${isUser
-                    ? "bg-blue-500 text-white border-blue-400"
-                    : "bg-white dark:bg-[#1e1f20] text-gray-800 dark:text-gray-200 border-gray-100 dark:border-gray-800"
-                }">
+                <div class="p-3.5 rounded-2xl max-w-[85%] text-[15px] leading-relaxed shadow-xs border ${bubbleClasses}">
                     ${isUser ? formatUserText(msg.content) : safeMarkdownParse(msg.content)}
                 </div>
             `;
             contentContainer.appendChild(msgDiv);
         });
     });
+
+    contentContainer.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
+    attachCodeCopyButtons(contentContainer);
+    twemoji.parse(contentContainer, { folder: "svg", ext: ".svg" });
 
     // Show modal and disable background page scrolling
     modal.classList.remove("hidden");
