@@ -210,13 +210,15 @@ async function initPromptSelect() {
 
                         const currentName = labelEl.innerText;
                         const targetName = p.name;
+                        const isCurrentlySide = SideTracker.isSide();
+                        const forkTypeDesc = isCurrentlySide ? "Side Chat (inheriting summary)" : "*Isolated* Side Chat";
+
                         const shouldFork = await showConfirm(
-                            `Current branch is dedicated to [${currentName}]. To chat with [${targetName}], a new *Isolated* Side Chat will be forked. Proceed?`
+                            `Current branch is dedicated to [${currentName}]. To chat with [${targetName}], a new ${forkTypeDesc} will be forked. Proceed?`
                         );
 
                         if (shouldFork) {
-                            // Automatically fork to a isolated side branch with the selected persona
-                            await doForkSide(false, newId);
+                            await doForkSide(isCurrentlySide, newId);
                         }
                         return;
                     }
@@ -1047,6 +1049,12 @@ async function doForkSide(withSummary, preferredPromptId = null) {
         const histRes = await fetch("/api/history", { headers: getHeaders() });
         const currentBranch = histRes.headers.get("X-Current-Branch") || "main";
 
+        const isCurrentSide = currentBranch.toLowerCase().includes("side") || SideTracker.isSide();
+        if (isCurrentSide && !withSummary) {
+            console.warn("Already in a side branch. Isolated fork is prohibited, fallback to withSummary = true.");
+            withSummary = true;
+        }
+
         // 1. Check if a summary already exists on the latest active node
         const lastNotebookBar = document.querySelector(".notebook-bar:last-of-type");
         const summaryBox = lastNotebookBar?.parentElement?.querySelector(".summary-box");
@@ -1383,6 +1391,10 @@ function createNotebookBar() {
     // Archive event
     const archiveBtn = notebookBar.querySelector(".archive-btn");
 
+    if (SideTracker.isSide() && archiveBtn) {
+        archiveBtn.classList.add("hidden");
+    }
+
     archiveBtn.addEventListener("click", async () => {
         const indicator = document.getElementById("branch-indicator");
         if (indicator && indicator.innerText.includes("side")) {
@@ -1435,10 +1447,21 @@ function createNotebookBar() {
 
     const forkBtn = notebookBar.querySelector(".fork-side-btn");
     const popover = notebookBar.querySelector(".fork-options-popover");
+    const forkCleanBtn = notebookBar.querySelector(".fork-clean");
 
     // Toggle options popover visibility
     forkBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+
+        const inSideBranch = SideTracker.isSide();
+        if (forkCleanBtn) {
+            if (inSideBranch) {
+                forkCleanBtn.classList.add("hidden");
+            } else {
+                forkCleanBtn.classList.remove("hidden");
+            }
+        }
+
         popover.classList.toggle("hidden");
     });
 

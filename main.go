@@ -387,6 +387,12 @@ func main() {
 			}
 		}
 
+		// Validation：Disallow isolated fork on side branch (GreenNode); must inherit summary.
+		if currentChain != nil && currentChain.BranchColor == GreenNode && !withSummary {
+			logPrintf("%s [Fork] Detected side branch; isolated fork is prohibited, forcing withSummary=true\n", tagWarn)
+			withSummary = true
+		}
+
 		if currentChain != nil {
 			parentAbstract := currentChain.DialogAbstract
 			parentPrompt := currentChain.PromptID
