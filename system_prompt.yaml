@@ -1,5 +1,6 @@
 active: default
 
+# id must be english or number
 prompts:
   - id: default
     name: English Mode
