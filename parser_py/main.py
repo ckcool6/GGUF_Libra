@@ -3,10 +3,15 @@
 
 import cmd
 import json
+import sys
 from typing import List
 import msgspec
 import parser
 import os 
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # ==========================================
 # TUI Interactive Console
@@ -388,12 +393,17 @@ class AppTUI(cmd.Cmd):
 # Main program
 # ==========================================
 def main():
-    # Start the foreground TUI directly
-    try:
-        AppTUI().cmdloop()
-    except KeyboardInterrupt:
-        # Catch Ctrl+C
-        print(f"\n{AppTUI.RED}[ABORT]{AppTUI.RESET} Forced exit...")
+    app = AppTUI()
+    intro = app.intro  
+
+    while True:
+        try:
+            app.cmdloop(intro=intro)
+            break
+        except KeyboardInterrupt:
+            print(f"\n{AppTUI.TAG_WARN} Operation cancelled.")
+            intro = ""  
+            continue
 
 if __name__ == "__main__":
     main()

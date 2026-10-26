@@ -2371,8 +2371,10 @@ const closeTerminalBtn = document.getElementById("close-terminal-btn");
 const clearTermBtn = document.getElementById("clear-term-btn");
 
 function initTerminal() {
+    // Prevent re-initialization if terminal instance already exists
     if (term) return;
 
+    // Initialize Terminal instance with custom styling
     term = new Terminal({
         fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
         fontSize: 13,
@@ -2383,7 +2385,7 @@ function initTerminal() {
             background: "#100F0F",
             foreground: "#CECDC3",
             cursor: "#879A39",
-            selectionBackground: "#282726",
+            selectionBackground: "rgba(135, 154, 57, 0.35)",
             black: "#100F0F",
             red: "#AF3029",
             green: "#879A39",
@@ -2399,9 +2401,44 @@ function initTerminal() {
     term.loadAddon(fitAddon);
     term.open(terminalContainer);
 
+    // ========================================================
+    // 1. Keyboard event interceptor
+    // ========================================================
+    term.attachCustomKeyEventHandler((e) => {
+        // Ctrl+C / Cmd+C: Dedicated to copying selected text; never interrupts
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+            if (e.type === "keydown" && term.hasSelection()) {
+                navigator.clipboard.writeText(term.getSelection());
+            }
+            return false;
+        }
+
+        // Ctrl+D / Cmd+D: Completely disabled (suppressed)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+            return false;
+        }
+
+        // Ctrl+V / Cmd+V: Paste from clipboard
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && e.type === "keydown") {
+            navigator.clipboard.readText().then((clipText) => {
+                if (clipText) {
+                    currentLine += clipText;
+                    term.write(clipText);
+                }
+            }).catch(err => console.warn("Clipboard read error:", err));
+            return false;
+        }
+
+        return true;
+    });
+
+    // ========================================================
+    // 2. Data input stream handler
+    // ========================================================
     term.onData((data) => {
         if (!termWs || termWs.readyState !== WebSocket.OPEN) return;
 
+        // Enter: Submit command
         if (data === "\r") {
             term.write("\r\n");
             if (currentLine.trim().length > 0) {
@@ -2413,6 +2450,7 @@ function initTerminal() {
             return;
         }
 
+        // Backspace: Erase character
         if (data === "\x7f" || data === "\b") {
             if (currentLine.length > 0) {
                 currentLine = currentLine.slice(0, -1);
@@ -2421,13 +2459,12 @@ function initTerminal() {
             return;
         }
 
-        if (data === "\x03") {
-            term.write("^C\r\n");
-            currentLine = "";
-            termWs.send("\x03");
+        // Drop any raw interrupt/EOF characters (\x03, \x04) if they slip through
+        if (data === "\x03" || data === "\x04") {
             return;
         }
 
+        // Up Arrow: Command history backward
         if (data === "\x1b[A") {
             if (cmdHistory.length > 0 && historyIndex > 0) {
                 while (currentLine.length > 0) {
@@ -2441,6 +2478,7 @@ function initTerminal() {
             return;
         }
 
+        // Down Arrow: Command history forward
         if (data === "\x1b[B") {
             if (historyIndex < cmdHistory.length) {
                 while (currentLine.length > 0) {
@@ -2458,10 +2496,12 @@ function initTerminal() {
             return;
         }
 
+        // Ignore unhandled escape sequences
         if (data.startsWith("\x1b")) {
             return;
         }
 
+        // Standard character input
         currentLine += data;
         term.write(data);
     });
