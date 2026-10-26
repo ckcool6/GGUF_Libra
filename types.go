@@ -16,6 +16,7 @@ type Message struct {
 	Branch    string `json:"branch,omitempty"` // "main" or "side"
 	CreatedAt int64  `json:"created_at"`
 	PromptID  string `json:"prompt_id,omitempty"`
+	Discarded bool   `json:"discarded,omitempty"`
 }
 
 type SystemPromptConfig struct {

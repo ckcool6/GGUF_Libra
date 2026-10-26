@@ -342,6 +342,7 @@ func apiHistoryHandler(w http.ResponseWriter, r *http.Request) {
 				if msg.Role != "system" {
 					msg.Branch = branchType
 					msg.PromptID = nodePrompt
+					msg.Discarded = node.IsDiscarded
 					nodeMsgs = append(nodeMsgs, msg)
 				}
 			}

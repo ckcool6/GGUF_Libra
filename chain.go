@@ -37,6 +37,7 @@ type chatChain struct {
 
 	ActiveThoughtChain string `json:"ActiveThoughtChain"`
 	PromptID           string `json:"prompt_id"`
+	IsDiscarded        bool   `json:"is_discarded,omitempty"`
 }
 
 // init
@@ -408,4 +409,13 @@ func LoadChainFromFile(filePath string) (*chatChain, error) {
 	}
 
 	return &root, nil
+}
+
+func markChainDiscarded(chain *chatChain) {
+	if chain == nil {
+		return
+	}
+	chain.IsDiscarded = true
+	markChainDiscarded(chain.DialogSide)
+	markChainDiscarded(chain.DialogMain)
 }

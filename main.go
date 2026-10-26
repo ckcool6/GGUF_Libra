@@ -530,8 +530,13 @@ func main() {
 			return
 		}
 
-		// Locate the fork point where this side branch diverged from the main branch
 		forkNode := rootChain.BackToMainForkedNode(currentChain)
+
+		if forkNode != nil && forkNode.DialogSide != nil {
+			markChainDiscarded(forkNode.DialogSide)
+		} else if currentChain.BranchColor == GreenNode {
+			markChainDiscarded(currentChain)
+		}
 
 		// If fork point not found, it is already on the main branch or tree structure is abnormal
 		if forkNode == nil {
@@ -553,8 +558,8 @@ func main() {
 			setActivePrompt(currentChain.PromptID)
 		}
 
-		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
+
 		// log
 		tailPreview := "(empty / new chapter)"
 		if currentChain.DialogAbstract != "" {

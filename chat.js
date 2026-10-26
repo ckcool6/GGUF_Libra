@@ -584,7 +584,7 @@ async function loadHistory() {
                     : safeMarkdownParse(m.content);
 
                 const isSideMsg = Boolean(m.branch && m.branch.toLowerCase().includes("side"));
-                const isDiscarded = !isCurrentInSide && isSideMsg;
+                const isDiscarded = Boolean(m.discarded);
 
                 if (isUser) {
                     let userBubbleInner = "";
@@ -604,7 +604,7 @@ async function loadHistory() {
                         </div>`;
                     chatBox.insertAdjacentHTML("beforeend", html);
 
-                    if (isCurrentInSide && isSideMsg) {
+                    if (isCurrentInSide && isSideMsg && !isDiscarded) {
                         SideTracker.bubbles.push(chatBox.lastElementChild);
                     }
                 } else {
@@ -655,7 +655,7 @@ async function loadHistory() {
                     lastAiWrapperCol = wrapper.querySelector(".flex-col");
                     chatBox.appendChild(wrapper);
 
-                    if (isCurrentInSide && isSideMsg) {
+                    if (isCurrentInSide && isSideMsg && !isDiscarded) {
                         SideTracker.bubbles.push(wrapper);
                     }
                 }
