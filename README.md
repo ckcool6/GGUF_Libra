@@ -117,24 +117,26 @@ node build.js
 
 We model the conversation tree as a **discrete heat diffusion system** over an undirected graph:
 
-1. **Diffusion Step**:
-   <p align="center">
-     <img src="https://latex.codecogs.com/svg.image?u_i(t%2B1)%20=%20u_i(t)%20%2B%20dt%20%5Ccdot%20%5Csum_%7Bj%20%5Cin%20%5Ctext%7BNeighbor%7D(i)%7D%20(u_j(t)%20-%20u_i(t))" />
-   </p>
+**1. Diffusion Step**:
 
-   *Matrix form:* $u_{t+1} = u_t - dt \cdot (L \cdot u_t)$
+$$u_i(t+1) = u_i(t) + dt \cdot \sum_{j \in \text{Neighbor}(i)} (u_j(t) - u_i(t))$$
 
-2. **Decay of the Slowest Mode**:
-   <p align="center">
-     <img src="https://latex.codecogs.com/svg.image?%5CVert%20u_%7Bt%2B1%7D%20%5CVert%20%5Capprox%20%5CVert%20u_t%20%5CVert%20%5Ccdot%20(1%20-%20%5Clambda_2%20%5Ccdot%20dt)" />
-   </p>
+*Matrix form:* $u_{t+1} = u_t - dt \cdot (L \cdot u_t)$
 
-   *Where &lambda;<sub>2</sub> is the algebraic connectivity.*
+---
 
-3. **Characteristic Relaxation Time (`logic_t`)**:
-   <p align="center">
-     <img src="https://latex.codecogs.com/svg.image?%5Ctau%20=%20%5Cfrac%7B1%7D%7B%5Clambda_2%7D" />
-   </p>
+**2. Decay of the Slowest Mode**:
+
+$$\|u_{t+1}\| \approx \|u_t\| \cdot (1 - \lambda_2 \cdot dt)$$
+
+*Where $\lambda_2$ is the algebraic connectivity.*
+
+---
+
+**3. Characteristic Relaxation Time (`logic_t`)**:
+
+$$\tau = \frac{1}{\lambda_2}$$
+
 
 
 ### Simple Intuition:
