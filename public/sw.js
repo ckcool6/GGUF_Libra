@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-const CACHE_NAME = 'gguf-libra-v3.1';
+const CACHE_NAME = 'gguf-libra-v3.3';
 
 
 const PRECACHE_ASSETS = [
