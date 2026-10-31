@@ -2812,8 +2812,7 @@ function initLogTerminal() {
     if (logTerm) return;
 
     logTerm = new Terminal({
-        cols: 120,
-        fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
+        fontFamily: "'JetBrains Mono', 'Xhei Intel', 'Menlo', 'Courier New', monospace",
         fontSize: 12,
         lineHeight: 1.25,
         cursorBlink: false,
