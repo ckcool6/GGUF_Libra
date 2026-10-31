@@ -42,6 +42,8 @@ const (
 	tagDone  = "\033[1;32m[DONE]\033[0m"
 )
 
+var isNoWebUI bool
+
 // ==================== SYSTEM LOG CAPTURE & BROADCAST ====================
 
 type LogHub struct {
@@ -453,6 +455,22 @@ func openBrowser(url string) {
 	_ = cmd.Start()
 }
 
+func hideConsoleWindow() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	user32 := syscall.NewLazyDLL("user32.dll")
+
+	procGetConsoleWindow := kernel32.NewProc("GetConsoleWindow")
+	procShowWindow := user32.NewProc("ShowWindow")
+
+	hwnd, _, _ := procGetConsoleWindow.Call()
+	if hwnd != 0 {
+		procShowWindow.Call(hwnd, 0)
+	}
+}
+
 // ==================== APP LIFELINE (AUTO-EXIT) ====================
 var (
 	liveClientCount int
@@ -471,6 +489,10 @@ func cancelExitCountdown() {
 }
 
 func startExitCountdown() {
+	if isNoWebUI {
+		return
+	}
+
 	liveMu.Lock()
 	defer liveMu.Unlock()
 
@@ -497,6 +519,21 @@ func startExitCountdown() {
 }
 
 func main() {
+
+	// port configs
+	defaultPort := os.Getenv("PORT")
+	if defaultPort == "" {
+		defaultPort = "8099"
+	}
+
+	portStr := flag.String("port", defaultPort, "Server listen port (set to 0 for random port)")
+	noWebUI := flag.Bool("noWebUI", false, "Run without opening Web UI in browser and disable auto-exit")
+	flag.Parse()
+	isNoWebUI = *noWebUI
+
+	if !*noWebUI {
+		hideConsoleWindow()
+	}
 
 	initGlobalLogCapture()
 
@@ -874,15 +911,6 @@ func main() {
 	http.HandleFunc("/api/upload-doc", uploadDocHandler)
 	http.HandleFunc("/api/edit-latest-ai", editLatestAiHandler)
 
-	// port configs
-	defaultPort := os.Getenv("PORT")
-	if defaultPort == "" {
-		defaultPort = "8099"
-	}
-
-	portStr := flag.String("port", defaultPort, "Server listen port (set to 0 for random port)")
-	flag.Parse()
-
 	listener, err := net.Listen("tcp", "127.0.0.1:"+*portStr)
 	if err != nil {
 		logPrintf("%s Failed to bind port %s: %v\n", tagError, *portStr, err)
@@ -895,19 +923,24 @@ func main() {
 
 	logPrintf("%s Server started, please open in browser: \033[1;34m%s\033[0m\n", tagInfo, serverURL)
 
-	exitTimer = time.AfterFunc(15*time.Second, func() {
-		liveMu.Lock()
-		defer liveMu.Unlock()
-		if liveClientCount <= 0 {
-			logPrintf("%s Browser failed to connect in time, exiting...\n", tagWarn)
-			os.Exit(0)
-		}
-	})
+	if !*noWebUI {
+		// default mode
+		exitTimer = time.AfterFunc(15*time.Second, func() {
+			liveMu.Lock()
+			defer liveMu.Unlock()
+			if liveClientCount <= 0 {
+				logPrintf("%s Browser failed to connect in time, exiting...\n", tagWarn)
+				os.Exit(0)
+			}
+		})
 
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		openBrowser(serverURL)
-	}()
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			openBrowser(serverURL)
+		}()
+	} else {
+		logPrintf("%s Running in --noWebUI mode (browser launch & auto-exit disabled)\n", tagInfo)
+	}
 
 	if err := http.Serve(listener, nil); err != nil {
 		logPrintf("%s Server error: %v\n", tagError, err)
