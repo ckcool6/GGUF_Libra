@@ -13,9 +13,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -334,6 +336,18 @@ func initParserTerminalHandler() {
 		}
 
 		logPrintf("%s [Parser] Spawning process: %s (OS: %s)\n", tagInfo, cmd.String(), runtime.GOOS)
+
+		if runtime.GOOS == "windows" {
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
+			v := reflect.ValueOf(cmd.SysProcAttr).Elem()
+
+			if f := v.FieldByName("HideWindow"); f.IsValid() && f.CanSet() {
+				f.SetBool(true)
+			}
+			if f := v.FieldByName("CreationFlags"); f.IsValid() && f.CanSet() {
+				f.SetUint(0x08000000) // CREATE_NO_WINDOW
+			}
+		}
 
 		if err := cmd.Start(); err != nil {
 			sendWsError(conn, "[Error] Failed to start process: %v", err)
