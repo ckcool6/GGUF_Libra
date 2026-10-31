@@ -2812,6 +2812,7 @@ function initLogTerminal() {
     if (logTerm) return;
 
     logTerm = new Terminal({
+        cols: 120,
         fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
         fontSize: 12,
         lineHeight: 1.25,
@@ -2835,6 +2836,25 @@ function initLogTerminal() {
     logFitAddon = new FitAddon();
     logTerm.loadAddon(logFitAddon);
     logTerm.open(logsContainer);
+
+
+    logTerm.attachCustomKeyEventHandler((e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+            if (e.type === "keydown" && logTerm.hasSelection()) {
+                navigator.clipboard.writeText(logTerm.getSelection());
+            }
+            return false;
+        }
+        return true;
+    });
+
+    logsContainer.addEventListener("contextmenu", (e) => {
+        if (logTerm.hasSelection()) {
+            e.preventDefault();
+            navigator.clipboard.writeText(logTerm.getSelection());
+            logTerm.clearSelection();
+        }
+    });
 }
 
 function openLogsTerminal() {
@@ -2893,3 +2913,24 @@ window.addEventListener("resize", () => {
         logFitAddon.fit();
     }
 });
+
+document.getElementById("copy-url-btn")?.addEventListener("click", () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const btn = document.getElementById("copy-url-btn");
+        const oldText = btn.innerText;
+        btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = oldText, 1500);
+    });
+});
+
+// ==================== BROWSER LIFELINE ====================
+function initLifeline() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/live`);
+
+    ws.onclose = () => {
+        setTimeout(initLifeline, 2000);
+    };
+}
+
+initLifeline();

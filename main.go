@@ -105,7 +105,9 @@ func initGlobalLogCapture() {
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
 
-				origStdout.Write(chunk)
+				if origStdout != nil {
+					_, _ = origStdout.Write(chunk)
+				}
 
 				text := strings.ReplaceAll(string(chunk), "\r\n", "\n")
 				text = strings.ReplaceAll(text, "\n", "\r\n")
@@ -393,6 +395,55 @@ func initParserTerminalHandler() {
 	})
 }
 
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default: // linux 等
+		cmd = exec.Command("xdg-open", url)
+	}
+	_ = cmd.Start()
+}
+
+// ==================== APP LIFELINE (AUTO-EXIT) ====================
+var (
+	liveClientCount int
+	liveMu          sync.Mutex
+	exitTimer       *time.Timer
+)
+
+func cancelExitCountdown() {
+	liveMu.Lock()
+	defer liveMu.Unlock()
+	liveClientCount++
+	if exitTimer != nil {
+		exitTimer.Stop()
+		exitTimer = nil
+	}
+}
+
+func startExitCountdown() {
+	liveMu.Lock()
+	defer liveMu.Unlock()
+
+	if liveClientCount <= 0 {
+		if exitTimer != nil {
+			exitTimer.Stop()
+		}
+		exitTimer = time.AfterFunc(5*time.Second, func() {
+			liveMu.Lock()
+			defer liveMu.Unlock()
+			if liveClientCount <= 0 {
+				logPrintf("%s All UI tabs closed, auto-exiting program...\n", tagInfo)
+				os.Exit(0)
+			}
+		})
+	}
+}
+
 func main() {
 
 	initGlobalLogCapture()
@@ -429,6 +480,29 @@ func main() {
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
+				break
+			}
+		}
+	})
+
+	http.HandleFunc("/ws/live", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		cancelExitCountdown()
+
+		defer func() {
+			liveMu.Lock()
+			liveClientCount--
+			liveMu.Unlock()
+			startExitCountdown()
+		}()
+
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
 				break
 			}
 		}
@@ -757,7 +831,7 @@ func main() {
 	portStr := flag.String("port", defaultPort, "Server listen port (set to 0 for random port)")
 	flag.Parse()
 
-	listener, err := net.Listen("tcp", ":"+*portStr)
+	listener, err := net.Listen("tcp", "127.0.0.1:"+*portStr)
 	if err != nil {
 		logPrintf("%s Failed to bind port %s: %v\n", tagError, *portStr, err)
 		return
@@ -765,8 +839,23 @@ func main() {
 	defer listener.Close()
 
 	actualPort := listener.Addr().(*net.TCPAddr).Port
+	serverURL := fmt.Sprintf("http://127.0.0.1:%d", actualPort)
 
-	logPrintf("%s Server started, please open in browser: \033[1;34mhttp://127.0.0.1:%d\033[0m\n", tagInfo, actualPort)
+	logPrintf("%s Server started, please open in browser: \033[1;34m%s\033[0m\n", tagInfo, serverURL)
+
+	exitTimer = time.AfterFunc(15*time.Second, func() {
+		liveMu.Lock()
+		defer liveMu.Unlock()
+		if liveClientCount <= 0 {
+			logPrintf("%s Browser failed to connect in time, exiting...\n", tagWarn)
+			os.Exit(0)
+		}
+	})
+
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		openBrowser(serverURL)
+	}()
 
 	if err := http.Serve(listener, nil); err != nil {
 		logPrintf("%s Server error: %v\n", tagError, err)

@@ -66,7 +66,8 @@ run('npm run build');
 // 2. Compile Go binary into release directory
 const outBinaryPath = path.join(RELEASE_DIR, EXE_NAME);
 run('go mod download');
-run(`go build -x -o "${outBinaryPath}"`);
+const ldflags = process.platform === 'win32' ? '-ldflags="-H windowsgui"' : '';
+run(`go build -x ${ldflags} -o "${outBinaryPath}"`);
 
 // 3. Archive frontend distribution and configurations
 console.log(`\n${TAG.info} Archiving base runtime assets...`);
