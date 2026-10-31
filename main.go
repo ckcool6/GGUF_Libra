@@ -24,11 +24,13 @@ import (
 )
 
 var (
-	mu            sync.Mutex
-	OpenRouterKey string
-	rootChain     *chatChain
-	currentChain  *chatChain
-	queryEngine   *query.Engine // Global query engine
+	mu               sync.Mutex
+	OpenRouterKey    string
+	rootChain        *chatChain
+	currentChain     *chatChain
+	queryEngine      *query.Engine // Global query engine
+	currentParserCmd *exec.Cmd
+	parserMu         sync.Mutex
 )
 
 const (
@@ -304,6 +306,19 @@ func resolveParserCmd() (*exec.Cmd, error) {
 	return nil, fmt.Errorf("neither binary (%s) nor parser.py found", binName)
 }
 
+func killParserCmd(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	if runtime.GOOS == "windows" {
+		kill := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", cmd.Process.Pid))
+		kill.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		_ = kill.Run()
+	} else {
+		_ = cmd.Process.Kill()
+	}
+}
+
 func initParserTerminalHandler() {
 	http.HandleFunc("/ws/parser", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -354,9 +369,17 @@ func initParserTerminalHandler() {
 			return
 		}
 
+		parserMu.Lock()
+		currentParserCmd = cmd
+		parserMu.Unlock()
+
 		defer func() {
+			parserMu.Lock()
+			currentParserCmd = nil
+			parserMu.Unlock()
+
 			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
+				killParserCmd(cmd)
 				logPrintf("%s [Parser] Process terminated (PID: %d)\n", tagInfo, cmd.Process.Pid)
 			}
 		}()
@@ -394,6 +417,14 @@ func initParserTerminalHandler() {
 
 		// WebSocket -> Stdin
 		go func() {
+
+			defer func() {
+				_ = stdin.Close()
+				if cmd.Process != nil {
+					killParserCmd(cmd)
+				}
+			}()
+
 			for {
 				_, msg, err := conn.ReadMessage()
 				if err != nil {
@@ -452,6 +483,13 @@ func startExitCountdown() {
 			defer liveMu.Unlock()
 			if liveClientCount <= 0 {
 				logPrintf("%s All UI tabs closed, auto-exiting program...\n", tagInfo)
+
+				parserMu.Lock()
+				if currentParserCmd != nil && currentParserCmd.Process != nil {
+					killParserCmd(currentParserCmd)
+				}
+				parserMu.Unlock()
+
 				os.Exit(0)
 			}
 		})
