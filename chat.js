@@ -2797,3 +2797,99 @@ if (imageViewerModal && imageViewerImg) {
     });
 }
 
+// ==================== REALTIME SERVER LOGS ====================
+let logTerm = null;
+let logFitAddon = null;
+let logWs = null;
+
+const logsModal = document.getElementById("logs-modal");
+const logsContainer = document.getElementById("logs-container");
+const openLogsBtn = document.getElementById("open-logs-btn");
+const closeLogsBtn = document.getElementById("close-logs-btn");
+const clearLogsBtn = document.getElementById("clear-logs-btn");
+
+function initLogTerminal() {
+    if (logTerm) return;
+
+    logTerm = new Terminal({
+        fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
+        fontSize: 12,
+        lineHeight: 1.25,
+        cursorBlink: false,
+        convertEol: true,
+        disableStdin: true,
+        theme: {
+            background: "#100F0F",
+            foreground: "#CECDC3",
+            black: "#100F0F",
+            red: "#AF3029",
+            green: "#879A39",
+            yellow: "#D0A215",
+            blue: "#205EA6",
+            magenta: "#CE5D97",
+            cyan: "#24837B",
+            white: "#CECDC3",
+        },
+    });
+
+    logFitAddon = new FitAddon();
+    logTerm.loadAddon(logFitAddon);
+    logTerm.open(logsContainer);
+}
+
+function openLogsTerminal() {
+    initLogTerminal();
+    logsModal.classList.remove("hidden");
+
+    if (logTerm) {
+        logTerm.clear();
+    }
+
+    setTimeout(() => {
+        if (logFitAddon) logFitAddon.fit();
+    }, 60);
+
+    if (logWs && logWs.readyState === WebSocket.OPEN) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/logs`;
+
+    logWs = new WebSocket(wsUrl);
+    logWs.binaryType = "arraybuffer";
+
+    const decoder = new TextDecoder("utf-8");
+
+    logWs.onmessage = (event) => {
+        if (!logTerm) return;
+        const text = event.data instanceof ArrayBuffer
+            ? decoder.decode(event.data, { stream: true })
+            : event.data;
+        logTerm.write(text);
+    };
+
+    logWs.onerror = () => {
+        logTerm?.writeln("\r\n\x1b[31m[Logs WebSocket Error]\x1b[0m");
+    };
+
+    logWs.onclose = () => {
+        logTerm?.writeln("\r\n\x1b[90m[Disconnected from log stream]\x1b[0m");
+    };
+}
+
+function closeLogsTerminal() {
+    if (logsModal) logsModal.classList.add("hidden");
+    if (logWs) {
+        logWs.close();
+        logWs = null;
+    }
+}
+
+if (openLogsBtn) openLogsBtn.addEventListener("click", openLogsTerminal);
+if (closeLogsBtn) closeLogsBtn.addEventListener("click", closeLogsTerminal);
+if (clearLogsBtn) clearLogsBtn.addEventListener("click", () => logTerm?.clear());
+
+window.addEventListener("resize", () => {
+    if (logsModal && !logsModal.classList.contains("hidden") && logFitAddon) {
+        logFitAddon.fit();
+    }
+});

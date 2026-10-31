@@ -180,8 +180,7 @@ func (chain *chatChain) GenerateAbstract(customUrl, customKey string) (string, e
 
 		chain.DialogAbstract = abstract
 
-		previewLen := min(80, len(abstract))
-		preview := strings.ReplaceAll(abstract[:previewLen], "\n", " ")
+		preview := strings.ReplaceAll(safeTruncate(abstract, 80), "\n", " ")
 		logPrintf("%s [Abstract] Generated in %.2fs (%d chars): \"%s...\"\n",
 			tagOK, time.Since(startTime).Seconds(), len(abstract), preview)
 

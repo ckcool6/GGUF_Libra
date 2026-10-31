@@ -53,7 +53,7 @@ func config_init() {
 	}
 
 	// 5. Initialize Tiktoken BPE encoder for token usage calculation and context management
-	stopLoading := StartLoading("Initializing token encoder (first run may require downloading vocabulary files, please wait)...")
+	stopLoading := StartLoading("Initializing token encoder (may download vocab)...")
 	tkm, err = tiktoken.GetEncoding("cl100k_base")
 	stopLoading()
 	if err != nil {

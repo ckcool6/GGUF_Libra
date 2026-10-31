@@ -38,6 +38,86 @@ const (
 	tagDone  = "\033[1;32m[DONE]\033[0m"
 )
 
+// ==================== SYSTEM LOG CAPTURE & BROADCAST ====================
+
+type LogHub struct {
+	mu         sync.Mutex
+	clients    map[*websocket.Conn]bool
+	history    [][]byte
+	maxHistory int
+}
+
+var logHub = &LogHub{
+	clients:    make(map[*websocket.Conn]bool),
+	history:    make([][]byte, 0, 300),
+	maxHistory: 300,
+}
+
+func (h *LogHub) register(conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.clients[conn] = true
+
+	for _, chunk := range h.history {
+		_ = conn.WriteMessage(websocket.BinaryMessage, chunk)
+	}
+}
+
+func (h *LogHub) unregister(conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.clients, conn)
+	_ = conn.Close()
+}
+
+func (h *LogHub) broadcast(chunk []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	saved := make([]byte, len(chunk))
+	copy(saved, chunk)
+	h.history = append(h.history, saved)
+	if len(h.history) > h.maxHistory {
+		h.history = h.history[len(h.history)-h.maxHistory:]
+	}
+
+	for conn := range h.clients {
+		_ = conn.WriteMessage(websocket.BinaryMessage, chunk)
+	}
+}
+
+func initGlobalLogCapture() {
+	r, w, err := os.Pipe()
+	if err != nil {
+		fmt.Println("Failed to create log pipe:", err)
+		return
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	os.Stderr = w
+
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			n, err := r.Read(buf)
+			if n > 0 {
+				chunk := make([]byte, n)
+				copy(chunk, buf[:n])
+
+				origStdout.Write(chunk)
+
+				text := strings.ReplaceAll(string(chunk), "\r\n", "\n")
+				text = strings.ReplaceAll(text, "\n", "\r\n")
+				logHub.broadcast([]byte(text))
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+}
+
 // log info
 var appStartTime = time.Now()
 
@@ -315,6 +395,8 @@ func initParserTerminalHandler() {
 
 func main() {
 
+	initGlobalLogCapture()
+
 	var err error
 	query.LogFunc = logPrintf
 
@@ -329,7 +411,28 @@ func main() {
 	config_init()
 	initRAG()
 
+	// parser terminal
 	initParserTerminalHandler()
+
+	// log terminal
+	http.HandleFunc("/ws/logs", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			logPrintf("%s WebSocket upgrade error: %v\n", tagError, err)
+			return
+		}
+		logHub.register(conn)
+		defer logHub.unregister(conn)
+
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("\x1b[32m[Connected to Go Backend Log Stream]\x1b[0m\r\n"))
+
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+	})
 
 	// Host static assets from the dist directory
 	http.Handle("/", http.FileServer(http.Dir("dist")))
@@ -401,8 +504,8 @@ func main() {
 			currentChain.PromptID = parentPrompt
 
 			rootChain.SaveChainToFile("chain_history.json")
-			previewLen := min(60, len(parentAbstract))
-			preview := strings.ReplaceAll(parentAbstract[:previewLen], "\n", " ")
+
+			preview := strings.ReplaceAll(safeTruncate(parentAbstract, 60), "\n", " ")
 			logPrintf("%s [Fork] Side branch successfully created & activated (Green Node)!\n", tagOK)
 			logPrintf("  - Inherited Summary : %v (\"%s...\")\n", withSummary, preview)
 			logPrintf("  - Vector Isolation  : Vector DB cleared to isolate side exploration\n")
@@ -443,8 +546,7 @@ func main() {
 		// Persist state to file
 		rootChain.SaveChainToFile("chain_history.json")
 		// log
-		previewLen := min(60, len(newNode.DialogAbstract))
-		preview := strings.ReplaceAll(newNode.DialogAbstract[:previewLen], "\n", " ")
+		preview := strings.ReplaceAll(safeTruncate(newNode.DialogAbstract, 60), "\n", " ")
 		logPrintf("%s [Merge] Side branch successfully merged & grafted into main branch tail!\n", tagOK)
 		logPrintf("  - Merged Abstract: \"%s...\"\n", preview)
 		logPrintf("  - Topology Action: Side branch archived to HistoryArchives and pruned from fork node\n")
@@ -563,8 +665,7 @@ func main() {
 		// log
 		tailPreview := "(empty / new chapter)"
 		if currentChain.DialogAbstract != "" {
-			pLen := min(60, len(currentChain.DialogAbstract))
-			tailPreview = strings.ReplaceAll(currentChain.DialogAbstract[:pLen], "\n", " ") + "..."
+			tailPreview = strings.ReplaceAll(safeTruncate(currentChain.DialogAbstract, 60), "\n", " ") + "..."
 		}
 		logPrintf("%s [Switch] Successfully switched from side branch to main branch tail!\n", tagOK)
 		logPrintf("  - Active Main Tail Node: \"%s\"\n", tailPreview)
@@ -633,8 +734,7 @@ func main() {
 		currentChain = newNode
 		rootChain.SaveChainToFile("chain_history.json")
 
-		previewLen := min(60, len(oldAbstract))
-		preview := strings.ReplaceAll(oldAbstract[:previewLen], "\n", " ")
+		preview := strings.ReplaceAll(safeTruncate(oldAbstract, 60), "\n", " ")
 		logPrintf("%s [Archive] Main branch archived successfully! Started new chapter (chain_history.json updated)\n", tagOK)
 		logPrintf("  - Inherited Summary: \"%s...\"\n", preview)
 
