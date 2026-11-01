@@ -1,5 +1,11 @@
 # GGUF Libra
 
+<div align="center">
+  <img src=".github/assets/icon.png" width="120" alt="Logo">
+  <h1>GGUF Libra - A Non-linear LLM chat client</h1>
+</div>
+
+
 ## Screenshot
 <img src=".github/assets/ui.png" alt="ui"/>
 <img src=".github/assets/log.png" alt="log"/>
