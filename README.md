@@ -4,9 +4,6 @@
 </div>
 
 
-**[Download latest](https://github.com/ckcool6/GGUF_Libra/releases/latest)**
-
-
 ## What is this
 A local LLM chat client focused on role-play and chat, based on `llama-server` (llama.cpp). It reshapes how the model recalls past context through a custom algorithm, allowing the model to remember key information while also forgetting trivial details.
 
@@ -17,19 +14,9 @@ A local LLM chat client focused on role-play and chat, based on `llama-server` (
 ## Why Design "Forgetting"?
 The model does not need to remember everything. Recalling trivial, insignificant interactions pollutes the context window and degrades conversation quality.
 
-## Core Features
-- **Git-Style Dialogue Branches**: Chat in isolated side branches where the model will not recall events from the main branch. You can also pass a summary from the main branch to let the model chat with background context.
-- **Custom `data.bin` Database**: Does not search the entire history. It uses a custom algorithm to rank memories and only retrieves the most significant ("heaviest") memories. See `parser_py/parser.py` for how this weight is calculated.
-- **RAG Vector Database**: In this project, RAG is strictly used for global background settings (e.g., character personas). Plain `.txt` files with sections under 500 characters/words are recommended for the most accurate retrieval.
-- **YAML System Prompts**: Supports `system_prompts.yaml` for defining prompts, removing the need for complex JSON-style character cards.
-- **Local & Private**: No cloud database or telemetry. Chat history is stored strictly on your local machine (`chain_history.json`) for topological recall, and can also be exported as `.txt` files.
-- **PWA Support**: Can be installed as a Progressive Web App.
-- **Latex Support**: Full support for rendering inline and block mathematical formulas.
-- **Tree-sitter Code Parser Support**:  The vector database chunks source files by syntactic AST structures rather than arbitrary line cuts. Currently supports Go, Python, C/C++, and JavaScript.
-- **No Accounts / Logins**: This is a local client for `llama-server`, so no login system is needed.
-- **No Frontend Frameworks**: Built with pure HTML, CSS, and Vanilla JavaScript (no React or Vue).
-- **No Backend Frameworks**: Uses only Go's standard `net/http` package.
-- **No SQL / External Database**: Operates completely without SQL or heavy database daemons, powered solely by native files (data.bin and local vector storage).
+## Release
+**[Download latest](https://github.com/ckcool6/GGUF_Libra/releases/latest)**
+
 
 ## How to Use (Windows)
 Start two `llama-server` instances on ports `8021` (chat model) and `8022` (embedding model).
@@ -118,7 +105,21 @@ node build.js
 
   make
 ```
-   
+
+## Core Features
+
+- **Git-Style Dialogue Branches**: Chat in isolated side branches where the model will not recall events from the main branch. You can also pass a summary from the main branch to let the model chat with background context.
+- **Custom `data.bin` Database**: Does not search the entire history. It uses a custom algorithm to rank memories and only retrieves the most significant ("heaviest") memories. See `parser_py/parser.py` for how this weight is calculated.
+- **RAG Vector Database**: In this project, RAG is strictly used for global background settings (e.g., character personas). Plain `.txt` files with sections under 500 characters/words are recommended for the most accurate retrieval.
+- **YAML System Prompts**: Supports `system_prompts.yaml` for defining prompts, removing the need for complex JSON-style character cards.
+- **Local & Private**: No cloud database or telemetry. Chat history is stored strictly on your local machine (`chain_history.json`) for topological recall, and can also be exported as `.txt` files.
+- **PWA Support**: Can be installed as a Progressive Web App.
+- **Latex Support**: Full support for rendering inline and block mathematical formulas.
+- **Tree-sitter Code Parser Support**:  The vector database chunks source files by syntactic AST structures rather than arbitrary line cuts. Currently supports Go, Python, C/C++, and JavaScript.
+- **No Accounts / Logins**: This is a local client for `llama-server`, so no login system is needed.
+- **No Frontend Frameworks**: Built with pure HTML, CSS, and Vanilla JavaScript (no React or Vue).
+- **No Backend Frameworks**: Uses only Go's standard `net/http` package.
+- **No SQL / External Database**: Operates completely without SQL or heavy database daemons, powered solely by native files (data.bin and local vector storage).   
    
 ## Theoretical Foundation: Why `logic_t`?
 
