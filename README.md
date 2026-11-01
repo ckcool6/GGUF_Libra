@@ -1,17 +1,18 @@
-# GGUF Libra
-
 <div align="center">
   <img src=".github/assets/icon.png" width="120" alt="Logo">
   <h1>GGUF Libra - A Non-linear LLM chat client</h1>
 </div>
 
 
-## Screenshot
-<img src=".github/assets/ui.png" alt="ui"/>
-<img src=".github/assets/log.png" alt="log"/>
+**[Download latest](https://github.com/ckcool6/GGUF_Libra/releases/latest)**
+
 
 ## What is this
 A local LLM chat client focused on role-play and chat, based on `llama-server` (llama.cpp). It reshapes how the model recalls past context through a custom algorithm, allowing the model to remember key information while also forgetting trivial details.
+
+## Screenshot
+<img src=".github/assets/ui.png" alt="ui"/>
+<img src=".github/assets/log.png" alt="log"/>
 
 ## Why Design "Forgetting"?
 The model does not need to remember everything. Recalling trivial, insignificant interactions pollutes the context window and degrades conversation quality.
