@@ -5,6 +5,12 @@
 <p align="center">
   <a href="https://github.com/ckcool6/GGUF_Libra/releases"><img src="https://img.shields.io/github/v/release/ckcool6/GGUF_Libra" alt="Release"></a>
   <a href="https://github.com/ckcool6/GGUF_Libra/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ckcool6/GGUF_Libra" alt="License"></a>
+   <a href="https://github.com/ckcool6/GGUF_Libra/network/members">
+    <img src="https://img.shields.io/github/forks/ckcool6/GGUF_Libra" alt="GitHub Forks" />
+  </a>
+  <a href="https://github.com/ckcool6/GGUF_Libra/stargazers">
+    <img src="https://img.shields.io/github/stars/ckcool6/GGUF_Libra" alt="GitHub Stars" />
+  </a>
 </p>
 
 <h1>GGUF Libra - A Non-linear LLM chat client</h1>
