@@ -1,6 +1,5 @@
 <div align="center">
-  <img src=".github/assets/title_icon.png" width="120" alt="Logo">
-  <h1>GGUF Libra - A Non-linear LLM chat client</h1>
+  <img src=".github/assets/readme_icon.png" width="120" alt="Logo">
 </div>
 
 <p align="center">
@@ -8,6 +7,7 @@
   <a href="https://github.com/ckcool6/GGUF_Libra/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ckcool6/GGUF_Libra" alt="License"></a>
 </p>
 
+<h1>GGUF Libra - A Non-linear LLM chat client</h1>
 
 ## What is this
 A local LLM chat client focused on role-play and chat, based on `llama-server` (llama.cpp). It reshapes how the model recalls past context through a custom algorithm, allowing the model to remember key information while also forgetting trivial details.
