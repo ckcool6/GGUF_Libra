@@ -1,7 +1,12 @@
 <div align="center">
-  <img src=".github/assets/icon.png" width="180" alt="Logo">
+  <img src=".github/assets/icon.png" width="120" alt="Logo">
   <h1>GGUF Libra - A Non-linear LLM chat client</h1>
 </div>
+
+<p align="center">
+  <a href="https://github.com/ckcool6/GGUF_Libra/releases"><img src="https://img.shields.io/github/v/release/ckcool6/GGUF_Libra" alt="Release"></a>
+  <a href="https://github.com/ckcool6/GGUF_Libra/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ckcool6/GGUF_Libra" alt="License"></a>
+</p>
 
 
 ## What is this
