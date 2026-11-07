@@ -1,5 +1,5 @@
 <div align="center">
-  <img src=".github/assets/icon.png" width="120" alt="Logo">
+  <img src=".github/assets/title_icon.png" width="120" alt="Logo">
   <h1>GGUF Libra - A Non-linear LLM chat client</h1>
 </div>
 
