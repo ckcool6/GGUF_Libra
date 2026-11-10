@@ -2818,6 +2818,7 @@ function initLogTerminal() {
         cursorBlink: false,
         convertEol: true,
         disableStdin: true,
+        scrollback: 10000,
         theme: {
             background: "#100F0F",
             foreground: "#CECDC3",
@@ -2860,12 +2861,9 @@ function openLogsTerminal() {
     initLogTerminal();
     logsModal.classList.remove("hidden");
 
-    if (logTerm) {
-        logTerm.clear();
-    }
-
     setTimeout(() => {
         if (logFitAddon) logFitAddon.fit();
+        if (logTerm) logTerm.scrollToBottom();
     }, 60);
 
     if (logWs && logWs.readyState === WebSocket.OPEN) return;

@@ -53,17 +53,24 @@ type LogHub struct {
 
 var logHub = &LogHub{
 	clients:    make(map[*websocket.Conn]bool),
-	history:    make([][]byte, 0, 300),
-	maxHistory: 300,
+	history:    make([][]byte, 0, 3000),
+	maxHistory: 3000,
 }
 
 func (h *LogHub) register(conn *websocket.Conn) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.clients[conn] = true
 
-	for _, chunk := range h.history {
-		_ = conn.WriteMessage(websocket.BinaryMessage, chunk)
+	historyCopy := make([][]byte, len(h.history))
+	copy(historyCopy, h.history)
+	h.mu.Unlock()
+
+	if len(historyCopy) > 0 {
+		var combined []byte
+		for _, chunk := range historyCopy {
+			combined = append(combined, chunk...)
+		}
+		_ = conn.WriteMessage(websocket.BinaryMessage, combined)
 	}
 }
 
