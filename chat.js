@@ -2377,7 +2377,7 @@ function initTerminal() {
     // Initialize Terminal instance with custom styling
     term = new Terminal({
         fontFamily: "'JetBrains Mono', 'Menlo', 'Courier New', monospace",
-        fontSize: 13,
+        fontSize: 14,
         lineHeight: 1.2,
         cursorBlink: true,
         convertEol: true,
@@ -2813,7 +2813,7 @@ function initLogTerminal() {
 
     logTerm = new Terminal({
         fontFamily: "'JetBrains Mono', 'Xhei Intel', 'Menlo', 'Courier New', monospace",
-        fontSize: 12,
+        fontSize: 14,
         lineHeight: 1.25,
         cursorBlink: false,
         convertEol: true,
