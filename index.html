@@ -155,6 +155,15 @@
                     <input id="custom-key" type="password" placeholder="Leave blank to use default server configuration"
                         class="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-200">
                 </div>
+
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <label
+                        class="block text-sm font-medium mb-1 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <span>🌐</span> Pro Web Search Key
+                    </label>
+                    <input id="custom-search-key" type="password" placeholder="Enter Pro License / Search Key"
+                        class="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-800 dark:text-gray-200">
+                </div>
             </div>
 
             <div class="flex justify-end gap-3 mt-6">
@@ -319,6 +328,17 @@
                     </svg>
                     <input type="file" id="image-input" accept="image/*" class="hidden">
                 </label>
+
+                <!-- 🌐 web search btn -->
+                <button type="button" id="web-search-btn"
+                    class="p-1.5 cursor-pointer rounded-full transition-all text-gray-400 dark:text-[#878580] hover:text-gray-600 dark:hover:text-[#CECDC3] flex items-center justify-center shrink-0 mb-[2px]"
+                    title="Toggle Web Search (Off)">
+                    <svg class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor"
+                        stroke-width="1.8" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                    </svg>
+                </button>
 
                 <textarea id="user-input" rows="1" placeholder="Type a message..."
                     class="flex-1 bg-transparent border-none focus:outline-none text-sm py-1 px-3 resize-none leading-relaxed text-gray-800 dark:text-[#CECDC3] placeholder-gray-400 dark:placeholder-[#6F6E69] caret-[#CECDC3]"></textarea>

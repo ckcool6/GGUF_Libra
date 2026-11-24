@@ -499,6 +499,8 @@ window.onload = async () => {
     await initPromptSelect();
 
     const savedTheme = localStorage.getItem("theme");
+    updateWebSearchBtnUI();
+
 
     if (
         savedTheme === "dark" ||
@@ -2053,6 +2055,9 @@ function refreshAvatarPreviews() {
 }
 
 document.getElementById("settings-btn").addEventListener("click", () => {
+    if (customSearchKeyInput) {
+        customSearchKeyInput.value = localStorage.getItem("custom_search_key") || "";
+    }
     customUrlInput.value = localStorage.getItem("custom_api_url") || "";
     if (customEmbeddingUrlInput) {
         customEmbeddingUrlInput.value = localStorage.getItem("custom_embedding_url") || "";
@@ -2078,6 +2083,9 @@ resetUserBtn.onclick = () => {
 };
 
 document.getElementById("save-settings").addEventListener("click", () => {
+    if (customSearchKeyInput) {
+        localStorage.setItem("custom_search_key", customSearchKeyInput.value.trim());
+    }
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
     if (customEmbeddingUrlInput) {
         localStorage.setItem("custom_embedding_url", customEmbeddingUrlInput.value.trim());
@@ -2794,6 +2802,40 @@ if (imageViewerModal && imageViewerImg) {
             imageViewerModal.classList.add("hidden");
             imageViewerImg.src = "";
         }
+    });
+}
+
+// ==================== WEB SEARCH STATE ====================
+let isWebSearchEnabled = localStorage.getItem("enable_web_search") === "true";
+const webSearchBtn = document.getElementById("web-search-btn");
+const customSearchKeyInput = document.getElementById("custom-search-key");
+
+function updateWebSearchBtnUI() {
+    if (!webSearchBtn) return;
+    if (isWebSearchEnabled) {
+        webSearchBtn.classList.add(
+            "text-emerald-600", "dark:text-[#879A39]",
+            "bg-emerald-50", "dark:bg-[#879A39]/15"
+        );
+        webSearchBtn.classList.remove("text-gray-400", "dark:text-[#878580]");
+        webSearchBtn.title = "Web Search: ON (Pro)";
+        webSearchBtn.querySelector("svg").classList.add("scale-110");
+    } else {
+        webSearchBtn.classList.remove(
+            "text-emerald-600", "dark:text-[#879A39]",
+            "bg-emerald-50", "dark:bg-[#879A39]/15"
+        );
+        webSearchBtn.classList.add("text-gray-400", "dark:text-[#878580]");
+        webSearchBtn.title = "Web Search: OFF";
+        webSearchBtn.querySelector("svg").classList.remove("scale-110");
+    }
+}
+
+if (webSearchBtn) {
+    webSearchBtn.addEventListener("click", () => {
+        isWebSearchEnabled = !isWebSearchEnabled;
+        localStorage.setItem("enable_web_search", isWebSearchEnabled);
+        updateWebSearchBtnUI();
     });
 }
 
