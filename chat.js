@@ -74,6 +74,31 @@ const WARNING_ICON_HTML = `
 </svg>`;
 
 // ==================================== UTILITY FUNCTIONS =====================================
+/**
+ * 将 HTML 中的 [1], [2] 转换为可点击、带 Tooltip 提示的超链接角标卡片
+ * @param {string} html 解析后的 HTML 字符串
+ * @param {Array} sources 搜索来源数组
+ * @returns {string} 替换后的 HTML
+ */
+function linkifyCitations(html, sources) {
+    if (!sources || sources.length === 0) return html;
+
+    // 匹配类似 [1], [2] 的数字角标
+    return html.replace(/\[(\d+)\]/g, (match, p1) => {
+        const index = parseInt(p1, 10) - 1;
+        const source = sources[index];
+
+        // 如果找到了对应的来源且有 URL，替换成漂亮的超链接徽章
+        if (source && source.url) {
+            const safeTitle = (source.title || "Reference source").replace(/"/g, '&quot;');
+            return `<a href="${source.url}" target="_blank" rel="noopener noreferrer" 
+                class="citation-badge inline-flex items-center justify-center text-[10px] font-mono font-semibold text-emerald-700 dark:text-[#879A39] bg-emerald-100/70 dark:bg-[#879A39]/15 border border-emerald-300/80 dark:border-[#879A39]/30 rounded px-1.5 py-0.2 mx-0.5 align-super hover:underline hover:scale-105 active:scale-95 transition-all shadow-2xs select-none" 
+                title="${safeTitle}">[${p1}]</a>`;
+        }
+        return match;
+    });
+}
+
 // Escape user plain text and handle line breaks
 function formatUserText(str) {
     // Create a temporary div to escape text using the browser's textContent property
@@ -711,6 +736,8 @@ if (input) {
 }
 
 async function send() {
+    currentSearchSources = [];
+
     if (sendBtn.classList.contains("is-loading")) {
         if (chatAbortController) {
             chatAbortController.abort();
@@ -756,6 +783,33 @@ async function send() {
 
     loading.classList.remove("hidden");
 
+    // ==================== 🌐 联网搜索执行拦截 ====================
+    let webSearchContext = "";
+    const loadingTextSpan = loading.querySelector("span");
+
+    if (isWebSearchEnabled && text) {
+        try {
+            if (loadingTextSpan) {
+                loadingTextSpan.innerText = "Searching the web...";
+            }
+
+            const searchKey = localStorage.getItem("custom_search_key") || "";
+            // 触发刚刚调通的 Mock 搜索
+            const searchResults = await mockWebSearch(text, searchKey);
+            currentSearchSources = searchResults;
+            webSearchContext = formatSearchContextForLLM(searchResults);
+
+        } catch (searchErr) {
+            console.error("Web search failed:", searchErr);
+            alert("Web Search Error: " + searchErr.message);
+        } finally {
+            // 搜索完成，无缝切回普通的模型推理提示
+            if (loadingTextSpan) {
+                loadingTextSpan.innerText = "Thinking...";
+            }
+        }
+    }
+
     // Scroll handling
     const lastMessageImg = chatBox.querySelector(".message-row:last-child img");
 
@@ -777,7 +831,8 @@ async function send() {
             headers: getHeaders(),
             signal: chatAbortController.signal,
             body: JSON.stringify({
-                message: text || "\u200B",
+                message: (text || "\u200B"),
+                search_context: webSearchContext,
                 // Strip "data:image/jpeg;base64," prefix and send base64 data only
                 image: imageToSend ? imageToSend.split(",")[1] : null,
                 custom_url: localStorage.getItem("custom_api_url") || "",
@@ -829,6 +884,10 @@ async function send() {
         }
     } finally {
         loading.classList.add("hidden");
+
+        const loadingTextSpan = loading.querySelector("span");
+        if (loadingTextSpan) loadingTextSpan.innerText = "Thinking...";
+
         sendBtn.classList.remove("is-loading");
         sendBtn.innerHTML = SEND_ICON_HTML;
         chatAbortController = null;
@@ -1015,7 +1074,12 @@ function finalizeAiBubble(ctx) {
     if (!ctx.aiBubbleDiv) return;
 
     // Final complete safe Markdown parsing for the last frame
-    ctx.aiBubbleDiv.innerHTML = safeMarkdownParse(ctx.fullText);
+    let renderedHtml = safeMarkdownParse(ctx.fullText);
+    if (currentSearchSources && currentSearchSources.length > 0) {
+        renderedHtml = linkifyCitations(renderedHtml, currentSearchSources);
+    }
+    ctx.aiBubbleDiv.innerHTML = renderedHtml;
+
     ctx.aiBubbleDiv.dataset.raw = ctx.fullText;
 
     // Highlight code blocks and parse emojis
@@ -2806,6 +2870,7 @@ if (imageViewerModal && imageViewerImg) {
 }
 
 // ==================== WEB SEARCH STATE ====================
+let currentSearchSources = []; // 暂存当前这轮提问拿到的搜索来源 [{title, url, snippet}, ...]
 let isWebSearchEnabled = localStorage.getItem("enable_web_search") === "true";
 const webSearchBtn = document.getElementById("web-search-btn");
 const customSearchKeyInput = document.getElementById("custom-search-key");
@@ -2838,6 +2903,76 @@ if (webSearchBtn) {
         updateWebSearchBtnUI();
     });
 }
+
+// ==================== MOCK SEARCH SERVICE ====================
+/**
+ * 模拟云端搜索 API
+ * @param {string} query 用户搜索的关键词
+ * @param {string} searchKey 付费凭证
+ * @returns {Promise<Array<{title: string, url: string, snippet: string}>>}
+ */
+async function mockWebSearch(query, searchKey) {
+    console.log(`[Mock Search API] 收到检索请求: "${query}" | Key: "${searchKey ? '******' : '未配置'}"`);
+
+    // 1. 模拟网络查询延迟 1 秒（假装在云端并发爬取、清洗网页）
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // 2. 模拟未来云端的鉴权拦截逻辑（暂时注释掉，等后期做收费再打开）
+    /*
+    if (!searchKey) {
+        throw new Error("401 Unauthorized: Web search requires a valid Pro API Key.");
+    }
+    */
+
+    // 3. 返回结构化的搜索结果（未来你的闭源云端 API 也是吐出这个格式）
+    const today = new Date().toISOString().slice(0, 10);
+    return [
+        {
+            title: `Breaking News: Real-time Analysis on "${query}"`,
+            url: "https://example.com/news/latest-report",
+            snippet: `[Live Broadcast ${today}]: Comprehensive survey regarding ${query} indicates unprecedented attention. Community experts noted major progress today.`,
+        },
+        {
+            title: `${query} - Official Architecture & Specification`,
+            url: "https://example.com/docs/spec",
+            snippet: `${query} represents an advanced protocol implementation designed for robust isolation, real-time memory synchronization, and secure sandbox execution.`,
+        },
+    ];
+}
+
+/**
+ * 将结构化的搜索结果转换为喂给 LLM 的注入 Prompt
+ * @param {Array} results 搜索结果数组
+ * @returns {string} 格式化后的提示词
+ */
+function formatSearchContextForLLM(results) {
+    if (!results || results.length === 0) return "";
+
+    const today = new Date().toISOString().slice(0, 10);
+    let contextStr = `\n\n[Web Search Results | Reference Date: ${today}]\n`;
+
+    results.forEach((item, index) => {
+        contextStr += `Source [${index + 1}]:\n`;
+        contextStr += `Title: ${item.title}\n`;
+        contextStr += `URL: ${item.url}\n`;
+        contextStr += `Content: ${item.snippet}\n\n`;
+    });
+
+    contextStr += `Instructions: You have access to real-time search results above. Answer the user prompt accurately based on these sources if relevant. Cite sources using bracket notation like [1], [2].\n`;
+
+    return contextStr;
+}
+
+// 暴露到 window 方便我们在控制台随时单测
+window.testMockSearch = async (keyword = "量子计算") => {
+    console.log("--- 开始测试 Mock 搜索链路 ---");
+    const key = localStorage.getItem("custom_search_key") || "";
+    const rawData = await mockWebSearch(keyword, key);
+    console.log("1. 搜索 API 原始返回对象:", rawData);
+    const finalPrompt = formatSearchContextForLLM(rawData);
+    console.log("2. 最终拼装成喂给大模型的文本:\n" + finalPrompt);
+    console.log("--- 测试结束 ---");
+};
 
 // ==================== REALTIME SERVER LOGS ====================
 let logTerm = null;

@@ -31,7 +31,8 @@ type PromptItem struct {
 }
 
 type reqBody struct {
-	Message string `json:"message"`
+	Message       string `json:"message"`
+	SearchContext string `json:"search_context"`
 	// Receives the base64-encoded image sent from the frontend.
 	Image              string `json:"image"`
 	CustomUrl          string `json:"custom_url"`

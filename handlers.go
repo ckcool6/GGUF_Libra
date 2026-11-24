@@ -198,6 +198,12 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		promptPrefix.WriteString("\n\n")
 	}
 
+	// Web Search reference results
+	if body.SearchContext != "" {
+		promptPrefix.WriteString(body.SearchContext)
+		promptPrefix.WriteString("\n\n")
+	}
+
 	if promptPrefix.Len() > 0 {
 		promptPrefix.WriteString("Respond to the user's message strictly based on the context and reasoning history provided above:\n\n")
 	}
