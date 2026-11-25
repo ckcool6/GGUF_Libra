@@ -794,8 +794,8 @@ async function send() {
             }
 
             const searchKey = localStorage.getItem("custom_search_key") || "";
-            // 触发刚刚调通的 Mock 搜索
-            const searchResults = await mockWebSearch(text, searchKey);
+            // trigger search web
+            const searchResults = await realWebSearch(text, searchKey);
             currentSearchSources = searchResults;
             webSearchContext = formatSearchContextForLLM(searchResults);
 
@@ -2119,6 +2119,9 @@ function refreshAvatarPreviews() {
 }
 
 document.getElementById("settings-btn").addEventListener("click", () => {
+
+    fetchUserCredits(localStorage.getItem("custom_search_key") || "");
+
     if (customSearchKeyInput) {
         customSearchKeyInput.value = localStorage.getItem("custom_search_key") || "";
     }
@@ -2870,10 +2873,45 @@ if (imageViewerModal && imageViewerImg) {
 }
 
 // ==================== WEB SEARCH STATE ====================
-let currentSearchSources = []; // 暂存当前这轮提问拿到的搜索来源 [{title, url, snippet}, ...]
+let currentSearchSources = []; // Cache search sources retrieved for the current dialogue round [{title, url, snippet}, ...]
 let isWebSearchEnabled = localStorage.getItem("enable_web_search") === "true";
 const webSearchBtn = document.getElementById("web-search-btn");
 const customSearchKeyInput = document.getElementById("custom-search-key");
+
+const SEARCH_GATEWAY_URL = "http://192.168.190.128:8000"; // vm test
+
+const creditsBadge = document.getElementById("credits-badge");
+const creditsCount = document.getElementById("credits-count");
+
+async function fetchUserCredits(searchKey) {
+    if (!searchKey || !creditsBadge || !creditsCount) {
+        creditsBadge?.classList.add("hidden");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SEARCH_GATEWAY_URL}/v1/user/credits`, {
+            headers: { "Authorization": `Bearer ${searchKey}` }
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            creditsCount.innerText = data.credits;
+            creditsBadge.classList.remove("hidden");
+        } else {
+            creditsBadge.classList.add("hidden");
+        }
+    } catch (e) {
+        console.warn("Failed to check credits:", e);
+        creditsBadge?.classList.add("hidden");
+    }
+}
+
+if (customSearchKeyInput) {
+    customSearchKeyInput.addEventListener("blur", () => {
+        fetchUserCredits(customSearchKeyInput.value.trim());
+    });
+}
 
 function updateWebSearchBtnUI() {
     if (!webSearchBtn) return;
@@ -2904,46 +2942,51 @@ if (webSearchBtn) {
     });
 }
 
-// ==================== MOCK SEARCH SERVICE ====================
+
+// ==================== REAL WEB SEARCH SERVICE ====================
 /**
- * 模拟云端搜索 API
- * @param {string} query 用户搜索的关键词
- * @param {string} searchKey 付费凭证
- * @returns {Promise<Array<{title: string, url: string, snippet: string}>>}
+ * Call the remote search gateway service (SLM query rewriting + Tavily + credit deduction)
  */
-async function mockWebSearch(query, searchKey) {
-    console.log(`[Mock Search API] 收到检索请求: "${query}" | Key: "${searchKey ? '******' : '未配置'}"`);
-
-    // 1. 模拟网络查询延迟 1 秒（假装在云端并发爬取、清洗网页）
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // 2. 模拟未来云端的鉴权拦截逻辑（暂时注释掉，等后期做收费再打开）
-    /*
+async function realWebSearch(query, searchKey) {
     if (!searchKey) {
-        throw new Error("401 Unauthorized: Web search requires a valid Pro API Key.");
+        throw new Error("Please configure your Pro Web Search Key in Settings first.");
     }
-    */
 
-    // 3. 返回结构化的搜索结果（未来你的闭源云端 API 也是吐出这个格式）
-    const today = new Date().toISOString().slice(0, 10);
-    return [
-        {
-            title: `Breaking News: Real-time Analysis on "${query}"`,
-            url: "https://example.com/news/latest-report",
-            snippet: `[Live Broadcast ${today}]: Comprehensive survey regarding ${query} indicates unprecedented attention. Community experts noted major progress today.`,
+    const res = await fetch(`${SEARCH_GATEWAY_URL}/v1/search`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${searchKey}`
         },
-        {
-            title: `${query} - Official Architecture & Specification`,
-            url: "https://example.com/docs/spec",
-            snippet: `${query} represents an advanced protocol implementation designed for robust isolation, real-time memory synchronization, and secure sandbox execution.`,
-        },
-    ];
+        body: JSON.stringify({ query: query })
+    });
+
+    if (res.status === 401) {
+        throw new Error("Pro Search Key is invalid or expired. Please check settings.");
+    }
+    if (res.status === 402) {
+        throw new Error("Credits exhausted! Please top up your account.");
+    }
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Search gateway error (${res.status})`);
+    }
+
+    const data = await res.json();
+
+    // Dynamically sync updated remaining credits to the settings badge
+    if (creditsCount && data.remaining_credits !== undefined) {
+        creditsCount.innerText = data.remaining_credits;
+    }
+
+    return data.sources; // Return standard array: [{title, url, snippet}, ...]
 }
 
+
 /**
- * 将结构化的搜索结果转换为喂给 LLM 的注入 Prompt
- * @param {Array} results 搜索结果数组
- * @returns {string} 格式化后的提示词
+ * Format structured search results into an injection prompt for the LLM
+ * @param {Array} results Array of search result objects
+ * @returns {string} Formatted prompt string
  */
 function formatSearchContextForLLM(results) {
     if (!results || results.length === 0) return "";
@@ -2963,15 +3006,15 @@ function formatSearchContextForLLM(results) {
     return contextStr;
 }
 
-// 暴露到 window 方便我们在控制台随时单测
-window.testMockSearch = async (keyword = "量子计算") => {
-    console.log("--- 开始测试 Mock 搜索链路 ---");
+// Expose to window for easy debugging and unit testing in the console
+window.testSearchPipeline = async (keyword = "quantum computing") => {
+    console.log("--- Starting Search Pipeline Test ---");
     const key = localStorage.getItem("custom_search_key") || "";
-    const rawData = await mockWebSearch(keyword, key);
-    console.log("1. 搜索 API 原始返回对象:", rawData);
+    const rawData = await realWebSearch(keyword, key);
+    console.log("1. Raw search API response object:", rawData);
     const finalPrompt = formatSearchContextForLLM(rawData);
-    console.log("2. 最终拼装成喂给大模型的文本:\n" + finalPrompt);
-    console.log("--- 测试结束 ---");
+    console.log("2. Final injected text for LLM:\n" + finalPrompt);
+    console.log("--- Test completed ---");
 };
 
 // ==================== REALTIME SERVER LOGS ====================
