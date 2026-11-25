@@ -783,6 +783,7 @@ async function send() {
 
     loading.classList.remove("hidden");
 
+    chatBox.scrollTop = chatBox.scrollHeight;
     // ==================== 🌐 联网搜索执行拦截 ====================
     let webSearchContext = "";
     const loadingTextSpan = loading.querySelector("span");
@@ -941,6 +942,7 @@ const streamChunkHandlers = {
             ctx.aiBubbleDiv = document.getElementById(ctx.currentBubbleId);
             ctx.isFirstChunk = false;
             SideTracker.track(chatBox.lastElementChild);
+            chatBox.scrollTop = chatBox.scrollHeight;
 
         }
     },
