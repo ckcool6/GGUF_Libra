@@ -13,6 +13,16 @@ import "highlight.js/styles/atom-one-light.min.css";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import {
+    initWebSearch,
+    isWebSearchActive,
+    performWebSearch,
+    clearSearchSources,
+    getSearchSources,
+    linkifyCitations,
+    loadSearchSettings,
+    saveSearchSettings,
+} from "./search.js";
 
 
 //=====================================icons===================================================
@@ -74,31 +84,6 @@ const WARNING_ICON_HTML = `
 </svg>`;
 
 // ==================================== UTILITY FUNCTIONS =====================================
-/**
- * 将 HTML 中的 [1], [2] 转换为可点击、带 Tooltip 提示的超链接角标卡片
- * @param {string} html 解析后的 HTML 字符串
- * @param {Array} sources 搜索来源数组
- * @returns {string} 替换后的 HTML
- */
-function linkifyCitations(html, sources) {
-    if (!sources || sources.length === 0) return html;
-
-    // 匹配类似 [1], [2] 的数字角标
-    return html.replace(/\[(\d+)\]/g, (match, p1) => {
-        const index = parseInt(p1, 10) - 1;
-        const source = sources[index];
-
-        // 如果找到了对应的来源且有 URL，替换成漂亮的超链接徽章
-        if (source && source.url) {
-            const safeTitle = (source.title || "Reference source").replace(/"/g, '&quot;');
-            return `<a href="${source.url}" target="_blank" rel="noopener noreferrer" 
-                class="citation-badge inline-flex items-center justify-center text-[10px] font-mono font-semibold text-emerald-700 dark:text-[#879A39] bg-emerald-100/70 dark:bg-[#879A39]/15 border border-emerald-300/80 dark:border-[#879A39]/30 rounded px-1.5 py-0.2 mx-0.5 align-super hover:underline hover:scale-105 active:scale-95 transition-all shadow-2xs select-none" 
-                title="${safeTitle}">[${p1}]</a>`;
-        }
-        return match;
-    });
-}
-
 // Escape user plain text and handle line breaks
 function formatUserText(str) {
     // Create a temporary div to escape text using the browser's textContent property
@@ -524,7 +509,7 @@ window.onload = async () => {
     await initPromptSelect();
 
     const savedTheme = localStorage.getItem("theme");
-    updateWebSearchBtnUI();
+    initWebSearch();
 
 
     if (
@@ -736,7 +721,7 @@ if (input) {
 }
 
 async function send() {
-    currentSearchSources = [];
+    clearSearchSources();
 
     if (sendBtn.classList.contains("is-loading")) {
         if (chatAbortController) {
@@ -788,23 +773,16 @@ async function send() {
     let webSearchContext = "";
     const loadingTextSpan = loading.querySelector("span");
 
-    if (isWebSearchEnabled && text) {
+    if (isWebSearchActive() && text) {
         try {
             if (loadingTextSpan) {
                 loadingTextSpan.innerText = "Searching the web...";
             }
-
-            const searchKey = localStorage.getItem("custom_search_key") || "";
-            // trigger search web
-            const searchResults = await realWebSearch(text, searchKey);
-            currentSearchSources = searchResults;
-            webSearchContext = formatSearchContextForLLM(searchResults);
-
+            webSearchContext = await performWebSearch(text);
         } catch (searchErr) {
             console.error("Web search failed:", searchErr);
             alert("Web Search Error: " + searchErr.message);
         } finally {
-            // 搜索完成，无缝切回普通的模型推理提示
             if (loadingTextSpan) {
                 loadingTextSpan.innerText = "Thinking...";
             }
@@ -1077,8 +1055,9 @@ function finalizeAiBubble(ctx) {
 
     // Final complete safe Markdown parsing for the last frame
     let renderedHtml = safeMarkdownParse(ctx.fullText);
-    if (currentSearchSources && currentSearchSources.length > 0) {
-        renderedHtml = linkifyCitations(renderedHtml, currentSearchSources);
+    const sources = getSearchSources();
+    if (sources && sources.length > 0) {
+        renderedHtml = linkifyCitations(renderedHtml, sources);
     }
     ctx.aiBubbleDiv.innerHTML = renderedHtml;
 
@@ -2122,11 +2101,8 @@ function refreshAvatarPreviews() {
 
 document.getElementById("settings-btn").addEventListener("click", () => {
 
-    fetchUserCredits(localStorage.getItem("custom_search_key") || "");
+    loadSearchSettings();
 
-    if (customSearchKeyInput) {
-        customSearchKeyInput.value = localStorage.getItem("custom_search_key") || "";
-    }
     customUrlInput.value = localStorage.getItem("custom_api_url") || "";
     if (customEmbeddingUrlInput) {
         customEmbeddingUrlInput.value = localStorage.getItem("custom_embedding_url") || "";
@@ -2152,9 +2128,9 @@ resetUserBtn.onclick = () => {
 };
 
 document.getElementById("save-settings").addEventListener("click", () => {
-    if (customSearchKeyInput) {
-        localStorage.setItem("custom_search_key", customSearchKeyInput.value.trim());
-    }
+
+    saveSearchSettings();
+
     localStorage.setItem("custom_api_url", customUrlInput.value.trim());
     if (customEmbeddingUrlInput) {
         localStorage.setItem("custom_embedding_url", customEmbeddingUrlInput.value.trim());
@@ -2874,150 +2850,6 @@ if (imageViewerModal && imageViewerImg) {
     });
 }
 
-// ==================== WEB SEARCH STATE ====================
-let currentSearchSources = []; // Cache search sources retrieved for the current dialogue round [{title, url, snippet}, ...]
-let isWebSearchEnabled = localStorage.getItem("enable_web_search") === "true";
-const webSearchBtn = document.getElementById("web-search-btn");
-const customSearchKeyInput = document.getElementById("custom-search-key");
-
-const SEARCH_GATEWAY_URL = "http://192.168.190.128:8000"; // vm test
-
-const creditsBadge = document.getElementById("credits-badge");
-const creditsCount = document.getElementById("credits-count");
-
-async function fetchUserCredits(searchKey) {
-    if (!searchKey || !creditsBadge || !creditsCount) {
-        creditsBadge?.classList.add("hidden");
-        return;
-    }
-
-    try {
-        const res = await fetch(`${SEARCH_GATEWAY_URL}/v1/user/credits`, {
-            headers: { "Authorization": `Bearer ${searchKey}` }
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            creditsCount.innerText = data.credits;
-            creditsBadge.classList.remove("hidden");
-        } else {
-            creditsBadge.classList.add("hidden");
-        }
-    } catch (e) {
-        console.warn("Failed to check credits:", e);
-        creditsBadge?.classList.add("hidden");
-    }
-}
-
-if (customSearchKeyInput) {
-    customSearchKeyInput.addEventListener("blur", () => {
-        fetchUserCredits(customSearchKeyInput.value.trim());
-    });
-}
-
-function updateWebSearchBtnUI() {
-    if (!webSearchBtn) return;
-    if (isWebSearchEnabled) {
-        webSearchBtn.classList.add(
-            "text-emerald-600", "dark:text-[#879A39]",
-            "bg-emerald-50", "dark:bg-[#879A39]/15"
-        );
-        webSearchBtn.classList.remove("text-gray-400", "dark:text-[#878580]");
-        webSearchBtn.title = "Web Search: ON (Pro)";
-        webSearchBtn.querySelector("svg").classList.add("scale-110");
-    } else {
-        webSearchBtn.classList.remove(
-            "text-emerald-600", "dark:text-[#879A39]",
-            "bg-emerald-50", "dark:bg-[#879A39]/15"
-        );
-        webSearchBtn.classList.add("text-gray-400", "dark:text-[#878580]");
-        webSearchBtn.title = "Web Search: OFF";
-        webSearchBtn.querySelector("svg").classList.remove("scale-110");
-    }
-}
-
-if (webSearchBtn) {
-    webSearchBtn.addEventListener("click", () => {
-        isWebSearchEnabled = !isWebSearchEnabled;
-        localStorage.setItem("enable_web_search", isWebSearchEnabled);
-        updateWebSearchBtnUI();
-    });
-}
-
-
-// ==================== REAL WEB SEARCH SERVICE ====================
-/**
- * Call the remote search gateway service (SLM query rewriting + Tavily + credit deduction)
- */
-async function realWebSearch(query, searchKey) {
-    if (!searchKey) {
-        throw new Error("Please configure your Pro Web Search Key in Settings first.");
-    }
-
-    const res = await fetch(`${SEARCH_GATEWAY_URL}/v1/search`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${searchKey}`
-        },
-        body: JSON.stringify({ query: query })
-    });
-
-    if (res.status === 401) {
-        throw new Error("Pro Search Key is invalid or expired. Please check settings.");
-    }
-    if (res.status === 402) {
-        throw new Error("Credits exhausted! Please top up your account.");
-    }
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Search gateway error (${res.status})`);
-    }
-
-    const data = await res.json();
-
-    // Dynamically sync updated remaining credits to the settings badge
-    if (creditsCount && data.remaining_credits !== undefined) {
-        creditsCount.innerText = data.remaining_credits;
-    }
-
-    return data.sources; // Return standard array: [{title, url, snippet}, ...]
-}
-
-
-/**
- * Format structured search results into an injection prompt for the LLM
- * @param {Array} results Array of search result objects
- * @returns {string} Formatted prompt string
- */
-function formatSearchContextForLLM(results) {
-    if (!results || results.length === 0) return "";
-
-    const today = new Date().toISOString().slice(0, 10);
-    let contextStr = `\n\n[Web Search Results | Reference Date: ${today}]\n`;
-
-    results.forEach((item, index) => {
-        contextStr += `Source [${index + 1}]:\n`;
-        contextStr += `Title: ${item.title}\n`;
-        contextStr += `URL: ${item.url}\n`;
-        contextStr += `Content: ${item.snippet}\n\n`;
-    });
-
-    contextStr += `Instructions: You have access to real-time search results above. Answer the user prompt accurately based on these sources if relevant. Cite sources using bracket notation like [1], [2].\n`;
-
-    return contextStr;
-}
-
-// Expose to window for easy debugging and unit testing in the console
-window.testSearchPipeline = async (keyword = "quantum computing") => {
-    console.log("--- Starting Search Pipeline Test ---");
-    const key = localStorage.getItem("custom_search_key") || "";
-    const rawData = await realWebSearch(keyword, key);
-    console.log("1. Raw search API response object:", rawData);
-    const finalPrompt = formatSearchContextForLLM(rawData);
-    console.log("2. Final injected text for LLM:\n" + finalPrompt);
-    console.log("--- Test completed ---");
-};
 
 // ==================== REALTIME SERVER LOGS ====================
 let logTerm = null;
