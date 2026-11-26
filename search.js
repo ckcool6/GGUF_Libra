@@ -14,6 +14,25 @@ let creditsBadge = null;
 let creditsCount = null;
 
 /**
+ * 工具函数：生成本地时间字符串 YYYY-MM-DD HH:mm:ss（彻底避免 UTC 时区慢一天的问题）
+ */
+function getLocalDateTimeString(date = new Date()) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/**
+ * 工具函数：将新闻发布时间（如 ISO 或 RFC 格式）转换为可读的本地时间 YYYY-MM-DD HH:mm
+ */
+function formatPublishedDate(rawDate) {
+    if (!rawDate) return "";
+    const parsed = new Date(rawDate);
+    if (isNaN(parsed.getTime())) return rawDate; // 如果后端返回非标准格式，直接原样保留
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+/**
  * 初始化联网搜索相关的按钮与事件绑定
  */
 export function initWebSearch() {
@@ -130,6 +149,7 @@ export async function fetchUserCredits(searchKey) {
 
 /**
  * 调用远程搜索网关（小模型提词 + Tavily + 扣点）
+ * 返回 { sources, searchedAt }
  */
 export async function realWebSearch(query, searchKey) {
     if (!searchKey) {
@@ -163,21 +183,32 @@ export async function realWebSearch(query, searchKey) {
         creditsCount.innerText = data.remaining_credits;
     }
 
-    return data.sources;
+    return {
+        sources: data.sources || [],
+        searchedAt: data.searched_at || ""
+    };
 }
 
 /**
  * 将搜索结果格式化为注入大模型的 Prompt 上下文
  */
-export function formatSearchContextForLLM(results) {
+export function formatSearchContextForLLM(results, searchedAt = "") {
     if (!results || results.length === 0) return "";
 
-    const today = new Date().toISOString().slice(0, 10);
-    let contextStr = `\n\n[Web Search Results | Reference Date: ${today}]\n`;
+    // 优先用后端返回的 searched_at，如果没有则用浏览器本地时间（非 UTC）
+    let referenceTime = getLocalDateTimeString();
+    if (searchedAt) {
+        const parsed = new Date(searchedAt);
+        referenceTime = isNaN(parsed.getTime()) ? searchedAt : getLocalDateTimeString(parsed);
+    }
+    let contextStr = `\n\n[Web Search Results | Current Time: ${referenceTime}]\n`;
 
     results.forEach((item, index) => {
         contextStr += `Source [${index + 1}]:\n`;
         contextStr += `Title: ${item.title}\n`;
+        if (item.published_date) {
+            contextStr += `Published Date: ${formatPublishedDate(item.published_date)}\n`;
+        }
         contextStr += `URL: ${item.url}\n`;
         contextStr += `Content: ${item.snippet}\n\n`;
     });
@@ -192,13 +223,13 @@ export function formatSearchContextForLLM(results) {
  */
 export async function performWebSearch(query) {
     const searchKey = localStorage.getItem("custom_search_key") || "";
-    const searchResults = await realWebSearch(query, searchKey);
-    currentSearchSources = searchResults;
-    return formatSearchContextForLLM(searchResults);
+    const { sources, searchedAt } = await realWebSearch(query, searchKey);
+    currentSearchSources = sources;
+    return formatSearchContextForLLM(sources, searchedAt);
 }
 
 /**
- * 将 HTML 中的 [1], [2] 转换为可点击、带 Tooltip 提示的超链接角标卡片
+ * 将 HTML 中的 [1], [1, 2] 转换为可点击、带发布日期 Tooltip 的超链接角标卡片
  */
 export function linkifyCitations(html, sources = currentSearchSources) {
     if (!sources || sources.length === 0) return html;
@@ -214,7 +245,12 @@ export function linkifyCitations(html, sources = currentSearchSources) {
 
             if (source && source.url) {
                 hasValidLink = true;
-                const safeTitle = (source.title || "Reference source").replace(/"/g, '&quot;');
+                let tooltipText = source.title || "Reference source";
+                if (source.published_date) {
+                    tooltipText += ` (${formatPublishedDate(source.published_date)})`;
+                }
+                const safeTitle = tooltipText.replace(/"/g, '&quot;');
+
                 return `<a href="${source.url}" target="_blank" rel="noopener noreferrer" 
                     class="citation-badge inline-flex items-center justify-center text-[10px] font-mono font-semibold text-emerald-700 dark:text-[#879A39] bg-emerald-100/70 dark:bg-[#879A39]/15 border border-emerald-300/80 dark:border-[#879A39]/30 rounded px-1.5 py-0.2 mx-0.5 align-super hover:underline hover:scale-105 active:scale-95 transition-all shadow-2xs select-none" 
                     title="${safeTitle}">[${numStr}]</a>`;
@@ -230,9 +266,9 @@ export function linkifyCitations(html, sources = currentSearchSources) {
 window.testSearchPipeline = async (keyword = "quantum computing") => {
     console.log("--- Starting Search Pipeline Test ---");
     const key = localStorage.getItem("custom_search_key") || "";
-    const rawData = await realWebSearch(keyword, key);
-    console.log("1. Raw search API response object:", rawData);
-    const finalPrompt = formatSearchContextForLLM(rawData);
+    const { sources, searchedAt } = await realWebSearch(keyword, key);
+    console.log("1. Raw search API response:", { sources, searchedAt });
+    const finalPrompt = formatSearchContextForLLM(sources, searchedAt);
     console.log("2. Final injected text for LLM:\n" + finalPrompt);
     console.log("--- Test completed ---");
 };
