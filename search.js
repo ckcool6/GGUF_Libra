@@ -151,13 +151,14 @@ export async function fetchUserCredits(searchKey) {
  * 调用远程搜索网关（小模型提词 + Tavily + 扣点）
  * 返回 { sources, searchedAt }
  */
-export async function realWebSearch(query, searchKey) {
+export async function realWebSearch(query, searchKey, signal = undefined) {
     if (!searchKey) {
         throw new Error("Please configure your Pro Web Search Key in Settings first.");
     }
 
     const res = await fetch(`${SEARCH_GATEWAY_URL}/v1/search`, {
         method: "POST",
+        signal,
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${searchKey}`
@@ -221,9 +222,9 @@ export function formatSearchContextForLLM(results, searchedAt = "") {
 /**
  * 一站式执行搜索：查 Key -> 请求网关 -> 缓存来源 -> 返回拼接好的上下文
  */
-export async function performWebSearch(query) {
+export async function performWebSearch(query, signal = undefined) {
     const searchKey = localStorage.getItem("custom_search_key") || "";
-    const { sources, searchedAt } = await realWebSearch(query, searchKey);
+    const { sources, searchedAt } = await realWebSearch(query, searchKey, signal);
     currentSearchSources = sources;
     return formatSearchContextForLLM(sources, searchedAt);
 }

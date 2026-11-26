@@ -344,10 +344,14 @@ function updateBranchIndicator(text) {
 function showModalDialog(message, isAlert = false) {
     return new Promise((resolve) => {
         const modal = document.getElementById("confirm-modal");
+        const titleEl = document.getElementById("confirm-modal-title");
         const msgEl = document.getElementById("confirm-modal-msg");
         const okBtn = document.getElementById("confirm-modal-ok");
         const cancelBtn = document.getElementById("confirm-modal-cancel");
 
+        if (titleEl) {
+            titleEl.innerText = isAlert ? "Notice" : "Confirmation";
+        }
         msgEl.innerText = message;
 
         // If alert mode: hide the Cancel button; otherwise show it
@@ -362,6 +366,7 @@ function showModalDialog(message, isAlert = false) {
         }
 
         modal.classList.remove("hidden");
+        setTimeout(() => okBtn?.focus(), 50);
 
         const close = (result) => {
             modal.classList.add("hidden");
@@ -764,30 +769,12 @@ async function send() {
     userBubbleHtml += `</div></div>`;
 
     chatBox.insertAdjacentHTML("beforeend", userBubbleHtml);
-    SideTracker.track(chatBox.lastElementChild);
+    const userBubbleRow = chatBox.lastElementChild;
+    SideTracker.track(userBubbleRow);
 
     loading.classList.remove("hidden");
 
     chatBox.scrollTop = chatBox.scrollHeight;
-    // ==================== 🌐 联网搜索执行拦截 ====================
-    let webSearchContext = "";
-    const loadingTextSpan = loading.querySelector("span");
-
-    if (isWebSearchActive() && text) {
-        try {
-            if (loadingTextSpan) {
-                loadingTextSpan.innerText = "Searching the web...";
-            }
-            webSearchContext = await performWebSearch(text);
-        } catch (searchErr) {
-            console.error("Web search failed:", searchErr);
-            alert("Web Search Error: " + searchErr.message);
-        } finally {
-            if (loadingTextSpan) {
-                loadingTextSpan.innerText = "Thinking...";
-            }
-        }
-    }
 
     // Scroll handling
     const lastMessageImg = chatBox.querySelector(".message-row:last-child img");
@@ -803,6 +790,56 @@ async function send() {
     }
 
     chatAbortController = new AbortController();
+
+    // ==================== 🌐 联网搜索执行拦截 ====================
+    let webSearchContext = "";
+    const loadingTextSpan = loading.querySelector("span");
+
+    if (isWebSearchActive() && text) {
+        try {
+            if (loadingTextSpan) {
+                loadingTextSpan.innerText = "Searching the web...";
+            }
+            webSearchContext = await performWebSearch(text, chatAbortController.signal);
+        } catch (searchErr) {
+            // 搜索失败（401/402/取消）：撤回刚上屏的用户气泡，并把字和图片退回输入框
+            if (userBubbleRow) {
+                userBubbleRow.remove();
+                const idx = SideTracker.bubbles.indexOf(userBubbleRow);
+                if (idx > -1) SideTracker.bubbles.splice(idx, 1);
+            }
+
+            input.value = text;
+            input.dispatchEvent(new Event("input")); // 自动恢复多行输入框高度
+            if (imageToSend) {
+                currentImageBase64 = imageToSend;
+                imagePreview.src = imageToSend;
+                imagePreviewWrapper.classList.remove("hidden");
+            }
+
+            loading.classList.add("hidden");
+            if (loadingTextSpan) {
+                loadingTextSpan.innerText = "Thinking...";
+            }
+            sendBtn.classList.remove("is-loading");
+            sendBtn.innerHTML = SEND_ICON_HTML;
+            chatAbortController = null;
+            if (openParserBtn) {
+                openParserBtn.classList.remove("opacity-40", "pointer-events-none", "cursor-not-allowed");
+            }
+
+            if (searchErr.name !== "AbortError") {
+                console.error("Web search failed:", searchErr);
+                alert("Web Search Error: " + searchErr.message);
+            }
+            return;
+        } finally {
+            // 搜索完成，无缝切回普通的模型推理提示
+            if (loadingTextSpan) {
+                loadingTextSpan.innerText = "Thinking...";
+            }
+        }
+    }
 
     try {
         const response = await fetch("/api/chat", {
