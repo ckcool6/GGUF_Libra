@@ -174,7 +174,10 @@ export async function realWebSearch(query, searchKey, signal = undefined) {
     }
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Search gateway error (${res.status})`);
+        const detailMsg = Array.isArray(err.detail)
+            ? err.detail.map(e => e.msg || JSON.stringify(e)).join("; ")
+            : err.detail;
+        throw new Error(detailMsg || `Search gateway error (${res.status})`);
     }
 
     const data = await res.json();
@@ -224,7 +227,8 @@ export function formatSearchContextForLLM(results, searchedAt = "") {
  */
 export async function performWebSearch(query, signal = undefined) {
     const searchKey = localStorage.getItem("custom_search_key") || "";
-    const { sources, searchedAt } = await realWebSearch(query, searchKey, signal);
+    const truncatedQuery = query.trim().slice(0, 500);
+    const { sources, searchedAt } = await realWebSearch(truncatedQuery, searchKey, signal);
     currentSearchSources = sources;
     return formatSearchContextForLLM(sources, searchedAt);
 }
