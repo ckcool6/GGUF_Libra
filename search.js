@@ -231,36 +231,108 @@ export async function performWebSearch(query, signal = undefined) {
 
 /**
  * 将 HTML 中的 [1], [1, 2] 转换为可点击、带发布日期 Tooltip 的超链接角标卡片
+ * （基于 DOM TreeWalker 安全替换，跳过代码块、已有链接及 KaTeX 公式）
  */
 export function linkifyCitations(html, sources = currentSearchSources) {
     if (!sources || sources.length === 0) return html;
 
-    // 匹配 [1] 以及 [1, 2]、[1,2,3]、[1、2] 等组合格式
-    return html.replace(/\[(\d+(?:\s*[,，、]\s*\d+)*)\]/g, (match, group) => {
-        const nums = group.split(/\s*[,，、]\s*/);
-        let hasValidLink = false;
+    // 1. 解析为内存中的 DOM 树（传入的 html 已经过 safeMarkdownParse 的 DOMPurify 清洗）
+    const container = document.createElement("div");
+    container.innerHTML = html;
 
-        const badges = nums.map((numStr) => {
-            const index = parseInt(numStr, 10) - 1;
-            const source = sources[index];
+    // 2. 只遍历纯文本节点，跳过 pre / code / a / script / style / .katex
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
 
-            if (source && source.url) {
-                hasValidLink = true;
-                let tooltipText = source.title || "Reference source";
-                if (source.published_date) {
-                    tooltipText += ` (${formatPublishedDate(source.published_date)})`;
-                }
-                const safeTitle = tooltipText.replace(/"/g, '&quot;');
-
-                return `<a href="${source.url}" target="_blank" rel="noopener noreferrer" 
-                    class="citation-badge inline-flex items-center justify-center text-[10px] font-mono font-semibold text-emerald-700 dark:text-[#879A39] bg-emerald-100/70 dark:bg-[#879A39]/15 border border-emerald-300/80 dark:border-[#879A39]/30 rounded px-1.5 py-0.2 mx-0.5 align-super hover:underline hover:scale-105 active:scale-95 transition-all shadow-2xs select-none" 
-                    title="${safeTitle}">[${numStr}]</a>`;
+            if (parent.closest("pre, code, a, script, style, .katex")) {
+                return NodeFilter.FILTER_REJECT;
             }
-            return `[${numStr}]`;
-        });
 
-        return hasValidLink ? badges.join("") : match;
+            return /\[\d+(?:\s*[,，、]\s*\d+)*\]/.test(node.nodeValue)
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+        }
     });
+
+    // 先收集所有待替换的文本节点，避免边遍历边修改 DOM 导致游标错乱
+    const textNodes = [];
+    let currentNode;
+    while ((currentNode = walker.nextNode())) {
+        textNodes.push(currentNode);
+    }
+
+    // 3. 逐个文本节点做安全替换
+    textNodes.forEach((textNode) => {
+        const text = textNode.nodeValue;
+        const regex = /\[(\d+(?:\s*[,，、]\s*\d+)*)\]/g;
+        const frag = document.createDocumentFragment();
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+            // 保留匹配前的普通文本
+            if (match.index > lastIndex) {
+                frag.appendChild(
+                    document.createTextNode(text.slice(lastIndex, match.index))
+                );
+            }
+
+            const nums = match[1].split(/\s*[,，、]\s*/);
+            const tempFrag = document.createDocumentFragment();
+            let hasValidLink = false;
+
+            nums.forEach((numStr) => {
+                const index = parseInt(numStr, 10) - 1;
+                const source = sources[index];
+                const rawUrl = (source?.url || "").trim();
+
+                // 严格校验协议：只放行 http:// 或 https://，彻底拦截 javascript: 等伪协议
+                if (source && /^https?:\/\//i.test(rawUrl)) {
+                    hasValidLink = true;
+
+                    const a = document.createElement("a");
+                    a.href = rawUrl;
+                    a.target = "_blank";
+                    a.rel = "noopener noreferrer";
+                    a.className =
+                        "citation-badge inline-flex items-center justify-center text-[10px] font-mono font-semibold text-emerald-700 dark:text-[#879A39] bg-emerald-100/70 dark:bg-[#879A39]/15 border border-emerald-300/80 dark:border-[#879A39]/30 rounded px-1.5 py-0.2 mx-0.5 align-super hover:underline hover:scale-105 active:scale-95 transition-all shadow-2xs select-none";
+
+                    let tooltipText = source.title || "Reference source";
+                    if (source.published_date) {
+                        tooltipText += ` (${formatPublishedDate(source.published_date)})`;
+                    }
+
+                    // 使用 DOM 属性赋值，浏览器会自动转义特殊字符，无需手动处理引号/XSS
+                    a.title = tooltipText;
+                    a.textContent = `[${numStr}]`;
+
+                    tempFrag.appendChild(a);
+                } else {
+                    tempFrag.appendChild(document.createTextNode(`[${numStr}]`));
+                }
+            });
+
+            if (hasValidLink) {
+                frag.appendChild(tempFrag);
+            } else {
+                // 如果序号都不在 sources 范围内（比如 [2026]），原样保留
+                frag.appendChild(document.createTextNode(match[0]));
+            }
+
+            lastIndex = regex.lastIndex;
+        }
+
+        // 保留剩余文本
+        if (lastIndex < text.length) {
+            frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+
+        textNode.parentNode.replaceChild(frag, textNode);
+    });
+
+    return container.innerHTML;
 }
 
 // 保留控制台调试方法
