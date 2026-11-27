@@ -1,20 +1,21 @@
 /**
- * search.js - 独立联网搜索模块
+ * search.js - Standalone Web Search Module
  */
 
-const SEARCH_GATEWAY_URL = "http://192.168.190.128:8000"; // vm test
+const SEARCH_GATEWAY_URL = "http://192.168.190.128:8000"; // VM test gateway endpoint
 
 let currentSearchSources = [];
 let isWebSearchEnabled = localStorage.getItem("enable_web_search") === "true";
 
-// DOM 引用（延迟在 init 时获取，防止脚本加载时机问题）
+// DOM references (lazily resolved during init to prevent script execution timing issues)
 let webSearchBtn = null;
 let customSearchKeyInput = null;
 let creditsBadge = null;
 let creditsCount = null;
 
 /**
- * 工具函数：生成本地时间字符串 YYYY-MM-DD HH:mm:ss（彻底避免 UTC 时区慢一天的问题）
+ * Utility: Generate local time string formatted as YYYY-MM-DD HH:mm:ss
+ * (Prevents UTC timezone day-offset discrepancies)
  */
 function getLocalDateTimeString(date = new Date()) {
     const pad = (n) => String(n).padStart(2, "0");
@@ -22,18 +23,18 @@ function getLocalDateTimeString(date = new Date()) {
 }
 
 /**
- * 工具函数：将新闻发布时间（如 ISO 或 RFC 格式）转换为可读的本地时间 YYYY-MM-DD HH:mm
+ * Utility: Format news publication date (ISO/RFC) into readable local time YYYY-MM-DD HH:mm
  */
 function formatPublishedDate(rawDate) {
     if (!rawDate) return "";
     const parsed = new Date(rawDate);
-    if (isNaN(parsed.getTime())) return rawDate; // 如果后端返回非标准格式，直接原样保留
+    if (isNaN(parsed.getTime())) return rawDate; // Fallback to raw string if non-standard format
     const pad = (n) => String(n).padStart(2, "0");
     return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
 /**
- * 初始化联网搜索相关的按钮与事件绑定
+ * Initialize web search elements and bind user interaction events
  */
 export function initWebSearch() {
     webSearchBtn = document.getElementById("web-search-btn");
@@ -59,14 +60,14 @@ export function initWebSearch() {
 }
 
 /**
- * 当前是否开启了联网搜索
+ * Check if web search toggle is currently active
  */
 export function isWebSearchActive() {
     return isWebSearchEnabled;
 }
 
 /**
- * 清空 / 获取本轮搜索来源
+ * Clear or retrieve current search sources
  */
 export function clearSearchSources() {
     currentSearchSources = [];
@@ -77,7 +78,7 @@ export function getSearchSources() {
 }
 
 /**
- * 更新输入框旁边的地球图标状态
+ * Update the web search icon UI state next to the input area
  */
 function updateWebSearchBtnUI() {
     if (!webSearchBtn) return;
@@ -101,7 +102,7 @@ function updateWebSearchBtnUI() {
 }
 
 /**
- * 设置页：打开设置弹窗时回填 Key 并查询余额
+ * Settings modal: populate Key and refresh credit balance upon opening
  */
 export function loadSearchSettings() {
     const savedKey = localStorage.getItem("custom_search_key") || "";
@@ -112,7 +113,7 @@ export function loadSearchSettings() {
 }
 
 /**
- * 设置页：点击保存时写入 Key
+ * Settings modal: persist Key to storage upon saving
  */
 export function saveSearchSettings() {
     if (customSearchKeyInput) {
@@ -121,7 +122,7 @@ export function saveSearchSettings() {
 }
 
 /**
- * 查询 Pro Key 剩余积分
+ * Fetch and update remaining credits for the Pro Search Key
  */
 export async function fetchUserCredits(searchKey) {
     if (!searchKey || !creditsBadge || !creditsCount) {
@@ -148,8 +149,8 @@ export async function fetchUserCredits(searchKey) {
 }
 
 /**
- * 调用远程搜索网关（小模型提词 + Tavily + 扣点）
- * 返回 { sources, searchedAt }
+ * Call remote search gateway (small model query optimization + Tavily + credit deduction)
+ * Returns { sources, searchedAt }
  */
 export async function realWebSearch(query, searchKey, signal = undefined) {
     if (!searchKey) {
@@ -182,7 +183,7 @@ export async function realWebSearch(query, searchKey, signal = undefined) {
 
     const data = await res.json();
 
-    // 同步更新设置页的余额徽章
+    // Synchronize balance badge in the settings view
     if (creditsCount && data.remaining_credits !== undefined) {
         creditsCount.innerText = data.remaining_credits;
     }
@@ -194,12 +195,12 @@ export async function realWebSearch(query, searchKey, signal = undefined) {
 }
 
 /**
- * 将搜索结果格式化为注入大模型的 Prompt 上下文
+ * Format search results into a structured prompt context for LLM ingestion
  */
 export function formatSearchContextForLLM(results, searchedAt = "") {
     if (!results || results.length === 0) return "";
 
-    // 优先用后端返回的 searched_at，如果没有则用浏览器本地时间（非 UTC）
+    // Prefer searched_at from gateway; fallback to local browser time (non-UTC)
     let referenceTime = getLocalDateTimeString();
     if (searchedAt) {
         const parsed = new Date(searchedAt);
@@ -223,7 +224,7 @@ export function formatSearchContextForLLM(results, searchedAt = "") {
 }
 
 /**
- * 一站式执行搜索：查 Key -> 请求网关 -> 缓存来源 -> 返回拼接好的上下文
+ * End-to-end search pipeline: resolve Key -> query gateway -> cache sources -> return formatted context
  */
 export async function performWebSearch(query, signal = undefined) {
     const searchKey = localStorage.getItem("custom_search_key") || "";
@@ -234,17 +235,17 @@ export async function performWebSearch(query, signal = undefined) {
 }
 
 /**
- * 将 HTML 中的 [1], [1, 2] 转换为可点击、带发布日期 Tooltip 的超链接角标卡片
- * （基于 DOM TreeWalker 安全替换，跳过代码块、已有链接及 KaTeX 公式）
+ * Convert [1], [1, 2] in HTML into clickable citation badge cards with publication date tooltips
+ * (Built on DOM TreeWalker for safe replacement, bypassing code blocks, links, and KaTeX formulas)
  */
 export function linkifyCitations(html, sources = currentSearchSources) {
     if (!sources || sources.length === 0) return html;
 
-    // 1. 解析为内存中的 DOM 树（传入的 html 已经过 safeMarkdownParse 的 DOMPurify 清洗）
+    // 1. Parse into in-memory DOM (input HTML is pre-sanitized by DOMPurify in safeMarkdownParse)
     const container = document.createElement("div");
     container.innerHTML = html;
 
-    // 2. 只遍历纯文本节点，跳过 pre / code / a / script / style / .katex
+    // 2. Filter text nodes only, strictly rejecting pre / code / a / script / style / .katex
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
             const parent = node.parentElement;
@@ -260,14 +261,14 @@ export function linkifyCitations(html, sources = currentSearchSources) {
         }
     });
 
-    // 先收集所有待替换的文本节点，避免边遍历边修改 DOM 导致游标错乱
+    // Collect candidate text nodes first to prevent cursor invalidation during active mutation
     const textNodes = [];
     let currentNode;
     while ((currentNode = walker.nextNode())) {
         textNodes.push(currentNode);
     }
 
-    // 3. 逐个文本节点做安全替换
+    // 3. Perform safe replacements per text node
     textNodes.forEach((textNode) => {
         const text = textNode.nodeValue;
         const regex = /\[(\d+(?:\s*[,，、]\s*\d+)*)\]/g;
@@ -276,7 +277,7 @@ export function linkifyCitations(html, sources = currentSearchSources) {
         let match;
 
         while ((match = regex.exec(text)) !== null) {
-            // 保留匹配前的普通文本
+            // Append plain text prior to current match
             if (match.index > lastIndex) {
                 frag.appendChild(
                     document.createTextNode(text.slice(lastIndex, match.index))
@@ -292,7 +293,7 @@ export function linkifyCitations(html, sources = currentSearchSources) {
                 const source = sources[index];
                 const rawUrl = (source?.url || "").trim();
 
-                // 严格校验协议：只放行 http:// 或 https://，彻底拦截 javascript: 等伪协议
+                // Strict protocol validation: allow only http:// or https:// to block javascript: pseudo-protocols
                 if (source && /^https?:\/\//i.test(rawUrl)) {
                     hasValidLink = true;
 
@@ -308,7 +309,7 @@ export function linkifyCitations(html, sources = currentSearchSources) {
                         tooltipText += ` (${formatPublishedDate(source.published_date)})`;
                     }
 
-                    // 使用 DOM 属性赋值，浏览器会自动转义特殊字符，无需手动处理引号/XSS
+                    // Native DOM assignment auto-escapes special characters to eliminate quotation/XSS issues
                     a.title = tooltipText;
                     a.textContent = `[${numStr}]`;
 
@@ -321,14 +322,14 @@ export function linkifyCitations(html, sources = currentSearchSources) {
             if (hasValidLink) {
                 frag.appendChild(tempFrag);
             } else {
-                // 如果序号都不在 sources 范围内（比如 [2026]），原样保留
+                // Keep original match if indices do not exist within sources (e.g., [2026])
                 frag.appendChild(document.createTextNode(match[0]));
             }
 
             lastIndex = regex.lastIndex;
         }
 
-        // 保留剩余文本
+        // Append trailing plain text
         if (lastIndex < text.length) {
             frag.appendChild(document.createTextNode(text.slice(lastIndex)));
         }
@@ -339,7 +340,7 @@ export function linkifyCitations(html, sources = currentSearchSources) {
     return container.innerHTML;
 }
 
-// 保留控制台调试方法
+// Global console test helper
 window.testSearchPipeline = async (keyword = "quantum computing") => {
     console.log("--- Starting Search Pipeline Test ---");
     const key = localStorage.getItem("custom_search_key") || "";
